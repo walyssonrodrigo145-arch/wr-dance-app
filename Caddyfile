@@ -1,5 +1,5 @@
 dancepro.wrmusicpro.com.br {
-    reverse_proxy app:3000
+    reverse_proxy dance-app:5000
 }
 
 escola.wrmusicpro.com.br {
