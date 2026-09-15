@@ -262,17 +262,7 @@ const SignupModal = ({ plan, onClose }: { plan: string; onClose: () => void }) =
           ) : (
             <>
               <div className="flex items-center gap-3 mb-1">
-                <div className="relative w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 p-[1px] shadow-md overflow-hidden">
-                  <div className="w-full h-full bg-gradient-to-b from-blue-500 to-indigo-700 rounded-lg flex items-center justify-center relative z-10">
-                    <div className="flex items-center gap-[2px] h-3">
-                      <div className="w-[3px] bg-white/90 rounded-full h-1.5" />
-                      <div className="w-[3px] bg-white/90 rounded-full h-3" />
-                      <div className="w-[3px] bg-white rounded-full h-full shadow-[0_0_5px_rgba(255,255,255,0.8)]" />
-                      <div className="w-[3px] bg-white/90 rounded-full h-2" />
-                    </div>
-                  </div>
-                </div>
-                <span className="font-bold text-sm opacity-90">DancePro</span>
+                <DanceProLogo size="sm" textClassName="text-white" />
               </div>
               <h2 className="text-xl font-black mb-1">
                 Cadastro
@@ -789,18 +779,8 @@ const LandingPage = () => {
         }`}
       >
         <div className="container flex items-center justify-between">
-          <div className="flex items-center gap-2 group cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-            <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 p-[1px] shadow-lg shadow-primary/30 group-hover:scale-105 transition-transform duration-300 overflow-hidden">
-              <div className="w-full h-full bg-gradient-to-b from-blue-500 to-indigo-700 rounded-xl flex items-center justify-center relative z-10">
-                <div className="flex items-center gap-[3px] h-4">
-                  <div className="w-1 bg-white/90 rounded-full h-2" />
-                  <div className="w-1 bg-white/90 rounded-full h-4" />
-                  <div className="w-1 bg-white rounded-full h-full shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
-                  <div className="w-1 bg-white/90 rounded-full h-3" />
-                </div>
-              </div>
-            </div>
-            <span className="text-2xl font-bold tracking-tight text-foreground">Music<span className="text-primary">Pro</span></span>
+          <div className="flex items-center gap-2 group cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+            <DanceProLogo size="md" />
           </div>
 
           {/* Desktop Menu */}
@@ -895,9 +875,9 @@ const LandingPage = () => {
           <div className="absolute bottom-[-5%] left-[-5%] w-[500px] h-[500px] bg-indigo-500/8 rounded-full blur-[120px]" />
           <div className="absolute top-1/2 left-1/3 w-[300px] h-[300px] bg-blue-400/5 rounded-full blur-[80px]" />
         </div>
-        {/* Piano Decoration */}
-        <div className="hidden xl:block absolute top-[40px] right-[-80px] transform -rotate-[8deg] z-0 pointer-events-none">
-          <img src="/img/piano-trans.png" loading="lazy" alt="" className="w-[460px] object-contain select-none opacity-70 drop-shadow-2xl" draggable={false} />
+        {/* Decoração fluida */}
+        <div className="hidden xl:block absolute top-[40px] right-[-80px] z-0 pointer-events-none">
+          <div className="w-[420px] h-[420px] bg-gradient-to-br from-pink-500/10 via-purple-500/10 to-transparent rounded-full blur-[100px]" />
         </div>
 
         <div className="container relative z-10">
@@ -987,9 +967,9 @@ const LandingPage = () => {
 
       {/* FEATURES */}
       <section id="features" className="relative py-24 bg-muted/30 border-b border-border/50 overflow-hidden">
-        {/* Instrument Decorations */}
-        <div className="hidden xl:block absolute top-[20px] right-[-200px] transform rotate-[20deg] z-0 pointer-events-none">
-          <img src="/img/guitar-trans.png" loading="lazy" alt="Imagem de guitarra" className="w-[500px] object-contain select-none opacity-90 drop-shadow-2xl" draggable={false} />
+        {/* Glow decor */}
+        <div className="hidden xl:block absolute top-[20px] right-[-100px] z-0 pointer-events-none">
+          <div className="w-[380px] h-[380px] bg-gradient-to-bl from-indigo-500/10 to-transparent rounded-full blur-[90px]" />
         </div>
 
         <div className="container relative z-10">
@@ -1034,9 +1014,9 @@ const LandingPage = () => {
 
       {/* TESTIMONIALS */}
       <section id="testimonials" className="relative py-24 bg-background overflow-hidden">
-        {/* Instrument Decorations */}
-        <div className="hidden xl:block absolute top-[20px] left-[-150px] transform -rotate-[15deg] z-0 pointer-events-none">
-          <img src="/img/sax-trans.png" loading="lazy" alt="Imagem de saxofone" className="w-[450px] object-contain select-none opacity-80 drop-shadow-2xl" draggable={false} />
+        {/* Glow decor */}
+        <div className="hidden xl:block absolute top-[20px] left-[-80px] z-0 pointer-events-none">
+          <div className="w-[350px] h-[350px] bg-gradient-to-tr from-pink-500/10 to-transparent rounded-full blur-[90px]" />
         </div>
 
         <div className="container relative z-10">
@@ -1248,12 +1228,12 @@ const LandingPage = () => {
 
       {/* ── PREÇOS ─────────────────────────────────────────────────────────────── */}
       <section id="pricing" className="relative py-24 bg-muted/30 border-y border-border/50 overflow-hidden">
-        {/* Instrument Decorations */}
-        <div className="hidden xl:block absolute top-[40px] left-[-250px] transform -rotate-[15deg] z-0 pointer-events-none">
-          <img src="/img/synth-trans.png" alt="" className="w-[600px] object-contain select-none opacity-80 drop-shadow-2xl" draggable={false} />
+        {/* Glow decor */}
+        <div className="hidden xl:block absolute top-[40px] left-[-100px] z-0 pointer-events-none">
+          <div className="w-[400px] h-[400px] bg-gradient-to-br from-purple-500/10 to-transparent rounded-full blur-[100px]" />
         </div>
-        <div className="hidden xl:block absolute top-[40px] right-[-180px] transform rotate-[15deg] z-0 pointer-events-none">
-          <img src="/img/violin-trans.png" alt="" className="w-[450px] object-contain select-none opacity-80 drop-shadow-2xl" draggable={false} />
+        <div className="hidden xl:block absolute top-[40px] right-[-100px] z-0 pointer-events-none">
+          <div className="w-[400px] h-[400px] bg-gradient-to-bl from-pink-500/10 to-transparent rounded-full blur-[100px]" />
         </div>
 
         <div className="container relative z-10">
@@ -1389,20 +1369,10 @@ const LandingPage = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-12 mb-20">
             <div className="col-span-2">
               <div className="flex items-center gap-2 mb-6 cursor-default">
-                <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 p-[1px] shadow-lg shadow-primary/30 overflow-hidden">
-                  <div className="w-full h-full bg-gradient-to-b from-blue-500 to-indigo-700 rounded-xl flex items-center justify-center relative z-10">
-                    <div className="flex items-center gap-[3px] h-4">
-                      <div className="w-1 bg-white/90 rounded-full h-2" />
-                      <div className="w-1 bg-white/90 rounded-full h-4" />
-                      <div className="w-1 bg-white rounded-full h-full shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
-                      <div className="w-1 bg-white/90 rounded-full h-3" />
-                    </div>
-                  </div>
-                </div>
-                <span className="text-2xl font-black text-foreground tracking-tight">Music<span className="text-primary">Pro</span></span>
+                <DanceProLogo size="md" />
               </div>
               <p className="text-muted-foreground font-medium mb-8 max-w-sm leading-relaxed">
-                A plataforma definitiva para gestão de escolas de música. Criada por músicos, para músicos.
+                A plataforma definitiva para gestão de estúdios e escolas de dança. Criada para potencializar a arte do movimento e a evolução de cada dançarino.
               </p>
             </div>
 
