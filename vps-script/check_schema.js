@@ -1,0 +1,14 @@
+const { Client } = require('ssh2');
+const conn = new Client();
+const config = { host: '179.197.76.174', port: 22, username: 'root', password: 'REDACTED_AUDIT', readyTimeout: 30000 };
+
+conn.on('ready', () => {
+  conn.exec(`docker exec wr-music-app-db-1 psql -U postgres -d wrmusic -c "\\d students"`, (err, stream) => {
+    if (err) throw err;
+    stream.on('data', (data) => process.stdout.write(data.toString()));
+    stream.stderr.on('data', (data) => process.stderr.write(data.toString()));
+    stream.on('close', () => {
+      conn.end();
+    });
+  });
+}).connect(config);

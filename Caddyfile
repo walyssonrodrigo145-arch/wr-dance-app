@@ -1,0 +1,20 @@
+wrmusicpro.com.br, www.wrmusicpro.com.br {
+    reverse_proxy app:3000
+}
+
+escola.wrmusicpro.com.br {
+    root * /srv/landpage
+    file_server
+}
+
+analytics.wrmusicpro.com.br {
+    reverse_proxy app:3000
+}
+
+leads.wrmusicpro.com.br {
+    reverse_proxy app:3000
+}
+
+staging.wrmusicpro.com.br {
+    reverse_proxy app-staging:3000
+}

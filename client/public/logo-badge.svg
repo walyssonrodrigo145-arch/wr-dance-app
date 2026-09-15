@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Waveform group -->
+  <g fill="#ffffff">
+    <!-- Bar 1 -->
+    <rect x="136" y="216" width="48" height="128" rx="24" />
+    <!-- Bar 2 -->
+    <rect x="216" y="144" width="48" height="272" rx="24" />
+    <!-- Bar 3 (Main tall bar) -->
+    <rect x="296" y="80" width="48" height="384" rx="24" />
+    <!-- Bar 4 -->
+    <rect x="376" y="184" width="48" height="192" rx="24" />
+  </g>
+</svg>

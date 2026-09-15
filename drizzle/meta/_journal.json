@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1783349455500,
+      "tag": "0000_right_starbolt",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784753282445,
+      "tag": "0001_audit_indexes_and_fixes",
+      "breakpoints": true
+    }
+  ]
+}

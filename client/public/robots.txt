@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+
+# Não indexar rotas privadas do app
+Disallow: /dashboard
+Disallow: /alunos
+Disallow: /aulas
+Disallow: /financeiro
+Disallow: /relatorios
+Disallow: /configuracoes
+Disallow: /automacoes
+Disallow: /progresso
+Disallow: /comunicados
+Disallow: /student/
+Disallow: /api/
+
+Sitemap: https://wrmusicpro.com.br/sitemap.xml

@@ -1,0 +1,12 @@
+{
+  "appId": "com.wrmusicpro.app",
+  "appName": "MusicPro",
+  "webDir": "dist/public",
+  "server": {
+    "url": "https://wrmusicpro.com.br",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}

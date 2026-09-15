@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MusicPro</string>
+    <string name="title_activity_main">MusicPro</string>
+    <string name="package_name">com.wrmusicpro.app</string>
+    <string name="custom_url_scheme">com.wrmusicpro.app</string>
+</resources>

@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: wr-music-app
+    env: node
+    plan: free
+    buildCommand: pnpm install && pnpm run build
+    startCommand: pnpm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromConfig: DATABASE_URL
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PORT
+        value: 3000
