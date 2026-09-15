@@ -1,3 +1,4 @@
+import { DanceProLogo } from '@/components/DanceProLogo';
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,

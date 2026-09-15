@@ -1,3 +1,4 @@
+import { DanceProLogo } from '@/components/DanceProLogo';
 import { useState, useEffect } from "react";
 import { AppSidebar } from "./AppSidebar";
 import { AppHeader } from "./AppHeader";

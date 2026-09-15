@@ -34,6 +34,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { BenefitsCarousel } from '@/components/BenefitsCarousel';
 import { HeroSlider } from '@/components/HeroSlider';
 import ClientsMarquee from '@/components/ClientsMarquee';
+import { DanceProLogo } from '@/components/DanceProLogo';
 import { trpc } from '@/lib/trpc';
 
 // ─── CONSTANTES ───────────────────────────────────────────────────────────────
@@ -908,11 +909,11 @@ const LandingPage = () => {
             >
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold mb-6 hover:bg-primary/15 transition-colors cursor-default">
                 <Star size={14} className="fill-current" />
-                <span>Sistema completo para escolas de música</span>
+                <span>Sistema completo para escolas e estúdios de dança</span>
               </div>
               
               <h1 className="text-5xl md:text-7xl font-outfit font-extrabold text-foreground leading-tight mb-6 tracking-tight">
-                Gestão total para <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-indigo-500">escolas de música</span>
+                Gestão total para <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-indigo-500">escolas de dança</span>
               </h1>
               
               <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-lg leading-relaxed font-medium">
@@ -994,7 +995,7 @@ const LandingPage = () => {
         <div className="container relative z-10">
           <div className="text-center max-w-3xl mx-auto mb-20">
             <h2 className="text-primary font-black tracking-widest uppercase text-sm mb-4">Tudo que você precisa</h2>
-            <h3 className="text-4xl md:text-5xl font-outfit font-extrabold text-foreground mb-6">Funcionalidades pensadas para músicos</h3>
+            <h3 className="text-4xl md:text-5xl font-outfit font-extrabold text-foreground mb-6">Funcionalidades pensadas para escolas de dança</h3>
             <p className="text-lg text-muted-foreground font-medium">
               Desenvolvido por quem entende a rotina de uma escola de dança. Simples de usar, poderoso nos resultados.
             </p>
@@ -1048,7 +1049,7 @@ const LandingPage = () => {
             {[
               { name: 'Ana Lima', role: 'Diretora - Cia. Arte em Movimento', text: 'O DancePro transformou completamente a forma como gerencio minha escola. Economizo horas por semana!', avatarColor: 'bg-gradient-to-br from-blue-500 to-indigo-600' },
               { name: 'Carlos Mendes', role: 'Professor - Studio Ritmo', text: 'Os lembretes automáticos reduziram em 80% as faltas dos alunos. Resultado incrível!', avatarColor: 'bg-gradient-to-br from-emerald-500 to-teal-600' },
-              { name: 'Patricia Souza', role: 'Fundadora - Acorde Music', text: 'O controle financeiro é fantástico. Antes era tudo planilha, agora tenho tudo automatizado.', avatarColor: 'bg-gradient-to-br from-violet-500 to-purple-600' },
+              { name: 'Patricia Souza', role: 'Diretora - Studio Dança & Expressão', text: 'O controle financeiro é fantástico. Antes era tudo planilha, agora tenho tudo automatizado.', avatarColor: 'bg-gradient-to-br from-violet-500 to-purple-600' },
             ].map((t, i) => (
               <motion.div key={t.name} {...fadeIn} transition={{ delay: i * 0.15 }} className="p-8 bg-card/40 backdrop-blur-xl shadow-2xl shadow-primary/5 border border-border/50 rounded-[32px] hover:border-primary/20 hover:shadow-primary/10 transition-all duration-300">
                 <div className="flex gap-1 mb-4">

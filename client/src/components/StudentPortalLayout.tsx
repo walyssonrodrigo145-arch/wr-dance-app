@@ -1,3 +1,4 @@
+import { DanceProLogo } from '@/components/DanceProLogo';
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { StudentSidebar } from "./StudentSidebar";

@@ -1,3 +1,4 @@
+import { DanceProLogo } from '@/components/DanceProLogo';
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
@@ -322,7 +323,7 @@ export function AppSidebar({ collapsed, onToggle, onNavigate }: AppSidebarProps)
                       {(user as any)?.schoolName || "WR"}
                     </p>
                     <p className="text-[9px] text-slate-400 font-extrabold uppercase tracking-widest mt-0.5 truncate">
-                      GESTÃO MUSICAL
+                      ESCOLA DE DANÇA
                     </p>
                   </div>
                 )}

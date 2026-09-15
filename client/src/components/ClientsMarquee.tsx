@@ -32,7 +32,7 @@ export default function ClientsMarquee() {
           </h2>
 
           <p className="text-sm md:text-base text-muted-foreground font-medium max-w-2xl mx-auto leading-relaxed">
-            Grandes escolas, conservatórios e estúdios musicais utilizam nosso ecossistema todos os dias para gerenciar alunos, turmas e finanças com máxima excelência.
+            Grandes escolas, companhias e estúdios de dança utilizam nosso ecossistema todos os dias para gerenciar alunos, turmas e finanças com máxima excelência.
           </p>
         </div>
       </div>

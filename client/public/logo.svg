@@ -1,37 +1,43 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
   <defs>
-    <linearGradient id="grad-outer" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#3b82f6" />
-      <stop offset="100%" stop-color="#4f46e5" />
+    <linearGradient id="dance-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4f46e5" />
+      <stop offset="50%" stop-color="#7c3aed" />
+      <stop offset="100%" stop-color="#ec4899" />
     </linearGradient>
-    <linearGradient id="grad-inner" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#3b82f6" />
-      <stop offset="100%" stop-color="#4338ca" />
+    <linearGradient id="dance-wave" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#fdf2f8" />
     </linearGradient>
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="15" result="coloredBlur"/>
+    <filter id="glow-dance" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
       <feMerge>
-        <feMergeNode in="coloredBlur"/>
-        <feMergeNode in="SourceGraphic"/>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
       </feMerge>
     </filter>
   </defs>
 
-  <!-- Outer background (simulates 1px border) -->
-  <rect x="0" y="0" width="512" height="512" rx="128" fill="url(#grad-outer)" />
-  
-  <!-- Inner gradient box -->
-  <rect x="12" y="12" width="488" height="488" rx="116" fill="url(#grad-inner)" />
+  <!-- Container arredondado premium -->
+  <rect width="512" height="512" rx="128" fill="url(#dance-bg)" />
 
-  <!-- Waveform group -->
-  <g fill="#ffffff">
-    <!-- Bar 1 -->
-    <rect x="136" y="216" width="48" height="128" rx="24" fill-opacity="0.9" />
-    <!-- Bar 2 -->
-    <rect x="216" y="144" width="48" height="272" rx="24" fill-opacity="0.9" />
-    <!-- Bar 3 (Main tall bar with glow) -->
-    <rect x="296" y="80" width="48" height="384" rx="24" filter="url(#glow)" />
-    <!-- Bar 4 -->
-    <rect x="376" y="184" width="48" height="192" rx="24" fill-opacity="0.9" />
+  <!-- Detalhe de iluminação sutil superior -->
+  <rect x="12" y="12" width="488" height="488" rx="116" stroke="rgba(255,255,255,0.2)" stroke-width="4" />
+
+  <!-- Símbolo cinético de salto e movimento fluido -->
+  <g filter="url(#glow-dance)">
+    <circle cx="280" cy="140" r="32" fill="url(#dance-wave)" />
+    <path 
+      d="M170 370 C 150 260, 210 190, 290 205 C 360 218, 380 290, 315 340 C 265 378, 205 375, 170 370 Z" 
+      fill="url(#dance-wave)" 
+      fill-opacity="0.95" 
+    />
+    <path 
+      d="M140 330 C 160 395, 250 420, 335 390 C 375 375, 395 345, 390 310" 
+      stroke="url(#dance-wave)" 
+      stroke-width="26" 
+      stroke-linecap="round" 
+      stroke-opacity="0.85" 
+    />
   </g>
 </svg>
