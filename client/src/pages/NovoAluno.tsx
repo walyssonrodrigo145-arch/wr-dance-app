@@ -1436,10 +1436,10 @@ export default function NovoAluno() {
               </div>
 
               <div className="space-y-6 relative z-10">
-                {/* Linha 1: Instrumento e Nível */}
+                {/* Linha 1: Modalidade e Nível */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em] ml-1">Instrumento principal</label>
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em] ml-1">Modalidade principal</label>
                     <Select value={form.instrumentId} onValueChange={(v) => handleInputChange('instrumentId', v)}>
                       <SelectTrigger className="h-12 rounded-xl border-border bg-muted/30 focus:ring-4 focus:ring-violet-500/10 transition-all text-sm font-semibold px-4">
                         <SelectValue placeholder="Selecione" />
@@ -1480,7 +1480,7 @@ export default function NovoAluno() {
                 {/* Linha 2: Professor, Sala e Data de Início */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em] ml-1">Professor Responsável</label>
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em] ml-1">Coreógrafo / Professor</label>
                     <Select value={form.professorId} onValueChange={(v) => handleInputChange('professorId', v)}>
                       <SelectTrigger className="h-12 rounded-xl border-border bg-muted/30 focus:ring-4 focus:ring-violet-500/10 transition-all text-sm font-semibold px-4">
                         <SelectValue placeholder="Selecione (Opcional)" />
@@ -1498,7 +1498,7 @@ export default function NovoAluno() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em] ml-1">Sala de Aula (Padrão)</label>
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em] ml-1">Sala de Ensaio (Padrão)</label>
                     <Select value={form.studioRoomId} onValueChange={(v) => handleInputChange('studioRoomId', v)}>
                       <SelectTrigger className="h-12 rounded-xl border-border bg-muted/30 focus:ring-4 focus:ring-violet-500/10 transition-all text-sm font-semibold px-4">
                         <SelectValue placeholder="Selecione a Sala" />

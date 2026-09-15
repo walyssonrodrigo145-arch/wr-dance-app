@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   app:
+    container_name: dance-app
     build:
       context: .
       args:
@@ -13,6 +14,11 @@ services:
         VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID}
         VITE_FIREBASE_VAPID_KEY: ${VITE_FIREBASE_VAPID_KEY}
         VITE_VAPID_PUBLIC_KEY: ${VITE_VAPID_PUBLIC_KEY}
+    ports:
+      - "3002:5000"
+    networks:
+      - default
+      - main-network
     environment:
       - NODE_ENV=production
       - TZ=America/Sao_Paulo
@@ -21,12 +27,11 @@ services:
     restart: unless-stopped
     depends_on:
       - db
-    # CRÍTICO: volume persistente para arquivos de upload dos professores.
-    # SEM este volume, todos os uploads são apagados a cada rebuild do container.
     volumes:
       - uploads_data:/app/uploads
 
   db:
+    container_name: dance-db
     image: postgres:15-alpine
     restart: unless-stopped
     environment:
@@ -36,23 +41,14 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
 
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - ./landpage:/srv/landpage
-      - caddy_data:/data
-      - caddy_config:/config
-
 volumes:
-  caddy_data:
-  caddy_config:
   db_data:
   # Volume nomeado para uploads: sobrevive a rebuilds e deployments.
   # Os arquivos ficam em /var/lib/docker/volumes/wr-dance-app_uploads_data/_data/
   uploads_data:
+
+networks:
+  main-network:
+    name: wr-music-app_default
+    external: true
 
