@@ -281,7 +281,7 @@ export default function StudentDashboard() {
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
           <div>
              <h1 className="text-3xl md:text-4xl font-black tracking-tighter drop-shadow-sm mb-2 text-foreground">Olá, {firstName}!</h1>
-             <p className="text-muted-foreground text-sm md:text-base font-medium max-w-xl">Continue evoluindo na sua jornada musical. Vamos tocar hoje?</p>
+             <p className="text-muted-foreground text-sm md:text-base font-medium max-w-xl">Continue evoluindo na sua jornada na dança. Prontos para dançar hoje?</p>
           </div>
           <div className="flex flex-wrap md:flex-nowrap items-center gap-4">
              <button onClick={() => navigate('/aluno/scanner')} className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-6 py-3.5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl hover:shadow-2xl transition-all hover:-translate-y-1 w-full md:w-auto">
@@ -494,17 +494,17 @@ export default function StudentDashboard() {
           <motion.div variants={item} className="h-full">
             <SectionCard
               icon={<BookOpen size={16} />}
-              title="Acervo musical"
+              title="Trilhas & Coreografias"
               actionLabel="Ver todos"
               onAction={() => navigate('/aluno/materiais')}
             >
               {(dashboard?.materials?.length ?? 0) === 0 ? (
                 <div className="py-10 flex flex-col items-center justify-center text-center">
                   <div className="w-14 h-14 rounded-2xl bg-muted/50 flex items-center justify-center text-muted-foreground/40 mb-4">
-                    <Music size={24} />
+                    <span className="text-2xl">🩰</span>
                   </div>
                   <p className="text-sm font-black text-foreground">Nenhum material ainda</p>
-                  <p className="text-xs text-muted-foreground font-medium mt-1.5">Seu professor enviará arquivos por aqui.</p>
+                  <p className="text-xs text-muted-foreground font-medium mt-1.5">Seu coreógrafo ou professor disponibilizará trilhas e vídeos de ensaio aqui.</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -700,15 +700,15 @@ export default function StudentDashboard() {
             </SectionCard>
           </motion.div>
 
-          {/* MusicPro Footer (modelo) */}
+          {/* DancePro Footer */}
           <motion.div variants={item}>
             <div className="flex items-center gap-4 p-5 rounded-[1.75rem] bg-card/60 backdrop-blur-xl border border-border/10 shadow-sm">
-              <div className="w-11 h-11 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+              <div className="w-11 h-11 rounded-2xl bg-pink-500/10 flex items-center justify-center text-pink-500 shrink-0">
                 <ShieldCheck size={20} />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-black text-foreground">MusicPro</p>
-                <p className="text-xs text-muted-foreground font-medium leading-snug mt-0.5">Tudo aqui para você evoluir com organização e constância.</p>
+                <p className="text-sm font-black text-foreground">DancePro</p>
+                <p className="text-xs text-muted-foreground font-medium leading-snug mt-0.5">Tudo aqui para você evoluir na sua arte, ritmo e constância.</p>
               </div>
             </div>
           </motion.div>

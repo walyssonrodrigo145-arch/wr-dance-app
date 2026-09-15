@@ -109,12 +109,12 @@ export function AppSidebar({ collapsed, onToggle, onNavigate }: AppSidebarProps)
         { label: "IA Assistente", href: "/ia", icon: Sparkles, activeStyle: "bg-[#1E1B4B] text-white border-l-4 border-[#5B50E6] shadow-lg shadow-indigo-950/50" },
         { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
         { label: "Alunos", href: "/alunos", icon: Users },
-        // Gestão de Professores: EXCLUSIVO do admin (professor não vê este item)
-        ...(user?.role === "admin" ? [{ label: "Professores", href: "/professores", icon: Users }] : []),
-        { label: "Aulas", href: "/aulas", icon: Calendar },
+        // Gestão de Professores / Coreógrafos: EXCLUSIVO do admin
+        ...(user?.role === "admin" ? [{ label: "Professores / Coreógrafos", href: "/professores", icon: Users }] : []),
+        { label: "Aulas & Ensaios", href: "/aulas", icon: Calendar },
         { label: "Reposições", href: "/reposicoes", icon: Repeat, badge: repositionCount > 0 ? repositionCount : undefined },
-        { label: "Instrumentos", href: "/instrumentos", icon: Guitar },
-        { label: "Salas de Estúdio", href: "/salas", icon: DoorOpen },
+        { label: "Modalidades / Ritmos", href: "/instrumentos", icon: Activity },
+        { label: "Salas de Ensaio", href: "/salas", icon: DoorOpen },
         { label: "Rankings", href: "/rankings", icon: Trophy },
         { label: "Relatórios", href: "/relatorios", icon: BarChart3 },
       ],

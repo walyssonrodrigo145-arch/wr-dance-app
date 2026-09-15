@@ -444,7 +444,7 @@ export default function Aulas() {
           {/* Filtros Suspensos e Botão Primário + Nova Aula */}
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase">Professor:</span>
+              <span className="text-[10px] font-bold text-muted-foreground uppercase">Coreógrafo / Prof:</span>
               <select
                 value={teacherFilter}
                 onChange={e => setTeacherFilter(e.target.value)}
@@ -456,13 +456,13 @@ export default function Aulas() {
             </div>
 
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase">Instrumento:</span>
+              <span className="text-[10px] font-bold text-muted-foreground uppercase">Modalidade:</span>
               <select
                 value={instrumentFilter}
                 onChange={e => setInstrumentFilter(e.target.value)}
                 className="h-9 px-3 rounded-xl bg-card border border-border/60 text-xs font-bold text-foreground outline-none shadow-sm cursor-pointer"
               >
-                <option value="todos">Todos</option>
+                <option value="todos">Todas</option>
                 {instruments.map(i => <option key={i.id} value={String(i.id)}>{i.name}</option>)}
               </select>
             </div>

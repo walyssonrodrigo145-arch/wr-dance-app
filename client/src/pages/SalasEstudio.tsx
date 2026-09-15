@@ -236,15 +236,15 @@ export default function SalasEstudio() {
       {/* ── HEADER DA PÁGINA ────────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 flex items-center justify-center shrink-0 shadow-sm">
+          <div className="w-12 h-12 rounded-2xl bg-pink-500/10 border border-pink-500/20 text-pink-500 flex items-center justify-center shrink-0 shadow-sm">
             <DoorOpen size={24} />
           </div>
           <div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight font-outfit text-foreground">
-              Salas de Estúdio / Ensaio
+              Salas de Ensaio & Estúdios de Dança
             </h1>
             <p className="text-xs sm:text-sm text-muted-foreground font-medium mt-0.5">
-              Organize os espaços da sua escola para vincular às aulas, otimizar horários e evitar conflitos.
+              Organize os espaços, tablados e salas com espelhos da sua escola de dança para vincular a turmas e ensaios sem conflitos.
             </p>
           </div>
         </div>
@@ -866,11 +866,11 @@ export default function SalasEstudio() {
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Estúdio de gravação">Estúdio de gravação</SelectItem>
-                    <SelectItem value="Sala acústica">Sala acústica</SelectItem>
-                    <SelectItem value="Sala para ensaios">Sala para ensaios</SelectItem>
-                    <SelectItem value="Sala multiuso">Sala multiuso</SelectItem>
-                    <SelectItem value="Sala de percussão">Sala de percussão</SelectItem>
+                    <SelectItem value="Sala com Espelho & Barra">Sala com Espelho & Barra</SelectItem>
+                    <SelectItem value="Sala de Tablado / Salão">Sala de Tablado / Salão</SelectItem>
+                    <SelectItem value="Sala de Danças Urbanas">Sala de Danças Urbanas</SelectItem>
+                    <SelectItem value="Sala Multiuso Dança">Sala Multiuso Dança</SelectItem>
+                    <SelectItem value="Estúdio de Gravação / Coreografia">Estúdio de Gravação / Coreografia</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

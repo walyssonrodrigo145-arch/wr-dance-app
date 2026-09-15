@@ -71,7 +71,7 @@ const StudentResults = lazy(() => import("./pages/student/Resultados"));
 const PageLoader = () => (
   <div className="flex-1 h-full min-h-[50vh] flex flex-col items-center justify-center text-muted-foreground gap-4">
     <Loader2 className="animate-spin text-primary" size={32} />
-    <span className="text-xs font-bold uppercase tracking-widest text-primary/60">Carregando MusicPro...</span>
+    <span className="text-xs font-bold uppercase tracking-widest text-primary/60">Carregando DancePro...</span>
   </div>
 );
 

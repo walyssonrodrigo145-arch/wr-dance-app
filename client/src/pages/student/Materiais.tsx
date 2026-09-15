@@ -188,13 +188,13 @@ export default function StudentMaterials() {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-widest border border-primary/20">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-500/10 text-pink-500 text-[10px] font-bold uppercase tracking-widest border border-pink-500/20">
             <Archive size={12} />
-            Biblioteca de Estudos
+            Acervo de Dança & Ensaios
           </div>
-          <h1 className="text-4xl font-black tracking-tight text-foreground">Meus Materiais</h1>
+          <h1 className="text-4xl font-black tracking-tight text-foreground">Trilhas & Materiais</h1>
           <p className="text-muted-foreground text-sm max-w-xl font-medium">
-            Sua central de estudos com todas as partituras, vídeos e áudios compartilhados para acelerar sua evolução.
+            Sua central de estudo com todas as trilhas sonoras, coreografias e vídeos de ensaio compartilhados para acelerar sua evolução.
           </p>
         </div>
         

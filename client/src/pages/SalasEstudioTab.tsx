@@ -147,15 +147,15 @@ export function SalasEstudioTab() {
         
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold uppercase tracking-wider">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-500/10 border border-pink-500/20 text-pink-400 text-xs font-bold uppercase tracking-wider">
               <Sparkles size={14} />
-              <span>Espaços Físicos & Estúdios</span>
+              <span>Espaços Físicos & Tablados de Dança</span>
             </div>
             <h2 className="text-2xl md:text-3xl font-black text-foreground font-outfit tracking-tight">
-              Salas de Estúdio / Ensaio
+              Salas de Ensaio & Estúdios de Dança
             </h2>
             <p className="text-sm text-muted-foreground max-w-xl">
-              Organize os espaços da sua escola para vincular às aulas, otimizar horários e evitar conflitos de salas no agendamento.
+              Organize os espaços, tablados e salas com espelhos da sua escola para vincular às turmas, otimizar horários e evitar conflitos no agendamento.
             </p>
           </div>
 

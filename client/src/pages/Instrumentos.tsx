@@ -9,38 +9,43 @@ import { motion, AnimatePresence } from "framer-motion";
 
 // ─── Preset colors ────────────────────────────────────────────────────────────
 const PRESET_COLORS = [
-  "#6366f1", "#8b5cf6", "#ec4899", "#f43f5e", "#f97316",
-  "#eab308", "#22c55e", "#14b8a6", "#0ea5e9", "#64748b",
+  "#ec4899", "#f43f5e", "#8b5cf6", "#6366f1", "#0ea5e9",
+  "#14b8a6", "#22c55e", "#eab308", "#f97316", "#64748b",
 ];
 
-const CATEGORIES = ["Cordas", "Teclas", "Percussão", "Sopro", "Voz", "Outro"];
+const CATEGORIES = [
+  "Dança Clássica",
+  "Danças Urbanas",
+  "Dança a Dois",
+  "Contemporânea & Moderna",
+  "Dança Infantil / Kids",
+  "Dança Tradicional & Étnica",
+  "Fitness & Livre",
+  "Outra"
+];
 
-// ─── Emoji map por instrumento ────────────────────────────────────────────────
-const INSTRUMENT_EMOJI: Record<string, string> = {
-  // Cordas
-  violao: "🎸", guitarra: "🎸", baixo: "🎸", contrabaixo: "🎸",
-  ukulele: "🪕", cavaquinho: "🪕", bandolim: "🪕", banjo: "🪕",
-  violino: "🎻", viola: "🎻", cello: "🎻", violoncelo: "🎻", contrabaixo_arco: "🎻",
-  harpa: "🎵", citara: "🎵",
-  // Teclas
-  piano: "🎹", teclado: "🎹", orgao: "🎹", órgão: "🎹", sintetizador: "🎹", acordeao: "🪗", acordeão: "🪗",
-  // Percussão
-  bateria: "🥁", caixa: "🥁", bumbo: "🥁", surdo: "🥁", pandeiro: "🪘",
-  cajón: "🪘", cajon: "🪘", congas: "🪘", bongo: "🪘", timbal: "🪘",
-  xilofone: "🎵", marimba: "🎵", vibrafone: "🎵", glockenspiel: "🎵",
-  // Sopro
-  flauta: "🪈", flautim: "🪈", oboé: "🎵", clarinete: "🎵", fagote: "🎵",
-  saxofone: "🎷", sax: "🎷",
-  trompete: "🎺", trompa: "🎺", trombone: "🎺", tuba: "🎺", flugelhorn: "🎺",
-  gaita: "🪗", harmonica: "🪗",
-  // Voz
-  canto: "🎤", voz: "🎤", vocal: "🎤", coro: "🎤",
-  // Outros
-  djembe: "🪘", berimbau: "🎵", cuica: "🪘", agogo: "🎵",
+// ─── Emoji map por modalidade / ritmo de dança ────────────────────────────────
+const MODALITY_EMOJI: Record<string, string> = {
+  // Clássica & Moderna
+  ballet: "🩰", bale: "🩰", pontas: "🩰", repertorio: "🩰",
+  jazz: "✨", lirico: "✨", contemporaneo: "🎭", contemporanea: "🎭", moderna: "🎭",
+  sapateado: "👞", tap: "👞",
+  // Urbanas
+  hiphop: "👟", breaking: "🤸", breakdance: "🤸", popping: "⚡", locking: "⚡",
+  house: "👟", kpop: "⭐", funk: "🔥", streetdance: "👟", dancehall: "💃",
+  // Dança a Dois / Salão
+  samba: "💃", sambadegafieira: "💃", forro: "🪗", sertanejo: "🤠",
+  tango: "🌹", bolero: "🌹", salsa: "🌶️", bachata: "🌶️", zouk: "✨", kizomba: "✨",
+  valsa: "👑", dancadesalao: "💃", salao: "💃",
+  // Étnicas / Tradicionais
+  flamenco: "💃", dancadoventre: "✨", ventre: "✨", dancacigana: "💃",
+  axe: "☀️", frevo: "☂️", maracatu: "🥁",
+  // Fitness
+  zumba: "🔥", fitdance: "🔥", alongamento: "🧘", flexibilidade: "🧘", pilates: "🧘",
 };
 
-/** Retorna o emoji mais adequado para o nome do instrumento */
-function getInstrumentEmoji(name: string): string {
+/** Retorna o emoji mais adequado para o nome da modalidade de dança */
+function getModalityEmoji(name: string): string {
   const key = name
     .toLowerCase()
     .normalize("NFD")
@@ -48,14 +53,14 @@ function getInstrumentEmoji(name: string): string {
     .replace(/[^a-z0-9]/g, "");      // remove espaços/símbolos
 
   // Busca exata
-  if (INSTRUMENT_EMOJI[key]) return INSTRUMENT_EMOJI[key];
+  if (MODALITY_EMOJI[key]) return MODALITY_EMOJI[key];
 
-  // Busca parcial (ex: "Violão Clássico" → "violao")
-  for (const [k, emoji] of Object.entries(INSTRUMENT_EMOJI)) {
+  // Busca parcial (ex: "Ballet Clássico Infantil" → "ballet")
+  for (const [k, emoji] of Object.entries(MODALITY_EMOJI)) {
     if (key.includes(k) || k.includes(key)) return emoji;
   }
 
-  return "🎵"; // fallback genérico
+  return "💃"; // fallback temático de dança
 }
 
 type InstrumentRow = {
@@ -65,8 +70,8 @@ type InstrumentRow = {
 
 // ─── Instrument Icon ──────────────────────────────────────────────────────────
 function InstrumentIcon({ name, color, size = 44 }: { name: string; color?: string | null; size?: number }) {
-  const emoji = getInstrumentEmoji(name);
-  const bg = (color ?? "#6366f1") + "20";
+  const emoji = getModalityEmoji(name);
+  const bg = (color ?? "#ec4899") + "20";
   return (
     <div
       className="rounded-2xl flex items-center justify-center shadow-sm flex-shrink-0"
@@ -84,14 +89,14 @@ function InstrumentModal({ open, onClose, editData }: {
   const utils = trpc.useUtils();
   const [form, setForm] = useState({
     name: editData?.name ?? "",
-    category: editData?.category ?? "Cordas",
-    color: editData?.color ?? "#6366f1",
+    category: editData?.category ?? "Dança Clássica",
+    color: editData?.color ?? "#ec4899",
   });
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
   const createMutation = trpc.instruments.create.useMutation({
     onSuccess: () => {
-      toast.success("Instrumento cadastrado!");
+      toast.success("Modalidade cadastrada!");
       utils.instruments.list.invalidate();
       onClose();
     },
@@ -100,7 +105,7 @@ function InstrumentModal({ open, onClose, editData }: {
 
   const updateMutation = trpc.instruments.update.useMutation({
     onSuccess: () => {
-      toast.success("Instrumento atualizado!");
+      toast.success("Modalidade atualizada!");
       utils.instruments.list.invalidate();
       onClose();
     },
@@ -124,7 +129,7 @@ function InstrumentModal({ open, onClose, editData }: {
       <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-card rounded-2xl border border-border shadow-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <div className="flex items-center justify-between p-5 border-b border-border">
-          <h3 className="text-sm font-bold text-foreground">{editData ? "Editar Instrumento" : "Novo Instrumento"}</h3>
+          <h3 className="text-sm font-bold text-foreground">{editData ? "Editar Modalidade" : "Nova Modalidade"}</h3>
           <button onClick={onClose} className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground"><X size={14} /></button>
         </div>
         <div className="p-5 space-y-4">
@@ -132,14 +137,14 @@ function InstrumentModal({ open, onClose, editData }: {
           <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
             <InstrumentIcon name={form.name} color={form.color} size={48} />
             <div>
-              <p className="text-sm font-bold text-foreground">{form.name || "Nome do instrumento"}</p>
+              <p className="text-sm font-bold text-foreground">{form.name || "Nome da modalidade"}</p>
               <p className="text-xs text-muted-foreground">{form.category}</p>
             </div>
           </div>
           {/* Nome */}
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-foreground">Nome *</label>
-            <Input value={form.name} onChange={e => set("name", e.target.value)} placeholder="Ex: Violão, Piano, Bateria..." className="h-9 text-sm rounded-xl" />
+            <label className="text-xs font-semibold text-foreground">Nome da Modalidade *</label>
+            <Input value={form.name} onChange={e => set("name", e.target.value)} placeholder="Ex: Ballet Clássico, Jazz, Hip Hop..." className="h-9 text-sm rounded-xl" />
           </div>
           {/* Categoria */}
           <div className="space-y-1">
@@ -151,7 +156,7 @@ function InstrumentModal({ open, onClose, editData }: {
           </div>
           {/* Cor */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-foreground">Cor</label>
+            <label className="text-xs font-semibold text-foreground">Cor de Identificação na Grade</label>
             <div className="flex gap-2 flex-wrap">
               {PRESET_COLORS.map(c => (
                 <button key={c} onClick={() => set("color", c)}
@@ -163,7 +168,7 @@ function InstrumentModal({ open, onClose, editData }: {
         </div>
         <div className="flex gap-2 p-5 pt-0">
           <Button variant="outline" className="flex-1 rounded-xl" onClick={onClose}>Cancelar</Button>
-          <Button className="flex-1 rounded-xl gap-2" onClick={handleSubmit} disabled={isPending}>
+          <Button className="flex-1 rounded-xl gap-2 bg-pink-600 hover:bg-pink-700 text-white" onClick={handleSubmit} disabled={isPending}>
             {isPending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
             {editData ? "Salvar" : "Cadastrar"}
           </Button>
@@ -184,9 +189,9 @@ function DeleteConfirm({ name, onConfirm, onCancel, isPending }: {
         <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4">
           <Trash2 size={20} className="text-red-600 dark:text-red-400" />
         </div>
-        <h3 className="text-sm font-bold text-foreground mb-1">Excluir instrumento?</h3>
+        <h3 className="text-sm font-bold text-foreground mb-1">Excluir modalidade?</h3>
         <p className="text-xs text-muted-foreground mb-5">
-          Tem certeza que deseja excluir <strong>{name}</strong>? Os alunos associados ficarão sem instrumento.
+          Tem certeza que deseja excluir <strong>{name}</strong>? Os alunos associados ficarão sem modalidade definida.
         </p>
         <div className="flex gap-2">
           <Button variant="outline" className="flex-1 rounded-xl" onClick={onCancel}>Cancelar</Button>
@@ -211,7 +216,7 @@ export default function Instrumentos() {
 
   const deleteMutation = trpc.instruments.delete.useMutation({
     onSuccess: () => {
-      toast.success("Instrumento excluído!");
+      toast.success("Modalidade excluída!");
       utils.instruments.list.invalidate();
       setDeleteInstrument(null);
     },
@@ -226,19 +231,19 @@ export default function Instrumentos() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3 lg:gap-4 w-full sm:w-auto">
-            <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-2xl bg-teal-500/10 flex items-center justify-center shadow-sm shrink-0">
-              <Guitar size={24} className="text-teal-600" />
+            <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-2xl bg-pink-500/10 flex items-center justify-center shadow-sm shrink-0">
+              <span className="text-xl">🩰</span>
             </div>
             <div className="min-w-0">
-              <h2 className="text-xl lg:text-2xl font-bold text-foreground tracking-tight leading-none">Instrumentos</h2>
-              <p className="text-[10px] lg:text-xs text-muted-foreground font-bold uppercase tracking-widest mt-1 lg:mt-2">{instruments?.length ?? 0} instrumentos ativos</p>
+              <h2 className="text-xl lg:text-2xl font-bold text-foreground tracking-tight leading-none">Modalidades & Ritmos</h2>
+              <p className="text-[10px] lg:text-xs text-muted-foreground font-bold uppercase tracking-widest mt-1 lg:mt-2">{instruments?.length ?? 0} modalidades ativas</p>
             </div>
           </div>
           <Button 
-            className="w-full sm:w-auto h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-widest gap-2 shadow-lg shadow-indigo-500/20 transition-all active:scale-95" 
+            className="w-full sm:w-auto h-11 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-black uppercase tracking-widest gap-2 shadow-lg shadow-pink-500/20 transition-all active:scale-95" 
             onClick={() => { setEditInstrument(null); setModalOpen(true); }}
           >
-            <Plus size={18} /> Novo Instrumento
+            <Plus size={18} /> Nova Modalidade
           </Button>
         </div>
 
@@ -249,11 +254,11 @@ export default function Instrumentos() {
         ) : (instruments ?? []).length === 0 ? (
           <div className="bg-card rounded-[2rem] border border-border p-20 flex flex-col items-center text-center shadow-sm">
             <div className="w-20 h-20 rounded-[2rem] bg-muted flex items-center justify-center text-4xl mb-6 shadow-inner">
-              🎸
+              🩰
             </div>
-            <h3 className="text-lg font-black text-foreground uppercase tracking-widest">Nenhum instrumento</h3>
+            <h3 className="text-lg font-black text-foreground uppercase tracking-widest">Nenhuma modalidade</h3>
             <p className="text-sm text-muted-foreground font-medium mt-2 max-w-xs">
-              Cadastre os instrumentos que sua escola oferece para vincular aos alunos.
+              Cadastre as modalidades e ritmos que sua escola ou estúdio de dança oferece para vincular aos alunos.
             </p>
           </div>
         ) : (

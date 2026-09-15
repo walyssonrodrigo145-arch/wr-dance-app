@@ -1,12 +1,12 @@
 {
-  "name": "WR Music - Dashboard",
-  "short_name": "WR Music",
-  "description": "Sistema de Gestão para Professor de Música",
+  "name": "DancePro — Gestão de Dança",
+  "short_name": "DancePro",
+  "description": "Sistema de Gestão para Escolas e Estúdios de Dança",
   "start_url": "/",
   "gcm_sender_id": "103953800507",
   "display": "standalone",
   "background_color": "#09090b",
-  "theme_color": "#6366f1",
+  "theme_color": "#ec4899",
   "orientation": "portrait",
   "icons": [
     {

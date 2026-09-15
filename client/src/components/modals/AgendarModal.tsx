@@ -441,7 +441,7 @@ export default function AgendarModal({ open, onOpenChange, initialDate, editingL
 
   const handleConfirmBatch = () => {
     const instrument = instruments?.find(i => i.id.toString() === formData.instrumentId);
-    const submissionTitle = formData.title || (instrument ? `Aula de ${instrument.name}` : "Aula de Música");
+    const submissionTitle = formData.title || (instrument ? `Aula de ${instrument.name}` : "Aula / Ensaio de Dança");
 
     createBatchMutation.mutate({
       studentId: Number(formData.studentId),
@@ -566,32 +566,32 @@ export default function AgendarModal({ open, onOpenChange, initialDate, editingL
                 </div>
               </div>
 
-              {/* Instrumento */}
+              {/* Modalidade / Ritmo */}
               <div className="space-y-2">
-                 <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-500/60 px-2">
-                   <Music size={12} /> Instrumento Opcional
+                 <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-pink-500/60 px-2">
+                   <span>🩰</span> Modalidade / Ritmo (Opcional)
                  </label>
                  <select
                    value={formData.instrumentId}
                    onChange={(e) => setFormData({...formData, instrumentId: e.target.value})}
-                   className="w-full h-14 bg-background border border-indigo-500/20 rounded-2xl px-4 text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all appearance-none cursor-pointer"
+                   className="w-full h-14 bg-background border border-pink-500/20 rounded-2xl px-4 text-sm font-bold focus:ring-4 focus:ring-pink-500/10 outline-none transition-all appearance-none cursor-pointer"
                  >
-                   <option value="">Nenhum...</option>
+                   <option value="">Nenhuma...</option>
                    {instruments?.map(inst => (
                      <option key={inst.id} value={inst.id.toString()}>{inst.name}</option>
                    ))}
                  </select>
               </div>
 
-              {/* Sala de Estúdio */}
+              {/* Sala de Ensaio */}
               <div className="space-y-2">
-                 <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-500/60 px-2">
-                   <LayoutList size={12} /> Sala (Opcional)
+                 <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-pink-500/60 px-2">
+                   <LayoutList size={12} /> Sala de Ensaio (Opcional)
                  </label>
                  <select
                    value={formData.studioRoomId}
                    onChange={(e) => setFormData({...formData, studioRoomId: e.target.value})}
-                   className="w-full h-14 bg-background border border-indigo-500/20 rounded-2xl px-4 text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all appearance-none cursor-pointer"
+                   className="w-full h-14 bg-background border border-pink-500/20 rounded-2xl px-4 text-sm font-bold focus:ring-4 focus:ring-pink-500/10 outline-none transition-all appearance-none cursor-pointer"
                  >
                    <option value="">Nenhuma sala...</option>
                    {studioRooms?.map(room => (

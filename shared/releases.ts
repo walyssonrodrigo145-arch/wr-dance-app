@@ -26,6 +26,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.16",
+    date: "2026-09-16",
+    title: "DancePro — Sistema de Gestão para Escolas e Estúdios de Dança",
+    summary: "Plataforma especializada e desacoplada com vocabulário de ritmos, modalidades, coreografias, salas de ensaio e tablados.",
+    items: [
+      { type: "novo", title: "Modalidades & Ritmos", description: "Cadastro e gestão de modalidades de dança (Ballet, Jazz, Hip Hop, Dança de Salão, Dança Urbana, etc.) com cores e ícones na grade." },
+      { type: "novo", title: "Salas de Ensaio & Tablados", description: "Espaços adaptados com controle de capacidade por m², salas com espelho, piso flutuante e relatórios de ocupação." },
+      { type: "melhoria", title: "Portal do Aluno e Vocabulário", description: "Terminologia 100% voltada a dança: trilhas sonoras, desafios coreográficos e acompanhamento da evolução corporal e técnica." },
+    ],
+  },
+  {
     version: "2026.09.15",
     date: "2026-09-15",
     title: "Renovação pelo portal e avaliações de professores",

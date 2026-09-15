@@ -131,8 +131,8 @@ export default function StudentExercises() {
     <div className="space-y-8 pb-10">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-foreground">Meus Exercícios</h1>
-          <p className="text-muted-foreground font-medium">Pratique e envie suas atividades para avaliação do professor.</p>
+          <h1 className="text-3xl font-black tracking-tight text-foreground">Desafios & Sequências</h1>
+          <p className="text-muted-foreground font-medium">Pratique e envie suas sequências coreográficas para avaliação do coreógrafo / professor.</p>
         </div>
         <div className="flex items-center gap-4 p-4 rounded-2xl bg-primary/5 border border-primary/10">
            <div className="text-right">

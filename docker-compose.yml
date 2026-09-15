@@ -32,7 +32,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password_seguro_db_local
-      POSTGRES_DB: wrmusic
+      POSTGRES_DB: wrdance
     volumes:
       - db_data:/var/lib/postgresql/data
 
@@ -53,6 +53,6 @@ volumes:
   caddy_config:
   db_data:
   # Volume nomeado para uploads: sobrevive a rebuilds e deployments.
-  # Os arquivos ficam em /var/lib/docker/volumes/wr-music-app_uploads_data/_data/
+  # Os arquivos ficam em /var/lib/docker/volumes/wr-dance-app_uploads_data/_data/
   uploads_data:
 
