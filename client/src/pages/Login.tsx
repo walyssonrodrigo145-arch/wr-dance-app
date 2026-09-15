@@ -1,3 +1,4 @@
+import { DanceProLogo } from '@/components/DanceProLogo';
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
@@ -5,7 +6,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Music, AlertCircle, ArrowRight, Loader2, Mail, CheckCircle2 } from "lucide-react";
+import { AlertCircle, ArrowRight, Loader2, Mail, CheckCircle2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 
@@ -97,8 +98,8 @@ export default function Login() {
       <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-primary/20 blur-[120px] animate-pulse" />
       <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-violet-600/10 blur-[120px]" />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full opacity-[0.03] pointer-events-none">
-        <Music size={600} className="absolute top-0 left-0 -rotate-12" />
-        <Music size={400} className="absolute bottom-0 right-0 rotate-12" />
+        <div className="w-96 h-96 rounded-full bg-blue-600/10 blur-[100px] absolute top-0 left-0" />
+        <div className="w-80 h-80 rounded-full bg-indigo-600/10 blur-[100px] absolute bottom-0 right-0" />
       </div>
       
       <div className="z-10 w-full max-w-[440px] px-4 sm:px-0 mx-auto">
@@ -107,12 +108,9 @@ export default function Login() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-10 text-center flex flex-col items-center"
         >
-          <div className="w-16 h-16 bg-gradient-to-br from-primary to-violet-600 rounded-2xl flex items-center justify-center mb-6 shadow-2xl shadow-primary/20 group hover:scale-110 transition-transform duration-500">
-            <Music className="w-8 h-8 text-white" />
+          <div className="mb-4 transform hover:scale-105 transition-transform duration-300">
+            <DanceProLogo size="lg" variant="dark" showSubtitle={true} />
           </div>
-          <h1 className="text-3xl font-black text-white mb-2 tracking-tight">
-            Music<span className="text-primary">Pro</span>
-          </h1>
           <p className="text-muted-foreground font-medium">
             {loginType === 'aluno' ? 'Área do Aluno' : 'Área da Escola / Professor'}
           </p>
