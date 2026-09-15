@@ -102,22 +102,24 @@ export function HeroSlider() {
   const [current, setCurrent] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
 
-  if (!slides || slides.length === 0) return null;
-
+  // ⚠️ Todos os hooks DEVEM ficar ANTES de qualquer return condicional (Rules of Hooks)
   // Garantir índice válido se a lista mudar
   useEffect(() => {
+    if (!slides || slides.length === 0) return;
     if (current >= slides.length) {
       setCurrent(0);
     }
-  }, [slides.length, current]);
+  }, [slides?.length, current]);
 
   useEffect(() => {
-    if (isHovered || slides.length <= 1) return;
+    if (!slides || slides.length <= 1 || isHovered) return;
     const interval = setInterval(() => {
       setCurrent((c) => (c === slides.length - 1 ? 0 : c + 1));
     }, AUTOPLAY_INTERVAL);
     return () => clearInterval(interval);
-  }, [isHovered, slides.length]);
+  }, [isHovered, slides?.length]);
+
+  if (!slides || slides.length === 0) return null;
 
   const nextSlide = () => setCurrent(current === slides.length - 1 ? 0 : current + 1);
   const prevSlide = () => setCurrent(current === 0 ? slides.length - 1 : current - 1);
