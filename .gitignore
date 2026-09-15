@@ -136,7 +136,7 @@ delete_*.cjs
 cleanup_*.ts
 create_test_*.ts
 seed_*.ts
-migrate*.ts
+/migrate*.ts
 migrate*.cjs
 migrate*.mjs
 run-*.ts
