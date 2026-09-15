@@ -1,43 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" fill="none">
   <defs>
-    <linearGradient id="dance-bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#4f46e5" />
-      <stop offset="50%" stop-color="#7c3aed" />
-      <stop offset="100%" stop-color="#ec4899" />
+    <linearGradient id="dp-blue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0088ff" />
+      <stop offset="50%" stop-color="#0066ff" />
+      <stop offset="100%" stop-color="#0050e6" />
     </linearGradient>
-    <linearGradient id="dance-wave" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ffffff" />
-      <stop offset="100%" stop-color="#fdf2f8" />
-    </linearGradient>
-    <filter id="glow-dance" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="12" result="blur" />
-      <feMerge>
-        <feMergeNode in="blur" />
-        <feMergeNode in="SourceGraphic" />
-      </feMerge>
-    </filter>
   </defs>
 
-  <!-- Container arredondado premium -->
-  <rect width="512" height="512" rx="128" fill="url(#dance-bg)" />
+  <!-- O 'D' principal azul -->
+  <path 
+    d="M 60 70 L 260 70 C 390 70 440 170 440 250 C 440 330 390 430 260 430 L 60 430 Z" 
+    fill="url(#dp-blue)" 
+  />
 
-  <!-- Detalhe de iluminação sutil superior -->
-  <rect x="12" y="12" width="488" height="488" rx="116" stroke="rgba(255,255,255,0.2)" stroke-width="4" />
+  <!-- Silhueta da bailarina em salto com braço estendido para o alto cortando o D -->
+  <!-- Cabeça da bailarina -->
+  <circle cx="282" cy="190" r="26" fill="#ffffff" />
 
-  <!-- Símbolo cinético de salto e movimento fluido -->
-  <g filter="url(#glow-dance)">
-    <circle cx="280" cy="140" r="32" fill="url(#dance-wave)" />
-    <path 
-      d="M170 370 C 150 260, 210 190, 290 205 C 360 218, 380 290, 315 340 C 265 378, 205 375, 170 370 Z" 
-      fill="url(#dance-wave)" 
-      fill-opacity="0.95" 
-    />
-    <path 
-      d="M140 330 C 160 395, 250 420, 335 390 C 375 375, 395 345, 390 310" 
-      stroke="url(#dance-wave)" 
-      stroke-width="26" 
-      stroke-linecap="round" 
-      stroke-opacity="0.85" 
-    />
-  </g>
+  <!-- Corpo dinâmico / salto coreográfico -->
+  <path 
+    d="M 185 190 C 220 215 255 240 285 242 C 320 245 365 195 408 145 C 390 190 350 255 315 285 C 285 310 265 375 238 432 C 226 390 245 340 270 300 C 235 290 185 315 58 382 C 125 315 180 250 185 190 Z" 
+    fill="#ffffff" 
+  />
 </svg>
