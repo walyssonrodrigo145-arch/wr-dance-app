@@ -144,6 +144,25 @@ async function ensureSchemaConsistency(db: any) {
       debugLog("[Database] Failed to execute create system tables:", e);
     }
     
+    // system_plans: migração de colunas legadas camelCase para snake_case
+    await db.execute(sql`DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'system_plans' AND column_name = 'priceMonthly') THEN
+        ALTER TABLE "system_plans" RENAME COLUMN "priceMonthly" TO "price_monthly";
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'system_plans' AND column_name = 'priceYearly') THEN
+        ALTER TABLE "system_plans" RENAME COLUMN "priceYearly" TO "price_yearly";
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'system_plans' AND column_name = 'maxStudents') THEN
+        ALTER TABLE "system_plans" RENAME COLUMN "maxStudents" TO "max_students";
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'system_plans' AND column_name = 'isActive') THEN
+        ALTER TABLE "system_plans" RENAME COLUMN "isActive" TO "is_active";
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'system_plans' AND column_name = 'showOnLanding') THEN
+        ALTER TABLE "system_plans" RENAME COLUMN "showOnLanding" TO "show_on_landing";
+      END IF;
+    END $$;`);
+
     // system_plans: allow_extra_students e extra_student_price
     await db.execute(sql`ALTER TABLE "system_plans" ADD COLUMN IF NOT EXISTS "allow_extra_students" boolean DEFAULT true NOT NULL`);
     await db.execute(sql`ALTER TABLE "system_plans" ADD COLUMN IF NOT EXISTS "extra_student_price" numeric DEFAULT 1.49 NOT NULL`);
