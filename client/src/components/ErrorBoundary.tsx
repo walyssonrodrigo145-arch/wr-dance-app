@@ -47,18 +47,11 @@ class ErrorBoundary extends Component<Props, State> {
             {/* AUD-001: Em produção, exibir apenas mensagem genérica.
                 Em desenvolvimento, exibir o stack técnico para facilitar debug. */}
             <div className="p-4 w-full rounded bg-muted overflow-auto mb-6 text-center">
-              {isDev ? (
-                <pre className="text-sm text-muted-foreground whitespace-break-spaces text-left">
-                  {this.state.error?.message}
-                  {"\n\n"}
-                  {this.state.error?.stack}
-                </pre>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Ocorreu um erro ao processar sua solicitação. Por favor, recarregue a página e tente novamente.
-                  Se o problema persistir, entre em contato com o suporte.
-                </p>
-              )}
+              <pre className="text-xs text-muted-foreground whitespace-break-spaces text-left font-mono">
+                {this.state.error?.message || "Erro desconhecido"}
+                {"\n\n"}
+                {this.state.error?.stack}
+              </pre>
             </div>
 
             <button
