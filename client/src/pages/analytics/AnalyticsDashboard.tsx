@@ -1,5 +1,5 @@
 /**
- * AnalyticsDashboard.tsx — Dashboard principal do MusicPro Analytics
+ * AnalyticsDashboard.tsx — Dashboard principal do DancePro Analytics
  * 
  * 14+ abas com métricas completas: visitantes, receita, conversão,
  * heatmap, funil, campanhas, mapa, dispositivos, IA insights e mais.
@@ -1883,7 +1883,7 @@ export default function AnalyticsDashboard() {
                 <span className="text-xs font-medium text-emerald-600 uppercase tracking-widest">Live</span>
               </div>
               <h1 className="font-outfit text-2xl md:text-3xl font-bold text-foreground">
-                MusicPro <span className="text-violet-600">Analytics</span>
+                DancePro <span className="text-violet-600">Analytics</span>
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
                 Monitoramento completo da plataforma · {new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}

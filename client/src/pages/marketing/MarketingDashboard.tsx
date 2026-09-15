@@ -334,7 +334,7 @@ export default function MarketingDashboard() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="sm:col-span-2 space-y-1.5">
                 <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Nome da Campanha</Label>
-                <Input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Ex: Lançamento MusicPro" />
+                <Input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Ex: Lançamento DancePro" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Intervalo (seg)</Label>

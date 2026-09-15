@@ -1,4 +1,4 @@
-// 📣 Changelog versionado do MusicPro (FONTE ÚNICA das "Novidades").
+// 📣 Changelog versionado do DancePro (FONTE ÚNICA das "Novidades").
 //
 // COMO MANTER (100% automático — sem cadastro no sistema):
 // Ao lançar uma funcionalidade, adicione um objeto `Release` NO TOPO da lista
@@ -25,6 +25,19 @@ export interface Release {
 }
 
 export const RELEASES: Release[] = [
+  {
+    version: "2026.09.15",
+    date: "2026-09-15",
+    title: "🩰 DancePro — Rebranding Completo",
+    summary: "O sistema foi totalmente adaptado para escolas de dança. Todos os textos, ícones e termos foram atualizados.",
+    items: [
+      { type: "novo", title: "Rebranding completo para DancePro", description: "Todos os textos, ícones e referências de escola de música foram substituídos pelo contexto de escola de dança." },
+      { type: "melhoria", title: "Modalidades substituem Instrumentos", description: "Labels, filtros, relatórios e rankings agora usam 'Modalidade' no lugar de 'Instrumento'." },
+      { type: "melhoria", title: "Portal do Aluno adaptado para dança", description: "Metrônomo e BPM removidos. Repertório virou Coreografias. Instrumento Principal virou Modalidade Principal." },
+      { type: "melhoria", title: "Salas adaptadas para escola de dança", description: "Placeholders das salas agora refletem tablados, barras, espelhos e equipamentos de dança." },
+      { type: "melhoria", title: "Leads e Marketing atualizados", description: "Modalidades de dança (Ballet, Forró, Zumba, Hip-Hop, Salsa) substituem instrumentos musicais nos funis de vendas." },
+    ],
+  },
   {
     version: "2026.09.16",
     date: "2026-09-16",

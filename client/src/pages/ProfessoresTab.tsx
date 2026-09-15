@@ -308,7 +308,7 @@ export function ProfessoresTab() {
                       <Input
                         value={especialidade}
                         onChange={e => setEspecialidade(e.target.value)}
-                        placeholder="Piano, Canto..."
+                        placeholder="Ballet, Forró, Zumba..."
                         className="h-10 rounded-xl border-border/60 bg-muted/30 focus:bg-background transition-colors"
                       />
                     </div>

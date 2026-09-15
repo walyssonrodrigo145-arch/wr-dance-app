@@ -132,9 +132,9 @@ export function StudentSidebar({ collapsed, onToggle, onNavigate }: StudentSideb
           </div>
         )}
         {!collapsed && (user as any)?.showSchoolName !== 0 && (
-          <div className="animate-in fade-in slide-in-from-left-2 duration-300 min-w-0 flex-1 pr-1" title={(user as any)?.schoolName || "MusicPro"}>
+          <div className="animate-in fade-in slide-in-from-left-2 duration-300 min-w-0 flex-1 pr-1" title={(user as any)?.schoolName || "DancePro"}>
             <p className="text-sm font-black text-white tracking-tight leading-tight break-words line-clamp-2">
-              {(user as any)?.schoolName || "MusicPro"}
+              {(user as any)?.schoolName || "DancePro"}
             </p>
             <p className="text-[10px] text-sidebar-foreground/50 font-bold uppercase tracking-widest mt-0.5 truncate">
               {(user as any)?.schoolLogo ? "Portal do Aluno" : "Premium Portal"}

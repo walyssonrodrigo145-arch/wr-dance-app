@@ -234,7 +234,7 @@ export default function CrmKanban() {
                               size="icon" 
                               variant="ghost" 
                               className="h-7 w-7 text-emerald-600 hover:bg-emerald-500/10 rounded-lg"
-                              onClick={() => window.open(`https://wa.me/55${lead.phone.replace(/\D/g, '')}?text=Olá ${lead.name}! Tudo bem? Gostaria de saber se podemos agendar sua aula experimental no MusicPro.`, '_blank')}
+                              onClick={() => window.open(`https://wa.me/55${lead.phone.replace(/\D/g, '')}?text=Olá ${lead.name}! Tudo bem? Gostaria de saber se podemos agendar sua aula experimental no DancePro.`, '_blank')}
                               title="Abrir WhatsApp"
                             >
                               <MessageCircle size={14} />
@@ -252,7 +252,7 @@ export default function CrmKanban() {
                                   monthlyFee: Number(lead.value) || 150,
                                   autoSendWhatsapp: true,
                                 });
-                                const fullUrl = res.fullUrl || (window.location.origin.includes('localhost') ? `https://wrmusicpro.com.br${res.url}` : `${window.location.origin}${res.url}`);
+                                const fullUrl = res.fullUrl || (window.location.origin.includes('localhost') ? `https://dancepro.wrdancepro.com.br${res.url}` : `${window.location.origin}${res.url}`);
                                 await navigator.clipboard.writeText(fullUrl);
 
                                 if (res.sentViaBot) {
@@ -260,7 +260,7 @@ export default function CrmKanban() {
                                 } else {
                                   toast.success("Link gerado e copiado! Redirecionando para o WhatsApp...");
                                   if (lead.phone) {
-                                    const text = encodeURIComponent(`Olá ${lead.name}! 🎵\n\nAqui está o seu link exclusivo para realizar sua matrícula na nossa escola de música:\n\n👉 ${fullUrl}\n\nAcesse o link acima para escolher o melhor dia e horário para suas aulas!`);
+                                    const text = encodeURIComponent(`Olá ${lead.name}! 🎵\n\nAqui está o seu link exclusivo para realizar sua matrícula na nossa escola de dança:\n\n👉 ${fullUrl}\n\nAcesse o link acima para escolher o melhor dia e horário para suas aulas!`);
                                     window.open(`https://wa.me/55${lead.phone.replace(/\D/g, '')}?text=${text}`, '_blank');
                                   }
                                 }

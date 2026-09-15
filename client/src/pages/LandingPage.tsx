@@ -271,7 +271,7 @@ const SignupModal = ({ plan, onClose }: { plan: string; onClose: () => void }) =
                     </div>
                   </div>
                 </div>
-                <span className="font-bold text-sm opacity-90">MusicPro</span>
+                <span className="font-bold text-sm opacity-90">DancePro</span>
               </div>
               <h2 className="text-xl font-black mb-1">
                 Cadastro
@@ -449,7 +449,7 @@ const SignupModal = ({ plan, onClose }: { plan: string; onClose: () => void }) =
                     <Sparkles size={32} />
                   </div>
                   <h3 className="text-xl font-outfit font-black text-foreground mb-2">
-                    Bem-vindo ao MusicPro! 🎉
+                    Bem-vindo ao DancePro! 🎉
                   </h3>
                   <p className="text-gray-500 text-sm">
                     Sua conta foi criada com sucesso! Você ganhou <strong className="text-blue-600">7 dias grátis</strong> para testar a plataforma.
@@ -751,7 +751,7 @@ const LandingPage = () => {
     { name: 'Clientes & Parceiros', href: '#clients' },
     { name: 'Depoimentos', href: '#testimonials' },
     { name: 'Preços', href: '#pricing' },
-    { name: 'Contato', href: 'https://wa.me/5533984055949?text=ola%20gostaria%20de%20mais%20informa%C3%A7%C3%B5es%20sobre%20o%20sistema%20musicpro', target: '_blank' },
+    { name: 'Contato', href: 'https://wa.me/5533984055949?text=ola%20gostaria%20de%20mais%20informa%C3%A7%C3%B5es%20sobre%20o%20sistema%20dancepro', target: '_blank' },
   ];
 
   const fadeIn = {
@@ -916,7 +916,7 @@ const LandingPage = () => {
               </h1>
               
               <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-lg leading-relaxed font-medium">
-                Pare de perder tempo com planilhas e WhatsApp. O MusicPro cuida da burocracia enquanto você foca no que ama: <strong className="text-foreground">ensinar música.</strong>
+                Pare de perder tempo com planilhas e WhatsApp. O DancePro cuida da burocracia enquanto você foca no que ama: <strong className="text-foreground">ensinar dança.</strong>
               </p>
               
               <div className="flex flex-col sm:flex-row items-center gap-4 mb-10">
@@ -959,7 +959,7 @@ const LandingPage = () => {
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-indigo-500/20 rounded-[48px] blur-2xl"></div>
                 <img
                   src="/images/dashboard-preview.png"
-                  alt="Dashboard do Sistema MusicPro"
+                  alt="Dashboard do Sistema DancePro"
                   className="relative rounded-[24px] shadow-2xl border border-border w-full h-auto object-cover"
                   onError={(e) => {
                     e.currentTarget.classList.add('hidden');
@@ -970,7 +970,7 @@ const LandingPage = () => {
                 <div className="hidden relative rounded-[24px] shadow-2xl border border-border/50 bg-gradient-to-br from-primary/10 via-indigo-500/5 to-background flex flex-col items-center justify-center aspect-video">
                   <div className="text-center p-8">
                     <Music size={52} className="text-primary/40 mx-auto mb-4" />
-                    <p className="text-foreground font-bold text-base">Dashboard MusicPro</p>
+                    <p className="text-foreground font-bold text-base">Dashboard DancePro</p>
                     <p className="text-muted-foreground/60 text-xs mt-1">Visualização do painel administrativo</p>
                   </div>
                 </div>
@@ -996,7 +996,7 @@ const LandingPage = () => {
             <h2 className="text-primary font-black tracking-widest uppercase text-sm mb-4">Tudo que você precisa</h2>
             <h3 className="text-4xl md:text-5xl font-outfit font-extrabold text-foreground mb-6">Funcionalidades pensadas para músicos</h3>
             <p className="text-lg text-muted-foreground font-medium">
-              Desenvolvido por quem entende a rotina de uma escola de música. Simples de usar, poderoso nos resultados.
+              Desenvolvido por quem entende a rotina de uma escola de dança. Simples de usar, poderoso nos resultados.
             </p>
           </div>
 
@@ -1046,7 +1046,7 @@ const LandingPage = () => {
 
           <div className="grid md:grid-cols-3 gap-6">
             {[
-              { name: 'Ana Lima', role: 'Diretora - Escola Harmonia', text: 'O MusicPro transformou completamente a forma como gerencio minha escola. Economizo horas por semana!', avatarColor: 'bg-gradient-to-br from-blue-500 to-indigo-600' },
+              { name: 'Ana Lima', role: 'Diretora - Cia. Arte em Movimento', text: 'O DancePro transformou completamente a forma como gerencio minha escola. Economizo horas por semana!', avatarColor: 'bg-gradient-to-br from-blue-500 to-indigo-600' },
               { name: 'Carlos Mendes', role: 'Professor - Studio Ritmo', text: 'Os lembretes automáticos reduziram em 80% as faltas dos alunos. Resultado incrível!', avatarColor: 'bg-gradient-to-br from-emerald-500 to-teal-600' },
               { name: 'Patricia Souza', role: 'Fundadora - Acorde Music', text: 'O controle financeiro é fantástico. Antes era tudo planilha, agora tenho tudo automatizado.', avatarColor: 'bg-gradient-to-br from-violet-500 to-purple-600' },
             ].map((t, i) => (
@@ -1183,7 +1183,7 @@ const LandingPage = () => {
                     </div>
                   </div>
                   <p className="text-muted-foreground font-medium leading-relaxed mb-6">
-                    Checkout seguro da InfinitePay com Pix (taxa zero) ou cartão de crédito em até 12x. O MusicPro gera o link e confirma o pagamento automaticamente — sem mensalidade e sem custo de integração.
+                    Checkout seguro da InfinitePay com Pix (taxa zero) ou cartão de crédito em até 12x. O DancePro gera o link e confirma o pagamento automaticamente — sem mensalidade e sem custo de integração.
                   </p>
                   <ul className="space-y-2">
                     {['PIX com taxa zero — você recebe 100%', 'Cartão em até 12x', 'Links curtos prontos para o WhatsApp', 'Confirmação automática em tempo real'].map((item) => (
@@ -1419,26 +1419,26 @@ const LandingPage = () => {
               <h5 className="font-extrabold text-foreground mb-6 uppercase tracking-widest text-sm">Escola</h5>
               <ul className="space-y-4 text-muted-foreground font-medium">
                 <li><a href="#" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-primary transition-colors cursor-pointer">Sobre nós</a></li>
-                <li><a href="https://wa.me/5533984055949?text=Gostaria%20de%20saber%20sobre%20parceria%20com%20o%20MusicPro" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Parceiros</a></li>
-                <li><a href="https://wa.me/5533984055949?text=Quero%20saber%20mais%20sobre%20o%20MusicPro" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Blog</a></li>
-                <li><a href="https://wa.me/5533984055949?text=ola%20gostaria%20de%20mais%20informa%C3%A7%C3%B5es%20sobre%20o%20sistema%20musicpro" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Contato</a></li>
+                <li><a href="https://wa.me/5533984055949?text=Gostaria%20de%20saber%20sobre%20parceria%20com%20o%20DancePro" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Parceiros</a></li>
+                <li><a href="https://wa.me/5533984055949?text=Quero%20saber%20mais%20sobre%20o%20DancePro" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Blog</a></li>
+                <li><a href="https://wa.me/5533984055949?text=ola%20gostaria%20de%20mais%20informa%C3%A7%C3%B5es%20sobre%20o%20sistema%20dancepro" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Contato</a></li>
               </ul>
             </div>
 
             <div>
               <h5 className="font-extrabold text-foreground mb-6 uppercase tracking-widest text-sm">Suporte</h5>
               <ul className="space-y-4 text-muted-foreground font-medium">
-                <li><a href="https://wa.me/5533984055949?text=Preciso%20de%20ajuda%20com%20o%20MusicPro" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Central de Ajuda</a></li>
+                <li><a href="https://wa.me/5533984055949?text=Preciso%20de%20ajuda%20com%20o%20DancePro" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Central de Ajuda</a></li>
                 <li><a href="/politica-de-privacidade" className="hover:text-primary transition-colors">Política de Privacidade</a></li>
                 <li><a href="/termos-de-uso" className="hover:text-primary transition-colors">Termos de Uso</a></li>
-                <li><a href="https://wa.me/5533984055949?text=Status%20do%20sistema%20MusicPro" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Status do Sistema</a></li>
+                <li><a href="https://wa.me/5533984055949?text=Status%20do%20sistema%20DancePro" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Status do Sistema</a></li>
               </ul>
             </div>
 
           </div>
 
           <div className="flex flex-col md:flex-row items-center justify-between pt-10 border-t border-border/50 text-muted-foreground font-medium text-sm gap-4">
-            <p>© {new Date().getFullYear()} MusicPro. Todos os direitos reservados.</p>
+            <p>© {new Date().getFullYear()} DancePro. Todos os direitos reservados.</p>
           </div>
         </div>
       </footer>

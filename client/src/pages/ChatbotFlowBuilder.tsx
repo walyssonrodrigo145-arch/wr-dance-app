@@ -800,7 +800,7 @@ export default function ChatbotFlowBuilder() {
                   🎵
                 </div>
                 <div>
-                  <p className="text-xs font-bold leading-tight">WR MusicPro Robô</p>
+                  <p className="text-xs font-bold leading-tight">WR DancePro Robô</p>
                   <p className="text-[10px] text-emerald-400 font-medium">online • autoatendimento</p>
                 </div>
               </div>

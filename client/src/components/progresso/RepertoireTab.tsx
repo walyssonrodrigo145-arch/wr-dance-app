@@ -146,7 +146,7 @@ export function RepertoireTab({ studentId, studentName }: { studentId: number; s
               Repertório{studentName ? ` de ${studentName}` : " do Aluno"}
             </h3>
             <p className="text-[10px] sm:text-xs text-muted-foreground font-bold mt-0.5">
-              Músicas do YouTube que o aluno executa dentro do MusicPro (aba Materiais)
+              Músicas do YouTube que o aluno executa dentro do DancePro (aba Materiais)
             </p>
           </div>
         </div>
@@ -183,7 +183,7 @@ export function RepertoireTab({ studentId, studentName }: { studentId: number; s
           </div>
           <p className="text-sm font-black text-foreground">Nenhuma música no repertório</p>
           <p className="text-xs text-muted-foreground mt-1.5 max-w-[320px]">
-            Adicione o primeiro link do YouTube — o aluno escuta pelo portal, sem sair do MusicPro.
+            Adicione o primeiro link do YouTube — o aluno escuta pelo portal, sem sair do DancePro.
           </p>
         </div>
       ) : (
@@ -475,7 +475,7 @@ export function RepertoireTab({ studentId, studentName }: { studentId: number; s
         open={!!playing}
         onOpenChange={(o) => { if (!o) setPlaying(null); }}
         title={playing?.title || "Música"}
-        description={playing?.studentName ? `Repertório de ${playing.studentName}` : "Executando pelo MusicPro"}
+        description={playing?.studentName ? `Repertório de ${playing.studentName}` : "Executando pelo DancePro"}
       >
         <div className="pt-1">
           {/* Capa antes do iframe (Erro 153/fundo branco) — iframe só após o play */}

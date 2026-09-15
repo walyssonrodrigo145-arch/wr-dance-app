@@ -341,7 +341,7 @@ export function SalasEstudioTab() {
                   </div>
                   <div>
                     <h3 className="text-xl font-black text-foreground font-outfit">
-                      {editingRoom ? "Editar Sala" : "Nova Sala de Estúdio"}
+                      {editingRoom ? "Editar Sala" : "Nova Sala de Ensaio"}
                     </h3>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {editingRoom ? "Altere os detalhes e a cor da sala" : "Cadastre uma nova sala de ensaio ou aula"}
@@ -368,7 +368,7 @@ export function SalasEstudioTab() {
                   <Input
                     value={form.name}
                     onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-                    placeholder="Ex: Estúdio A - Piano Acústico / Sala 02"
+                    placeholder="Ex: Sala A - Ballet / Sala 02"
                     className="h-12 text-sm font-semibold rounded-2xl bg-muted/30 border-border/60 focus:border-primary"
                     required
                   />
@@ -381,7 +381,7 @@ export function SalasEstudioTab() {
                   <Input
                     value={form.description}
                     onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-                    placeholder="Ex: Equipada com bateria Roland, 2 amplificadores e ar-condicionado"
+                    placeholder="Ex: Tablado de madeira, espelhos, barras de balé e ar-condicionado"
                     className="h-12 text-sm rounded-2xl bg-muted/30 border-border/60 focus:border-primary"
                   />
                 </div>
@@ -494,7 +494,7 @@ export function SalasEstudioTab() {
                   <div className="space-y-2">
                     <Label className="text-xs font-bold text-muted-foreground uppercase">Preferências / Restrições (Opcional)</Label>
                     <Input 
-                      placeholder="Ex: Evitar aulas de bateria após as 18h na Sala 1" 
+                      placeholder="Ex: Evitar aulas de sapateado após as 18h na Sala 1" 
                       value={schedulePreferences} 
                       onChange={(e) => setSchedulePreferences(e.target.value)} 
                       className="rounded-xl h-11 bg-background/50"

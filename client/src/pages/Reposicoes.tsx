@@ -188,7 +188,7 @@ function RepositionDetailsModal({ repositionId, open, onOpenChange }: { repositi
               <Detail label="Aluno" value={r.studentName || "—"} />
               <Detail label="Status" value={CREDIT_STATUS_CONFIG[r.reposition.status]?.label || r.reposition.status} />
               <Detail label="Motivo" value={r.reasonName || "—"} />
-              <Detail label="Instrumento" value={r.instrumentName || "Geral"} />
+              <Detail label="Modalidade" value={r.instrumentName || "Geral"} />
               <Detail label="Aula original" value={fmtDateTime(r.originalLessonAt)} />
               <Detail label="Criado em" value={fmtDateTime(r.reposition.createdAt)} />
               <Detail label="Liberação" value={fmtDateTime(r.reposition.releasedAt)} />

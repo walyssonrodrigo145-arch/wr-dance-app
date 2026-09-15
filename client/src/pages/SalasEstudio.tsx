@@ -64,7 +64,7 @@ export default function SalasEstudio() {
   // Form State
   const [formData, setFormData] = useState({
     name: "",
-    category: "Estúdio de gravação",
+    category: "Sala de Ensaio",
     capacity: 8,
     equipments: "",
     status: "ativa",
@@ -137,7 +137,7 @@ export default function SalasEstudio() {
       id: r.id,
       name: r.name,
       isPrincipal: r.isPrincipal ?? false,
-      category: r.category || "Estúdio de gravação",
+      category: r.category || "Sala de Ensaio",
       capacity: r.capacity || 8,
       equipments: eqList,
       extraEquipmentsCount: Math.max(0, eqList.length - 3),
@@ -159,7 +159,7 @@ export default function SalasEstudio() {
     setEditingRoom(null);
     setFormData({
       name: "",
-      category: "Estúdio de gravação",
+      category: "Sala de Ensaio",
       capacity: 8,
       equipments: "",
       status: "ativa",
@@ -173,7 +173,7 @@ export default function SalasEstudio() {
     setEditingRoom(room);
     setFormData({
       name: room.name,
-      category: room.category || "Estúdio de gravação",
+      category: room.category || "Sala de Ensaio",
       capacity: room.capacity || 8,
       equipments: Array.isArray(room.equipments) ? room.equipments.join(", ") : room.equipments || "",
       status: room.status || "ativa",
@@ -836,7 +836,7 @@ export default function SalasEstudio() {
         <DialogContent className="sm:max-w-[500px] bg-card border-border">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold font-outfit">
-              {editingRoom ? "Editar Sala de Estúdio" : "Cadastrar Nova Sala"}
+              {editingRoom ? "Editar Sala de Ensaio" : "Cadastrar Nova Sala"}
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
               Insira os detalhes técnicos da sala para disponibilizá-la no agendamento de aulas.
@@ -891,7 +891,7 @@ export default function SalasEstudio() {
               <Input
                 value={formData.equipments}
                 onChange={(e) => setFormData({ ...formData, equipments: e.target.value })}
-                placeholder="Bateria, Teclado, Ar Condicionado"
+                placeholder="Tablado, Espelhos, Barras, Ar Condicionado"
                 className="h-10 rounded-xl"
               />
             </div>

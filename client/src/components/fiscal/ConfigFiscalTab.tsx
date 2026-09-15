@@ -301,7 +301,7 @@ export function ConfigFiscalTab() {
             <Input
               value={form.razaoSocial}
               onChange={(e) => setForm({ ...form, razaoSocial: e.target.value })}
-              placeholder="Ex: Escola de Música Harmonia LTDA"
+              placeholder="Ex: Escola de Dança Harmonia LTDA"
               className="mt-1.5 h-11 rounded-2xl bg-background border-border text-xs"
             />
           </div>

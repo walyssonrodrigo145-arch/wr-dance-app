@@ -400,7 +400,7 @@ export default function Assinatura() {
               <div className="flex-1">
                 <h3 className="text-2xl font-black tracking-tight mb-2">Tem certeza absoluta?</h3>
                 <p className="text-white/80 text-sm mb-6 max-w-2xl font-medium leading-relaxed">
-                  Esta ação é irreversível. Sua assinatura será cancelada imediatamente no Asaas e seu acesso ao MusicPro será bloqueado. <strong className="text-white">Todos os seus alunos, aulas, faturas e arquivos serão excluídos de nossos servidores permanentemente.</strong>
+                  Esta ação é irreversível. Sua assinatura será cancelada imediatamente no Asaas e seu acesso ao DancePro será bloqueado. <strong className="text-white">Todos os seus alunos, aulas, faturas e arquivos serão excluídos de nossos servidores permanentemente.</strong>
                 </p>
                 <div className="flex flex-wrap gap-3">
                   <button 
@@ -451,7 +451,7 @@ export default function Assinatura() {
                       </div>
                       <h2 className="text-2xl font-black tracking-tight">Regras da Assinatura</h2>
                     </div>
-                    <p className="text-indigo-100 text-sm font-medium">Informações importantes sobre a gestão do seu plano no MusicPro e integração com o Asaas.</p>
+                    <p className="text-indigo-100 text-sm font-medium">Informações importantes sobre a gestão do seu plano no DancePro e integração com o Asaas.</p>
                   </div>
                   <button 
                     onClick={() => setShowRulesModal(false)}

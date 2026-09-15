@@ -28,7 +28,7 @@ export default function ClientsMarquee() {
           </div>
 
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-outfit font-extrabold text-foreground tracking-tight leading-[1.15]">
-            Quem confia na <span className="text-primary font-black">MusicPro</span> para transformar sua escola
+            Quem confia na <span className="text-primary font-black">DancePro</span> para transformar sua escola
           </h2>
 
           <p className="text-sm md:text-base text-muted-foreground font-medium max-w-2xl mx-auto leading-relaxed">

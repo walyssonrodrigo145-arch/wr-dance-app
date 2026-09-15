@@ -9,7 +9,7 @@ const DEFAULT_SLIDES = [
     id: 1,
     title: 'Gestão de Alunos',
     highlight: 'Automática',
-    subtitle: 'O MusicPro automatiza a maioria das tarefas chatas e manuais que você e sua equipe fazem hoje.',
+    subtitle: 'O DancePro automatiza a maioria das tarefas chatas e manuais que você e sua equipe fazem hoje.',
     points: [
       'Registro de presença rápido e fácil.',
       'Acompanhamento de evolução do aluno.',

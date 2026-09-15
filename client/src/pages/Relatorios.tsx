@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import { 
   TrendingUp, Users, DollarSign, Download, Filter, 
-  ChevronRight, Music, CreditCard,
+  ChevronRight, PersonStanding, CreditCard,
   CalendarDays, Search, UserPlus, Target, Clock,
   LayoutGrid, PieChart as PieIcon, TrendingDown, Wallet, LineChart as LineIcon,
   Layers, GraduationCap, BarChart2, Sparkles, FileText, AlertCircle, Activity, Loader2
@@ -29,7 +29,7 @@ const TAB_CONFIG = [
   { key: 'projecao',     label: 'Projeção 6M',   icon: TrendingUp },
   { key: 'alunos',       label: 'Alunos',        icon: Users },
   { key: 'aulas',        label: 'Aulas',         icon: CalendarDays },
-  { key: 'instrumentos', label: 'Instrumentos',  icon: Music },
+  { key: 'modalidades', label: 'Modalidades',  icon: PersonStanding },
   { key: 'mensalidades', label: 'Mensalidades',  icon: FileText },
   { key: 'modalidades',  label: 'Modalidades',   icon: Layers },
   { key: 'engajamento',  label: 'Acessos',       icon: Activity },
@@ -235,7 +235,7 @@ const Relatorios: React.FC = () => {
         columns = ["Mês", "Receita Projetada", "Despesa Projetada", "Lucro Projetado"];
         projecaoQuery.data?.projection?.forEach(p => rows.push([p.monthName, Number(p.receita), Number(p.despesa), Number(p.lucro)]));
       } else if (activeTab === 'alunos') {
-        columns = ["ID", "Nome", "Professor", "Instrumento", "Mensalidade", "Status"];
+        columns = ["ID", "Nome", "Professor", "Modalidade", "Mensalidade", "Status"];
         alunosReportQuery.data?.forEach(s => rows.push([s.id, s.name, s.professorName || '', s.instrumentName || '', Number(s.monthlyFee), s.status]));
       } else if (activeTab === 'aulas') {
         columns = ["Data", "Aluno", "Professor", "Status", "Observação"];
@@ -248,8 +248,8 @@ const Relatorios: React.FC = () => {
         overduePaymentsQuery.data?.forEach(p => {
           rows.push([p.studentName, format(new Date(p.dueDate), 'dd/MM/yyyy'), Number(p.amount), p.status]);
         });
-      } else if (activeTab === 'instrumentos') {
-        columns = ["Instrumento", "Categoria", "Alunos Ativos"];
+      } else if (activeTab === 'modalidades') {
+        columns = ["Modalidade", "Categoria", "Alunos Ativos"];
         instrumentStatsQuery.data?.forEach(instr => {
           rows.push([instr.name, instr.category || 'Geral', Number(instr.studentCount || 0)]);
         });
@@ -332,7 +332,7 @@ const Relatorios: React.FC = () => {
               {[
                 { label: 'Alunos Ativos', value: activeStudents || 0, icon: Users, color: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' },
                 { label: 'Aulas do Mês', value: statsQuery.data?.monthLessons || 0, icon: GraduationCap, color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
-                { label: 'Instrumentos', value: instrumentStatsQuery.data?.length || 0, icon: Music, color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400' },
+                { label: 'Modalidades', value: instrumentStatsQuery.data?.length || 0, icon: PersonStanding, color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400' },
               ].map((item, i) => (
                 <motion.div
                   key={item.label}
@@ -611,7 +611,7 @@ const Relatorios: React.FC = () => {
               className="bg-card border border-border p-5 rounded-2xl flex items-center gap-4 hover:shadow-lg hover:shadow-primary/10 hover:border-primary/30 transition-all duration-300 group"
             >
               <div className="w-11 h-11 rounded-xl flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-300 shrink-0" style={{ backgroundColor: `${instr.color || '#6366f1'}20` }}>
-                <Music className="w-5 h-5" style={{ color: instr.color || '#6366f1' }} />
+                <PersonStanding className="w-5 h-5" style={{ color: instr.color || '#6366f1' }} />
               </div>
               <div className="flex-1 min-w-0">
                 <h4 className="text-sm font-black text-foreground truncate font-outfit">{instr.name}</h4>
@@ -625,8 +625,8 @@ const Relatorios: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Barras */}
           <ChartCard>
-            <SectionTitle icon={LayoutGrid} title="Alunos por Instrumento" badge="Geral" color="text-indigo-600 dark:text-indigo-400" />
-            <p className="text-xs text-muted-foreground mb-6 mt-1">Comparativo de matrículas ativas por instrumento.</p>
+            <SectionTitle icon={LayoutGrid} title="Alunos por Modalidade" badge="Geral" color="text-indigo-600 dark:text-indigo-400" />
+            <p className="text-xs text-muted-foreground mb-6 mt-1">Comparativo de matrículas ativas por modalidade.</p>
             <div className="h-72 w-full">
               {pieData.length === 0 ? <EmptyState /> : (
                 <ResponsiveContainer width="100%" height="100%">
@@ -644,8 +644,8 @@ const Relatorios: React.FC = () => {
 
           {/* Pizza */}
           <ChartCard>
-            <SectionTitle icon={PieIcon} title="Distribuição por Instrumento" badge="Fatias" color="text-purple-600 dark:text-purple-400" />
-            <p className="text-xs text-muted-foreground mb-6 mt-1">Fatia de mercado de cada instrumento na escola.</p>
+            <SectionTitle icon={PieIcon} title="Distribuição por Modalidade" badge="Fatias" color="text-purple-600 dark:text-purple-400" />
+            <p className="text-xs text-muted-foreground mb-6 mt-1">Fatia de mercado de cada modalidade na escola.</p>
             <div className="h-60 w-full">
               {pieData.length === 0 ? <EmptyState /> : (
                 <ResponsiveContainer width="100%" height="100%">
@@ -1148,7 +1148,7 @@ const Relatorios: React.FC = () => {
             {activeTab === 'alunos'       && renderAlunos()}
             {activeTab === 'modalidades'  && renderModalidades()}
             {activeTab === 'aulas'        && renderAulas()}
-            {activeTab === 'instrumentos' && renderInstrumentos()}
+            {activeTab === 'modalidades' && renderInstrumentos()}
             {activeTab === 'mensalidades' && renderMensalidades()}
             {activeTab === 'engajamento'  && renderEngajamento()}
           </motion.div>

@@ -135,8 +135,8 @@ export default function RecepcaoQRCode() {
   }, []);
 
   const lastScans = (recentLogs ?? []).slice(0, 5);
-  // Usa o nome/logo da escola (branding white-label) com fallback para MusicPro.
-  const schoolName = (user as any)?.schoolName || "MusicPro";
+  // Usa o nome/logo da escola (branding white-label) com fallback para DancePro.
+  const schoolName = (user as any)?.schoolName || "DancePro";
   const schoolLogo = (user as any)?.schoolLogo || null;
 
   return (
@@ -372,7 +372,7 @@ export default function RecepcaoQRCode() {
           <div className="flex items-center gap-2 text-white/20 text-xs">
             <Shield size={12} />
             <span>
-              MusicPro — Sistema de Presença Seguro •{" "}
+              DancePro — Sistema de Presença Seguro •{" "}
               {format(new Date(), "yyyy")}
             </span>
           </div>

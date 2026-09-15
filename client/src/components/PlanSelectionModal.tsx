@@ -1,4 +1,4 @@
-// 🚀 Modal de seleção de planos do MusicPro — aparece para admins com escola em trial
+// 🚀 Modal de seleção de planos do DancePro — aparece para admins com escola em trial
 // (ex.: contas criadas via login Google). Assinatura via Asaas (platform.changePlan).
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { Sparkles, Check, Loader2, Clock, Crown } from "lucide-react";
 
-const DISMISS_KEY = "musicpro_plan_modal_dismissed";
+const DISMISS_KEY = "dancepro_plan_modal_dismissed";
 
 interface Plan {
   id: string;
@@ -76,7 +76,7 @@ export function PlanSelectionModal() {
         {/* Header */}
         <div className="text-center space-y-2 mb-5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r from-violet-500/15 to-indigo-500/15 text-violet-600 dark:text-violet-400 text-[10px] font-black uppercase tracking-widest border border-violet-500/25">
-            <Sparkles size={11} /> Escolha seu plano MusicPro
+            <Sparkles size={11} /> Escolha seu plano DancePro
           </div>
           <h2 className="text-2xl font-black tracking-tight text-foreground">
             Sua escola está pronta! 🎵

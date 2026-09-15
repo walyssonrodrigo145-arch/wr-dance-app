@@ -4,7 +4,7 @@ import {
   Mail, 
   Phone, 
   Calendar, 
-  Music, 
+  PersonStanding, 
   Trophy,
   GraduationCap,
   Clock,
@@ -113,7 +113,7 @@ export default function StudentProfile() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-foreground">Meu Perfil</h1>
-          <p className="text-muted-foreground font-medium">Gerencie suas informações e acompanhe sua jornada musical.</p>
+          <p className="text-muted-foreground font-medium">Gerencie suas informações e acompanhe sua jornada na dança.</p>
         </div>
         <div className="flex items-center gap-3">
           <button 
@@ -142,7 +142,7 @@ export default function StudentProfile() {
           <Card className="border-none shadow-2xl bg-card/50 backdrop-blur-xl overflow-hidden relative">
             <div className="h-32 bg-gradient-to-br from-primary to-indigo-600 relative overflow-hidden">
                <div className="absolute inset-0 opacity-20 flex items-center justify-center rotate-12 scale-150">
-                  <Music size={120} strokeWidth={1} />
+                  <PersonStanding size={120} strokeWidth={1} />
                </div>
             </div>
             <CardContent className="px-8 pb-8 -mt-16 text-center relative z-10">
@@ -222,10 +222,10 @@ export default function StudentProfile() {
               <CardContent className="p-6">
                 <div className="flex items-center gap-5">
                    <div className="w-14 h-14 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-600 shadow-inner">
-                      <Music size={28} />
+                      <PersonStanding size={28} />
                    </div>
                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Instrumento Principal</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Modalidade Principal</p>
                       <p className="text-xl font-black text-foreground">{(profile as any)?.instrumentName || "Não definido"}</p>
                    </div>
                 </div>
@@ -285,7 +285,7 @@ export default function StudentProfile() {
                   {[
                      { icon: Trophy, label: "Técnica", value: profile?.level || "Iniciante" },
                      { icon: Clock, label: "Prática Total", value: "---" },
-                     { icon: Music, label: "Repertório", value: "---" },
+                     { icon: PersonStanding, label: "Coreografias", value: "---" },
                      { icon: Trophy, label: "Nível Atual", value: profile?.level || "Iniciante" },
                   ].map((item, i) => (
                      <div key={i} className="text-center p-6 rounded-3xl bg-muted/30 border border-border group hover:border-primary/40 hover:bg-card transition-all cursor-default">

@@ -552,14 +552,14 @@ export default function PublicEnrollment() {
         <AnimatePresence mode="wait">
 
           {/* ═══════════════════════════════════════════════
-              PASSO 1 — Selecione o Curso / Instrumento
+              PASSO 1 — Selecione o Curso / Modalidade
           ═══════════════════════════════════════════════ */}
           {step === "course" && (
             <motion.div key="course" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-5">
               <div className="space-y-1">
                 <h1 className="text-2xl font-black text-foreground">Quais cursos você quer fazer?</h1>
                 <p className="text-xs text-muted-foreground">
-                  Selecione um ou mais instrumentos. {courses.length >= 2
+                  Selecione uma ou mais modalidades. {courses.length >= 2
                     ? "Com 2 ou mais cursos, mostramos os planos de 2 aulas/semana."
                     : "Com 1 curso, mostramos os planos de 1 aula/semana."}
                 </p>
@@ -651,7 +651,7 @@ export default function PublicEnrollment() {
                     <span className="font-bold text-foreground">{formatBRL(monthlyTotal)}</span>
                   </div>
                   <p className="text-[9px] text-muted-foreground/70 leading-snug">
-                    O plano já cobre os instrumentos selecionados — cobramos 1x por plano (e 1 taxa de inscrição).
+                    O plano já cobre as modalidades selecionadas — cobramos 1x por plano (e 1 taxa de inscrição).
                   </p>
                   {enrollmentFeeTotal > 0 && (
                     <div className="flex justify-between">
@@ -673,7 +673,7 @@ export default function PublicEnrollment() {
                   </p>
                   <ol className="space-y-2">
                     {[
-                      { n: 1, t: "Escolha seus cursos e planos", d: "Selecione um ou mais instrumentos e o plano de cada um." },
+                      { n: 1, t: "Escolha seus cursos e planos", d: "Selecione uma ou mais modalidades e o plano de cada um." },
                       { n: 2, t: "Preencha seus dados", d: "Informe seus dados para criar sua matrícula." },
                       { n: 3, t: "Faça o primeiro pagamento", d: `Pague a 1ª mensalidade${enrollmentFeeTotal > 0 ? " + taxa de inscrição" : ""} (${formatBRL(totalToPay)}).` },
                       { n: 4, t: "Escolha seus horários", d: "Após o pagamento, escolha o dia e horário de cada curso." },

@@ -8,7 +8,7 @@ import {
   Clock, 
   ChevronRight,
   BookOpen,
-  Music,
+  Headphones,
   Video,
   FileText,
   Bell,
@@ -248,7 +248,7 @@ export default function StudentDashboard() {
   const MaterialIcon = ({ category }: { category: string }) =>
     category === 'pdf' ? <FileText size={16} />
     : category === 'video' ? <Video size={16} />
-    : category === 'audio' ? <Music size={16} />
+    : category === 'audio' ? <Headphones size={16} />
     : category === 'imagem' ? <ImageIcon size={16} />
     : <FileText size={16} />;
 
@@ -485,7 +485,7 @@ export default function StudentDashboard() {
           </motion.div>
         </div>
 
-        {/* ── Coluna 2: Acervo musical + Exercícios recentes ── */}
+        {/* ── Coluna 2: Acervo de vídeos + Exercícios recentes ── */}
         <div className="space-y-6 md:space-y-8">
           <motion.div variants={item} className="h-full">
             <RepositionCreditsCard />
@@ -573,7 +573,7 @@ export default function StudentDashboard() {
           </motion.div>
         </div>
 
-        {/* ── Coluna 3: Mural de avisos + Missões + MusicPro ── */}
+        {/* ── Coluna 3: Mural de avisos + Missões + DancePro ── */}
         <div className="space-y-6 md:space-y-8">
           <motion.div variants={item} className="h-full">
             <SectionCard

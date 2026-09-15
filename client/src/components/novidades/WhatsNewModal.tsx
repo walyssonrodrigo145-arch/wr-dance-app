@@ -37,7 +37,7 @@ export function WhatsNewModal() {
               <Sparkles size={22} />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-widest text-primary">Novidades no MusicPro</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-primary">Novidades no DancePro</p>
               <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">
                 Versão {unseenRelease.version}{dateLabel ? ` • ${dateLabel}` : ""}
               </p>

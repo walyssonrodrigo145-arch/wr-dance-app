@@ -395,7 +395,7 @@ export default function BaseConhecimentoIA() {
                           ) : (
                             <span className="text-purple-600 dark:text-purple-400 flex items-center gap-1">
                               <Bot size={12} />
-                              IA WR MusicPro ({item.topicsCount || 0} tópicos consultados)
+                              IA WR DancePro ({item.topicsCount || 0} tópicos consultados)
                             </span>
                           )}
                         </div>

@@ -12,7 +12,7 @@ import { youtubeEmbedSrc } from "@/lib/youtubeEmbed";
 /**
  * PRD Tutoriais — Aba "Tutoriais" (professor/admin).
  * Lista os vídeos do YouTube cadastrados pelo Superadmin (master panel) que
- * explicam as funcionalidades do MusicPro. Player com capa antes do iframe
+ * explicam as funcionalidades do DancePro. Player com capa antes do iframe
  * (VideoFacade — Erro 153) + fallbacks "player alternativo" e "Abrir no YouTube".
  */
 export default function Tutoriais() {
@@ -49,7 +49,7 @@ export default function Tutoriais() {
           <div>
             <h2 className="text-lg md:text-xl font-black tracking-tight text-foreground">🎓 Tutoriais do Sistema</h2>
             <p className="text-[11px] text-muted-foreground font-semibold mt-0.5">
-              Aprenda a usar cada funcionalidade do MusicPro com nossos vídeos
+              Aprenda a usar cada funcionalidade do DancePro com nossos vídeos
             </p>
           </div>
         </div>
@@ -144,7 +144,7 @@ export default function Tutoriais() {
         open={!!playing}
         onOpenChange={(o) => { if (!o) { setPlaying(null); setEmbedSrc(""); } }}
         title={playing?.title || "Tutorial"}
-        description={playing?.category ? `Tutorial · ${playing.category}` : "Vídeo do MusicPro"}
+        description={playing?.category ? `Tutorial · ${playing.category}` : "Vídeo do DancePro"}
       >
         <div className="space-y-3 pt-1">
           <VideoFacade

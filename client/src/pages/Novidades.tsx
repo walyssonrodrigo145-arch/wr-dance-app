@@ -45,7 +45,7 @@ export default function Novidades() {
         <div>
           <h1 className="text-2xl md:text-3xl font-outfit font-black text-foreground tracking-tight">Novidades</h1>
           <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1">
-            Tudo o que lançamos no MusicPro
+            Tudo o que lançamos no DancePro
           </p>
         </div>
       </div>

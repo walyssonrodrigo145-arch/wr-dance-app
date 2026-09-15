@@ -73,7 +73,7 @@ export function StudentPortalLayout({ children }: StudentPortalLayoutProps) {
           </div>
           
           <div className="flex flex-col items-center gap-3">
-            <h2 className="text-white text-xl font-black tracking-tight">{(user as any)?.schoolName || "MusicPro"} Portal</h2>
+            <h2 className="text-white text-xl font-black tracking-tight">{(user as any)?.schoolName || "DancePro"} Portal</h2>
             <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
               <Loader2 size={16} className="animate-spin text-primary" />
               <span className="text-xs font-black text-white/60 uppercase tracking-[0.2em]">Sincronizando seus dados...</span>
@@ -137,7 +137,7 @@ export function StudentPortalLayout({ children }: StudentPortalLayoutProps) {
               className="flex items-center gap-1.5 text-[11px] sm:text-xs font-semibold text-muted-foreground hover:text-primary transition-colors"
             >
               <span>Plataforma educacional com tecnologia</span>
-              <span className="font-black text-primary tracking-tight">MusicPro</span>
+              <span className="font-black text-primary tracking-tight">DancePro</span>
             </a>
           </div>
         </main>

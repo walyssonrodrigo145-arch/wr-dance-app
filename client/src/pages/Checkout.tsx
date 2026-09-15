@@ -64,7 +64,7 @@ export default function Checkout() {
         {/* Informational Side */}
         <div className="space-y-6">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary font-bold text-xs uppercase tracking-widest border border-primary/20">
-            <Sparkles size={14} /> MusicPro Premium
+            <Sparkles size={14} /> DancePro Premium
           </div>
           
           <h1 className="text-4xl md:text-5xl font-black tracking-tight text-foreground">
@@ -74,7 +74,7 @@ export default function Checkout() {
           <p className="text-lg text-muted-foreground font-medium leading-relaxed">
             {isExpired 
               ? `O seu teste gratuito expirou em ${trialDate}. Para continuar acessando seus alunos, aulas e a IA Assistente, escolha um plano abaixo.` 
-              : "Tenha acesso ilimitado a todas as ferramentas do MusicPro e automatize a gestão da sua escola de música."}
+              : "Tenha acesso ilimitado a todas as ferramentas do DancePro e automatize a gestão da sua escola de dança."}
           </p>
 
           <ul className="space-y-3">

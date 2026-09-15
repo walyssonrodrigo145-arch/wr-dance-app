@@ -19,7 +19,7 @@ import {
   ChevronLeft,
   Loader2,
   FileText,
-  Music,
+  PersonStanding,
   Folder,
   UploadCloud,
   Filter,
@@ -70,7 +70,7 @@ export default function Progresso() {
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<"jornada" | "biblioteca" | "observacoes" | "metas" | "desempenho" | "repertorio">("jornada");
+  const [activeTab, setActiveTab] = useState<"jornada" | "biblioteca" | "observacoes" | "metas" | "desempenho" | "coreografias">("jornada");
   const [isListCollapsed, setIsListCollapsed] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
@@ -324,7 +324,7 @@ export default function Progresso() {
     switch (icon || derived) {
       case "play": return <Play size={20} className="text-indigo-600" />;
       case "pen": return <PenTool size={20} className="text-indigo-600" />;
-      case "music": return <Music size={20} className="text-indigo-600" />;
+      case "music": return <PersonStanding size={20} className="text-indigo-600" />;
       case "metronome": return <Clock size={20} className="text-indigo-600" />;
       case "star": return <Star size={20} className="text-indigo-600" />;
       default: return <BookOpen size={20} className="text-indigo-600" />;
@@ -833,7 +833,7 @@ export default function Progresso() {
                     {[
                       { id: "jornada", label: "Jornada", icon: Activity },
                       { id: "biblioteca", label: "Biblioteca", icon: Folder },
-                      { id: "repertorio", label: "Repertório", icon: Music },
+                      { id: "coreografias", label: "Coreografias", icon: PersonStanding },
                       { id: "observacoes", label: "Notas", icon: BookOpen },
                       { id: "metas", label: "Metas", icon: Target },
                     ].map((tab) => {
@@ -948,7 +948,7 @@ export default function Progresso() {
                                           <div className="bg-indigo-50/30 dark:bg-indigo-500/10 border border-indigo-100/50 dark:border-indigo-500/20 p-6 rounded-2xl flex flex-col md:flex-row justify-between gap-6 items-center shadow-sm">
                                             <div className="flex gap-4 items-center flex-1">
                                               <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-600/20 shrink-0">
-                                                <Music size={28} />
+                                                <PersonStanding size={28} />
                                               </div>
                                               <div>
                                                 <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-1">FOCO DO DIA</p>
@@ -1215,9 +1215,9 @@ export default function Progresso() {
                        </motion.div>
                      )}
 
-                     {activeTab === "repertorio" && selectedStudentId != null && (
+                     {activeTab === "coreografias" && selectedStudentId != null && (
                        <motion.div
-                         key="repertorio"
+                         key="coreografias"
                          initial={{ opacity: 0, scale: 0.98 }}
                          animate={{ opacity: 1, scale: 1 }}
                          exit={{ opacity: 0, scale: 0.98 }}
@@ -1297,7 +1297,7 @@ export default function Progresso() {
                       <SelectContent className="rounded-2xl border-border">
                          <SelectItem value="tecnica">Técnica</SelectItem>
                          <SelectItem value="teoria">Teoria</SelectItem>
-                         <SelectItem value="repertorio">Repertório</SelectItem>
+                         <SelectItem value="coreografias">Repertório</SelectItem>
                          <SelectItem value="geral">Geral</SelectItem>
                       </SelectContent>
                    </Select>
@@ -1623,7 +1623,7 @@ export default function Progresso() {
                     >
                       <span className="text-base leading-none">🎯</span>
                       <span className="text-[10px] font-black leading-tight">Automático</span>
-                      <span className="text-[8px] opacity-80 leading-tight">Pelo instrumento</span>
+                      <span className="text-[8px] opacity-80 leading-tight">Pela modalidade</span>
                     </button>
                     {specialists.filter((s: any) => s.active !== false).map((s: any) => (
                       <button

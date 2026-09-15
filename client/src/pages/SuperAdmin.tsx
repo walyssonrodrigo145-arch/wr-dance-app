@@ -261,7 +261,7 @@ function SuperAdminPanel() {
           className="flex items-center gap-2 font-semibold text-sm bg-violet-600/10 text-violet-600 border-violet-500/30 hover:bg-violet-600 hover:text-white transition-all"
         >
           <BarChart2 size={16} />
-          MusicPro Analytics ↗
+          DancePro Analytics ↗
         </Button>
       </div>
 
@@ -1607,7 +1607,7 @@ function LandingClientsManager() {
                 <Label htmlFor="client-name">Nome da Escola / Cliente *</Label>
                 <Input
                   id="client-name"
-                  placeholder="Ex: Escola de Música Harmonia"
+                  placeholder="Ex: Escola de Dança Elegance"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="mt-1"
@@ -1709,7 +1709,7 @@ function LandingClientsManager() {
                 <Label htmlFor="client-testi">Depoimento Curto (Opcional)</Label>
                 <Input
                   id="client-testi"
-                  placeholder="Ex: O MusicPro revolucionou nossa gestão escolar!"
+                  placeholder="Ex: O DancePro revolucionou nossa gestão escolar!"
                   value={testimonial}
                   onChange={(e) => setTestimonial(e.target.value)}
                   className="mt-1"

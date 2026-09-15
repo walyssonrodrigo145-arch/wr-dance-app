@@ -401,7 +401,7 @@ export default function IAAssistente() {
                 }
                 className="h-full border-border/40"
                 height="100%"
-                emptyStateMessage="Como posso ajudar com sua escola de música hoje?"
+                emptyStateMessage="Como posso ajudar com sua escola de dança hoje?"
               />
             </div>
           </div>

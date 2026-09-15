@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
-// Estágios do Funil Comercial de Música MusicPro
+// Estágios do Funil Comercial de Dança DancePro
 const DEFAULT_STAGES = [
   { key: "novo", label: "Novo Lead", color: "bg-[#5B50E6]", text: "text-indigo-400", bgLight: "bg-indigo-500/10", border: "border-indigo-500/30" },
   { key: "contato", label: "Contato Realizado", color: "bg-purple-500", text: "text-purple-400", bgLight: "bg-purple-500/10", border: "border-purple-500/30" },
@@ -31,12 +31,12 @@ const DEFAULT_STAGES = [
 
 // Dados ricos para visualização e demonstração completa do sistema
 const SAMPLE_LEADS = [
-  { id: 101, name: "Mariana Silva", phone: "(11) 98765-4321", email: "mariana.silva@email.com", instrument: "Violão", modality: "Presencial", level: "Iniciante", value: "320.00", stage: "novo", temperature: "quente", source: "Instagram", createdAt: new Date() },
-  { id: 102, name: "Gabriel Santos", phone: "(11) 97711-2233", email: "gabriel.piano@email.com", instrument: "Piano / Teclado", modality: "Presencial", level: "Intermediário", value: "380.00", stage: "contato", temperature: "quente", source: "WhatsApp", createdAt: new Date() },
-  { id: 103, name: "Bruno Mendes", phone: "(19) 99888-7766", email: "bruno.rock@email.com", instrument: "Guitarra", modality: "Híbrido", level: "Avançado", value: "350.00", stage: "aula_experimental", temperature: "quente", source: "Google", createdAt: new Date() },
+  { id: 101, name: "Mariana Silva", phone: "(11) 98765-4321", email: "mariana.silva@email.com", instrument: "Ballet", modality: "Presencial", level: "Iniciante", value: "320.00", stage: "novo", temperature: "quente", source: "Instagram", createdAt: new Date() },
+  { id: 102, name: "Gabriel Santos", phone: "(11) 97711-2233", email: "gabriel.forro@email.com", instrument: "Forró", modality: "Presencial", level: "Intermediário", value: "380.00", stage: "contato", temperature: "quente", source: "WhatsApp", createdAt: new Date() },
+  { id: 103, name: "Bruno Mendes", phone: "(19) 99888-7766", email: "bruno.dance@email.com", instrument: "Zumba", modality: "Híbrido", level: "Avançado", value: "350.00", stage: "aula_experimental", temperature: "quente", source: "Google", createdAt: new Date() },
   { id: 104, name: "Julia Lima", phone: "(21) 98123-4567", email: "julia.canto@email.com", instrument: "Canto / Técnica Vocal", modality: "Online", level: "Iniciante", value: "290.00", stage: "fez_aula", temperature: "morno", source: "Indicação", createdAt: new Date() },
-  { id: 105, name: "Pedro Rocha", phone: "(31) 99234-5678", email: "pedro.sax@email.com", instrument: "Saxofone", modality: "Presencial", level: "Iniciante", value: "420.00", stage: "proposta", temperature: "quente", source: "Instagram", createdAt: new Date() },
-  { id: 106, name: "Lucas Ferreira", phone: "(41) 98877-6655", email: "lucas.drums@email.com", instrument: "Bateria", modality: "Presencial", level: "Iniciante", value: "360.00", stage: "fechado", temperature: "ganho", source: "Site", createdAt: new Date() },
+  { id: 105, name: "Pedro Rocha", phone: "(31) 99234-5678", email: "pedro.salsa@email.com", instrument: "Salsa", modality: "Presencial", level: "Iniciante", value: "420.00", stage: "proposta", temperature: "quente", source: "Instagram", createdAt: new Date() },
+  { id: 106, name: "Lucas Ferreira", phone: "(41) 98877-6655", email: "lucas.hiphop@email.com", instrument: "Hip-Hop", modality: "Presencial", level: "Iniciante", value: "360.00", stage: "fechado", temperature: "ganho", source: "Site", createdAt: new Date() },
   { id: 107, name: "Camila Ribeiro", phone: "(51) 97654-3210", email: "camila.violino@email.com", instrument: "Violino", modality: "Presencial", level: "Iniciante", value: "390.00", stage: "fechado", temperature: "ganho", source: "WhatsApp", createdAt: new Date() },
 ];
 
@@ -150,7 +150,7 @@ export default function LeadsApp() {
     const clean = phone.replace(/\D/g, "");
     const num = clean.startsWith("55") ? clean : `55${clean}`;
     const text = encodeURIComponent(
-      `Olá ${name || ""}! Tudo bem? Sou da escola de música MusicPro. Vi seu interesse no curso de ${instrument || "música"}! Gostaria de agendar uma Aula Experimental gratuita?`
+      `Olá ${name || ""}! Tudo bem? Sou da escola de dança DancePro. Vi seu interesse no curso de ${instrument || "dança"}! Gostaria de agendar uma Aula Experimental gratuita?`
     );
     return `https://wa.me/${num}?text=${text}`;
   };
@@ -172,7 +172,7 @@ export default function LeadsApp() {
               <Music size={22} />
             </div>
             <div className="flex flex-col">
-              <span className="font-extrabold text-white text-base tracking-tight font-outfit leading-none">MusicPro</span>
+              <span className="font-extrabold text-white text-base tracking-tight font-outfit leading-none">DancePro</span>
               <span className="text-[10px] text-indigo-400 font-extrabold uppercase tracking-widest mt-1">CRM COMERCIAL</span>
             </div>
           </div>
@@ -334,7 +334,7 @@ export default function LeadsApp() {
               {userInitials}
             </div>
             <div className="flex-1 overflow-hidden">
-              <p className="font-bold text-white text-xs truncate">{user?.name || "MusicPro Admin"}</p>
+              <p className="font-bold text-white text-xs truncate">{user?.name || "DancePro Admin"}</p>
               <p className="text-[10px] text-slate-400 truncate">Escola Ativa</p>
             </div>
           </div>
@@ -450,12 +450,12 @@ export default function LeadsApp() {
                     className="h-10 px-3 bg-[#0B091A] border border-indigo-950/80 text-xs text-white rounded-xl focus:outline-none focus:border-indigo-500"
                   >
                     <option value="todos">Todos os Cursos</option>
-                    <option value="Violão">Violão</option>
-                    <option value="Guitarra">Guitarra</option>
-                    <option value="Piano">Piano / Teclado</option>
-                    <option value="Bateria">Bateria</option>
+                    <option value="Ballet">Ballet</option>
+                    <option value="Zumba">Zumba</option>
+                    <option value="Piano">Forró</option>
+                    <option value="Hip-Hop">Hip-Hop</option>
                     <option value="Canto">Canto</option>
-                    <option value="Saxofone">Saxofone</option>
+                    <option value="Salsa">Salsa</option>
                     <option value="Violino">Violino</option>
                   </select>
                 </div>
@@ -466,7 +466,7 @@ export default function LeadsApp() {
                     const encodedUri = encodeURI(csvContent);
                     const link = document.createElement("a");
                     link.setAttribute("href", encodedUri);
-                    link.setAttribute("download", `leads_musicpro_${new Date().toISOString().slice(0, 10)}.csv`);
+                    link.setAttribute("download", `leads_dancepro_${new Date().toISOString().slice(0, 10)}.csv`);
                     document.body.appendChild(link);
                     link.click();
                     toast.success("Planilha de Leads baixada com sucesso!");
@@ -694,9 +694,9 @@ export default function LeadsApp() {
 
                 <div className="space-y-3">
                   {[
-                    { id: 1, lead: "Mariana Silva (Violão)", task: "Ligar para confirmar presença na aula experimental de sábado", time: "Hoje, 14:00", type: "ligacao" },
-                    { id: 2, lead: "Gabriel Santos (Piano)", task: "Enviar proposta com desconto de matrícula via WhatsApp", time: "Hoje, 16:30", type: "whatsapp" },
-                    { id: 3, lead: "Bruno Mendes (Guitarra)", task: "Acompanhamento pós-aula experimental (Feedback)", time: "Amanhã, 10:00", type: "whatsapp" },
+                    { id: 1, lead: "Mariana Silva (Ballet)", task: "Ligar para confirmar presença na aula experimental de sábado", time: "Hoje, 14:00", type: "ligacao" },
+                    { id: 2, lead: "Gabriel Santos (Forró)", task: "Enviar proposta com desconto de matrícula via WhatsApp", time: "Hoje, 16:30", type: "whatsapp" },
+                    { id: 3, lead: "Bruno Mendes (Zumba)", task: "Acompanhamento pós-aula experimental (Feedback)", time: "Amanhã, 10:00", type: "whatsapp" },
                   ].map((item) => (
                     <div key={item.id} className="flex items-center justify-between p-4 rounded-xl bg-[#0B091A] border border-indigo-950/50 hover:border-cyan-500/40 transition-all">
                       <div className="flex items-center gap-3">
@@ -737,9 +737,9 @@ export default function LeadsApp() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {[
-                    { id: 201, lead: "Pedro Rocha", inst: "Saxofone", plan: "Plano Mensal Individual (1x/sem)", value: "R$ 420,00/mês", status: "Aguardando Assinatura", date: "Enviado há 1 dia" },
+                    { id: 201, lead: "Pedro Rocha", inst: "Salsa", plan: "Plano Mensal Individual (1x/sem)", value: "R$ 420,00/mês", status: "Aguardando Assinatura", date: "Enviado há 1 dia" },
                     { id: 202, lead: "Julia Lima", inst: "Canto", plan: "Plano Trimestral VIP", value: "R$ 350,00/mês", status: "Em Análise", date: "Enviado há 2 dias" },
-                    { id: 203, lead: "Lucas Ferreira", inst: "Bateria", plan: "Plano Anual MusicPro", value: "R$ 360,00/mês", status: "Aprovada e Matriculado", date: "Fechado Hoje" },
+                    { id: 203, lead: "Lucas Ferreira", inst: "Hip-Hop", plan: "Plano Anual DancePro", value: "R$ 360,00/mês", status: "Aprovada e Matriculado", date: "Fechado Hoje" },
                   ].map((prop) => (
                     <div key={prop.id} className="p-5 rounded-2xl bg-[#0B091A] border border-indigo-950/60 space-y-4">
                       <div className="flex items-start justify-between">
@@ -776,7 +776,7 @@ export default function LeadsApp() {
                 <div className="flex items-center justify-between border-b border-indigo-950/50 pb-4">
                   <div>
                     <h3 className="font-bold text-base font-outfit text-white">Metas Comerciais do Mês</h3>
-                    <p className="text-xs text-slate-400">Acompanhamento do plano de expansão e matrículas da escola de música.</p>
+                    <p className="text-xs text-slate-400">Acompanhamento do plano de expansão e matrículas da escola de dança.</p>
                   </div>
                   <Button onClick={() => setIsGoalsModalOpen(true)} className="h-9 px-3 text-xs bg-indigo-600 hover:bg-indigo-700 font-bold rounded-xl gap-1.5 text-white">
                     <Edit3 size={14} /> Ajustar Metas
@@ -901,7 +901,7 @@ export default function LeadsApp() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {[
-                    { id: "106", name: "Lucas Ferreira", inst: "Bateria", start: "Início: 18/08" },
+                    { id: "106", name: "Lucas Ferreira", inst: "Hip-Hop", start: "Início: 18/08" },
                     { id: "107", name: "Camila Ribeiro", inst: "Violino", start: "Início: 20/08" },
                   ].map((std) => (
                     <div key={std.id} className="bg-[#0B091A] border border-indigo-950/50 p-5 rounded-2xl space-y-4">
@@ -1034,9 +1034,9 @@ export default function LeadsApp() {
                   <div className="space-y-3">
                     {[
                       { inst: "Violão / Guitarra", count: "18 leads", pct: "38%" },
-                      { inst: "Piano / Teclado", count: "12 leads", pct: "25%" },
+                      { inst: "Forró", count: "12 leads", pct: "25%" },
                       { inst: "Canto / Técnica Vocal", count: "9 leads", pct: "19%" },
-                      { inst: "Bateria", count: "6 leads", pct: "12%" },
+                      { inst: "Hip-Hop", count: "6 leads", pct: "12%" },
                       { inst: "Outros (Sax, Violino, Baixo)", count: "3 leads", pct: "6%" },
                     ].map((row, i) => (
                       <div key={i} className="space-y-1.5">
@@ -1142,7 +1142,7 @@ function CreateLeadModal({ open, onClose }: any) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [instrument, setInstrument] = useState("Violão");
+  const [instrument, setInstrument] = useState("Ballet");
   const [level, setLevel] = useState("Iniciante");
   const [modality, setModality] = useState("Presencial");
   const [value, setValue] = useState("320");
@@ -1209,12 +1209,12 @@ function CreateLeadModal({ open, onClose }: any) {
                 onChange={(e) => setInstrument(e.target.value)}
                 className="w-full h-9 rounded-md bg-[#0B091A] border border-indigo-950 px-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
               >
-                <option value="Violão">Violão</option>
-                <option value="Guitarra">Guitarra</option>
-                <option value="Bateria">Bateria</option>
-                <option value="Piano / Teclado">Piano / Teclado</option>
+                <option value="Ballet">Ballet</option>
+                <option value="Zumba">Zumba</option>
+                <option value="Hip-Hop">Hip-Hop</option>
+                <option value="Forró">Forró</option>
                 <option value="Canto / Técnica Vocal">Canto / Técnica Vocal</option>
-                <option value="Saxofone">Saxofone</option>
+                <option value="Salsa">Salsa</option>
                 <option value="Violino">Violino</option>
                 <option value="Baixo">Baixo</option>
               </select>

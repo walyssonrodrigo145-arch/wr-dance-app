@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
 /**
- * Seletor de data de nascimento integrado ao design do MusicPro (Dia / Mês / Ano).
+ * Seletor de data de nascimento integrado ao design do DancePro (Dia / Mês / Ano).
  * Evita o date picker nativo do celular, mantendo a identidade visual do sistema.
  */
 export function BirthDatePicker({ value, onChange, error }: { value: string; onChange: (v: string) => void; error?: boolean }) {

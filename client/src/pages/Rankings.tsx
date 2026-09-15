@@ -391,7 +391,7 @@ export default function Rankings() {
   const handleShare = async () => {
     try {
       if (navigator.share) {
-        await navigator.share({ title: "Rankings MusicPro", text: "Confira os rankings da nossa escola!", url: window.location.origin + "/rankings" });
+        await navigator.share({ title: "Rankings DancePro", text: "Confira os rankings da nossa escola!", url: window.location.origin + "/rankings" });
       } else {
         await navigator.clipboard.writeText(window.location.origin + "/rankings");
         toast.success("Link copiado para a área de transferência!");
@@ -683,7 +683,7 @@ export default function Rankings() {
                           onChange={(e) => setInstrumentFilter(e.target.value)}
                           className="h-10 flex-1 min-w-0 rounded-xl border border-border bg-background px-3 text-xs font-bold outline-none focus:ring-2 focus:ring-primary/20 max-w-[190px]"
                         >
-                          <option value="todos">Todos os instrumentos</option>
+                          <option value="todos">Todas as modalidades</option>
                           {(instrumentsList as any[]).map((i) => (
                             <option key={i.id} value={String(i.id)}>{i.name}</option>
                           ))}
@@ -919,7 +919,7 @@ export default function Rankings() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {[
                   { id: "todos", label: "Todos os alunos ativos" },
-                  { id: "instrumento", label: "Por instrumento" },
+                  { id: "instrumento", label: "Por modalidade" },
                   { id: "nivel", label: "Por nível" },
                   { id: "manual", label: "Seleção manual" },
                 ].map((opt) => (
@@ -938,7 +938,7 @@ export default function Rankings() {
               </div>
               {editor.participantRule === "instrumento" && (
                 <select value={editor.instrumentId} onChange={(e) => setEditor((p) => ({ ...p, instrumentId: e.target.value }))} className="w-full h-12 rounded-xl border border-border bg-background px-3 text-sm font-bold">
-                  <option value="">Selecione o instrumento…</option>
+                  <option value="">Selecione a modalidade…</option>
                   {(instrumentsList as any[]).map((i) => (
                     <option key={i.id} value={i.id}>{i.name}</option>
                   ))}

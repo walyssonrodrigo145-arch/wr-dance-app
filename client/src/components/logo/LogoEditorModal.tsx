@@ -440,7 +440,7 @@ export function LogoEditorModal({
                 </div>
                 <div className="min-w-0">
                   <p className={`text-[11px] font-black truncate ${theme === "dark" ? "text-white" : "text-slate-900"}`}>Sua Escola</p>
-                  <p className={`text-[8px] uppercase tracking-widest font-bold ${theme === "dark" ? "text-slate-400/60" : "text-slate-400"}`}>Escola de Música</p>
+                  <p className={`text-[8px] uppercase tracking-widest font-bold ${theme === "dark" ? "text-slate-400/60" : "text-slate-400"}`}>Escola de Dança</p>
                 </div>
               </div>
             </div>

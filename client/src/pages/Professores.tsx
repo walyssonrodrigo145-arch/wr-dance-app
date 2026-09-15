@@ -340,7 +340,7 @@ function ProfessoresPanel() {
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold text-foreground/80 flex items-center gap-1.5"><Star size={11} /> Especialidade</label>
-                      <Input value={especialidade} onChange={(e) => setEspecialidade(e.target.value)} placeholder="Piano, Canto..." className="h-10 rounded-xl" />
+                      <Input value={especialidade} onChange={(e) => setEspecialidade(e.target.value)} placeholder="Ballet, Forró, Zumba..." className="h-10 rounded-xl" />
                     </div>
                     <div className="col-span-2 space-y-1.5 mt-1 border-t border-border/30 pt-3">
                       <label className="text-xs font-semibold text-foreground/80 flex items-center gap-1.5"><Camera size={11} /> Foto do Professor</label>

@@ -2153,7 +2153,7 @@ export default function Configuracoes() {
                       <div className="p-4 rounded-2xl border border-border bg-muted/30">
                         <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Requisito no app InfinitePay</p>
                         <p className="text-xs text-muted-foreground font-medium leading-relaxed">
-                          No app InfinitePay: <span className="font-bold">Vendas &gt; Checkout &gt; Configurações &gt; Habilitar Checkout Integrado</span> (ou na web: <span className="font-mono">app.infinitepay.io/external-checkout#configuracoes</span>). Não é preciso criar checkout manual com itens — o MusicPro gera os links via API.
+                          No app InfinitePay: <span className="font-bold">Vendas &gt; Checkout &gt; Configurações &gt; Habilitar Checkout Integrado</span> (ou na web: <span className="font-mono">app.infinitepay.io/external-checkout#configuracoes</span>). Não é preciso criar checkout manual com itens — o DancePro gera os links via API.
                         </p>
                       </div>
                     </div>

@@ -5,7 +5,7 @@ import { ArrowLeft, FileText } from "lucide-react";
 export default function TermosDeUso() {
   useEffect(() => {
     window.scrollTo({ top: 0 });
-    document.title = "Termos de Uso — MusicPro";
+    document.title = "Termos de Uso — DancePro";
   }, []);
 
   return (
@@ -19,7 +19,7 @@ export default function TermosDeUso() {
           </Link>
           <div className="flex items-center gap-2 text-primary font-black text-lg">
             <FileText size={20} />
-            MusicPro
+            DancePro
           </div>
         </div>
       </header>
@@ -45,7 +45,7 @@ export default function TermosDeUso() {
 
         <section>
           <p className="text-muted-foreground leading-relaxed text-lg">
-            Bem-vindo ao <strong className="text-foreground">MusicPro</strong>. Ao acessar ou usar nossa plataforma, você concorda com os presentes Termos de Uso. Leia-os cuidadosamente antes de utilizar o serviço. Caso não concorde, não utilize a plataforma.
+            Bem-vindo ao <strong className="text-foreground">DancePro</strong>. Ao acessar ou usar nossa plataforma, você concorda com os presentes Termos de Uso. Leia-os cuidadosamente antes de utilizar o serviço. Caso não concorde, não utilize a plataforma.
           </p>
         </section>
 
@@ -53,12 +53,12 @@ export default function TermosDeUso() {
           {
             num: "1",
             title: "Aceitação dos Termos",
-            content: `Estes Termos constituem um contrato legal entre você (Usuário) e a MusicPro. Ao criar uma conta, você declara ter lido, compreendido e aceito integralmente estes Termos e nossa Política de Privacidade. Usuários menores de 18 anos devem ter consentimento dos responsáveis legais.`
+            content: `Estes Termos constituem um contrato legal entre você (Usuário) e a DancePro. Ao criar uma conta, você declara ter lido, compreendido e aceito integralmente estes Termos e nossa Política de Privacidade. Usuários menores de 18 anos devem ter consentimento dos responsáveis legais.`
           },
           {
             num: "2",
             title: "Descrição do Serviço",
-            content: `O MusicPro é uma plataforma SaaS (Software como Serviço) voltada para gestão de escolas de música, oferecendo:`,
+            content: `O DancePro é uma plataforma SaaS (Software como Serviço) voltada para gestão de escolas de dança, oferecendo:`,
             items: [
               { label: "Gestão de alunos e professores", text: "Cadastro, histórico, evolução e comunicação." },
               { label: "Controle financeiro", text: "Mensalidades, cobranças e integração com Asaas." },
@@ -93,7 +93,7 @@ export default function TermosDeUso() {
           {
             num: "5",
             title: "Uso Permitido",
-            content: `A plataforma deve ser utilizada exclusivamente para fins legítimos de gestão escolar musical. É expressamente proibido:`,
+            content: `A plataforma deve ser utilizada exclusivamente para fins legítimos de gestão escolar de dança. É expressamente proibido:`,
             items: [
               { label: "Uso fraudulento", text: "Usar a plataforma para fins ilegais, fraudulentos ou prejudiciais a terceiros." },
               { label: "Engenharia reversa", text: "Tentar descompilar, fazer engenharia reversa ou extrair o código-fonte da plataforma." },
@@ -105,12 +105,12 @@ export default function TermosDeUso() {
           {
             num: "6",
             title: "Responsabilidade pelos Dados dos Alunos",
-            content: `Você, como escola/professor (Operador), é responsável pelos dados pessoais dos alunos que inserir na plataforma. Isso inclui obter os consentimentos necessários dos alunos e/ou responsáveis legais conforme a LGPD. O MusicPro atua como Operador de dados em relação a estas informações e as processa conforme suas instruções.`
+            content: `Você, como escola/professor (Operador), é responsável pelos dados pessoais dos alunos que inserir na plataforma. Isso inclui obter os consentimentos necessários dos alunos e/ou responsáveis legais conforme a LGPD. O DancePro atua como Operador de dados em relação a estas informações e as processa conforme suas instruções.`
           },
           {
             num: "7",
             title: "Propriedade Intelectual",
-            content: `Todo o conteúdo da plataforma (código, design, textos, marca MusicPro) é propriedade exclusiva da MusicPro e protegido por leis de propriedade intelectual. Os dados inseridos por você (alunos, aulas, financeiro) permanecem de sua propriedade. Você concede ao MusicPro uma licença limitada para processar esses dados com o objetivo exclusivo de prestar os serviços contratados.`
+            content: `Todo o conteúdo da plataforma (código, design, textos, marca DancePro) é propriedade exclusiva da DancePro e protegido por leis de propriedade intelectual. Os dados inseridos por você (alunos, aulas, financeiro) permanecem de sua propriedade. Você concede ao DancePro uma licença limitada para processar esses dados com o objetivo exclusivo de prestar os serviços contratados.`
           },
           {
             num: "8",
@@ -120,7 +120,7 @@ export default function TermosDeUso() {
           {
             num: "9",
             title: "Limitação de Responsabilidade",
-            content: `O MusicPro não se responsabiliza por perdas indiretas, lucros cessantes ou danos consequentes resultantes do uso ou impossibilidade de uso da plataforma. Nossa responsabilidade total, em qualquer hipótese, está limitada ao valor pago pelo Usuário nos últimos 3 (três) meses de assinatura.`
+            content: `O DancePro não se responsabiliza por perdas indiretas, lucros cessantes ou danos consequentes resultantes do uso ou impossibilidade de uso da plataforma. Nossa responsabilidade total, em qualquer hipótese, está limitada ao valor pago pelo Usuário nos últimos 3 (três) meses de assinatura.`
           },
           {
             num: "10",
@@ -167,7 +167,7 @@ export default function TermosDeUso() {
       {/* Footer */}
       <footer className="border-t border-border/50 py-10 mt-8 bg-muted/20">
         <div className="max-w-4xl mx-auto px-6 text-center text-muted-foreground font-medium text-sm">
-          <p>© {new Date().getFullYear()} MusicPro. Todos os direitos reservados.</p>
+          <p>© {new Date().getFullYear()} DancePro. Todos os direitos reservados.</p>
           <p className="mt-2">
             <Link href="/politica-de-privacidade" className="hover:text-primary transition-colors">Política de Privacidade</Link>
             {" · "}

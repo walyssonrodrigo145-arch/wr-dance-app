@@ -168,7 +168,7 @@ export default function StudentLessons() {
         <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-primary/5 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
         <div className="relative z-10">
           <h1 className="text-4xl md:text-5xl font-black tracking-tighter drop-shadow-sm">Minhas Aulas</h1>
-          <p className="text-muted-foreground font-medium mt-2 max-w-md">Gerencie seu cronograma e revise seu histórico musical.</p>
+          <p className="text-muted-foreground font-medium mt-2 max-w-md">Gerencie seu cronograma e revise seu histórico de aulas de dança.</p>
         </div>
         <div className="relative z-10 flex items-center gap-4">
           <button className="w-12 h-12 rounded-2xl bg-muted border border-border flex items-center justify-center text-foreground hover:bg-muted/80 transition-all shadow-sm">

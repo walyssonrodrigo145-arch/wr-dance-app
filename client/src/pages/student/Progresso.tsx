@@ -3,9 +3,9 @@ import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import {
   CheckCircle2, Award, Loader2, BookOpen,
-  ChevronLeft, ChevronRight, CalendarDays, Music,
+  ChevronLeft, ChevronRight, CalendarDays, PersonStanding,
   Timer, Guitar, PenTool, Star, Play, Pause,
-  Sparkles, Target, Music2
+  Sparkles, Target, Activity
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -14,8 +14,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle
 } from "@/components/ui/dialog";
 import { EditStudyPlanModal } from "@/components/modals/EditStudyPlanModal";
-import { FloatingMetronome } from "@/components/metronome/Metronome";
-import { metronome } from "@/lib/metronomeEngine";
+// import { FloatingMetronome } from "@/components/metronome/Metronome"; // Removido — não aplicável para escola de dança
+// import { metronome } from "@/lib/metronomeEngine"; // Removido — não aplicável para escola de dança
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Exercise {
@@ -103,7 +103,7 @@ const ExerciseIcon = ({ icon, title }: { icon?: string; title?: string }) => {
     case "pen":      return <PenTool size={sz} className={cls} />;
     case "star":     return <Star size={sz} className={cls} />;
     case "play":     return <Play size={sz} className={cls} />;
-    default:         return <Music size={sz} className={cls} />;
+    default:         return <PersonStanding size={sz} className={cls} />;
   }
 }
 
@@ -204,13 +204,13 @@ function ExerciseDetailModal({ exercise, dayFocus, onClose }: ExerciseDetailModa
           {typeof exercise.bpm === "number" && exercise.bpm > 0 && (
             <div className="bg-violet-50 rounded-xl p-3 flex items-center gap-3 flex-wrap">
               <span className="text-xs font-black text-violet-700 flex items-center gap-2">
-                <Music2 size={16} className="text-violet-500" /> BPM recomendado: {exercise.bpm}
+                <Activity size={16} className="text-violet-500" /> BPM recomendado: {exercise.bpm}
               </span>
               <button
                 type="button"
                 onClick={() => {
-                  metronome.start(exercise.bpm);
-                  toast.success(`Metrônomo iniciado em ${exercise.bpm} BPM`);
+                  // metronome.start(exercise.bpm); // Removido — metrônomo não aplicável para dança
+                  // toast.success(`Metrônomo iniciado em ${exercise.bpm} BPM`);
                 }}
                 className="ml-auto h-9 px-4 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
               >
@@ -484,7 +484,7 @@ export default function StudentProgress() {
   return (
     <div className="bg-slate-50 min-h-screen pb-24 font-sans text-slate-800 subtle-scrollbar overflow-x-hidden">
       {/* PRD 03 — Metrônomo flutuante disponível durante todo o estudo */}
-      <FloatingMetronome />
+      {/* <FloatingMetronome /> — Removido: não aplicável para escola de dança */}
 
       {/* Modal de Detalhes */}
       <ExerciseDetailModal
@@ -590,7 +590,7 @@ export default function StudentProgress() {
                <div className="flex items-start justify-between gap-4 mb-5">
                   <div className="flex gap-4 items-center">
                     <div className="w-12 h-12 rounded-[1rem] bg-indigo-50 flex items-center justify-center shrink-0">
-                       <Music size={20} className="text-indigo-600" />
+                       <PersonStanding size={20} className="text-indigo-600" />
                     </div>
                     <div className="flex flex-col">
                       <p className="text-[9px] font-black text-indigo-600 uppercase tracking-widest mb-0.5">FOCO DO DIA</p>
@@ -687,8 +687,8 @@ export default function StudentProgress() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  metronome.start(ex.bpm);
-                                  toast.success(`Metrônomo iniciado em ${ex.bpm} BPM`);
+                                  // metronome.start(ex.bpm); // Removido
+                                  // toast.success(`Metrônomo iniciado em ${ex.bpm} BPM`);
                                 }}
                                 title={`Iniciar metrônomo em ${ex.bpm} BPM`}
                                 className="flex items-center gap-1.5 text-[9px] font-black text-violet-600 bg-violet-50 hover:bg-violet-100 px-2 py-0.5 rounded-md uppercase tracking-widest transition-all active:scale-95 cursor-pointer"

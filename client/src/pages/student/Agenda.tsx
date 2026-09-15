@@ -7,7 +7,7 @@ import {
   Calendar as CalendarIcon,
   Plus,
   MoreVertical,
-  Music,
+  PersonStanding,
   MapPin,
   CheckCircle2
 } from "lucide-react";
@@ -77,7 +77,7 @@ export default function StudentAgenda() {
         <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-primary/5 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
         <div className="relative z-10">
           <h1 className="text-4xl md:text-5xl font-black tracking-tighter drop-shadow-sm">Minha Agenda</h1>
-          <p className="text-muted-foreground font-medium mt-2 max-w-md">Consulte seus horários de aula e eventos musicais em um só lugar.</p>
+          <p className="text-muted-foreground font-medium mt-2 max-w-md">Consulte seus horários de aula e eventos de dança em um só lugar.</p>
         </div>
         <div className="relative z-10 flex items-center gap-2 bg-muted/50 backdrop-blur-md p-1.5 rounded-2xl border border-border shadow-sm">
            <button onClick={() => setViewType("mes")} className={cn("px-5 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl transition-all", viewType === "mes" ? "bg-background text-foreground shadow-sm" : "hover:bg-muted text-muted-foreground")}>Mês</button>
@@ -216,7 +216,7 @@ export default function StudentAgenda() {
 
                     {dayLessons.length === 0 && (
                       <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex flex-col items-center opacity-0 group-hover:opacity-[0.03] transition-opacity pointer-events-none text-foreground">
-                         <Music size={32} className="opacity-50" />
+                         <PersonStanding size={32} className="opacity-50" />
                       </div>
                     )}
                  </motion.div>

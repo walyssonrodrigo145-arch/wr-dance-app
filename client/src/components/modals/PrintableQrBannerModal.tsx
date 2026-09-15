@@ -172,7 +172,7 @@ export function PrintableQrBannerModal({
         <div class="step-text" style="color: #065f46;">Pronto! Sua presença foi confirmada.</div>
       </div>
     </div>
-    <div class="footer">Totem Oficial • ${schoolName} • MusicPro</div>
+    <div class="footer">Totem Oficial • ${schoolName} • DancePro</div>
   </div>
 </body>
 </html>`;
@@ -344,7 +344,7 @@ export function PrintableQrBannerModal({
       ctx.fillStyle = "#94a3b8";
       ctx.font = "500 20px sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(`Totem Oficial  •  ${schoolName}  •  MusicPro`, canvas.width / 2, 1520);
+      ctx.fillText(`Totem Oficial  •  ${schoolName}  •  DancePro`, canvas.width / 2, 1520);
 
       // Exportação e Download
       const pngUrl = canvas.toDataURL("image/png");

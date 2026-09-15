@@ -157,7 +157,7 @@ export default function Alunos() {
       s.monthlyFee,
       s.dueDay || ""
     ]);
-    exportToCSV("alunos_musicpro", headers, rows);
+    exportToCSV("alunos_dancepro", headers, rows);
     toast.success(`${studentsToExport.length} alunos exportados com sucesso!`);
   };
 
@@ -866,7 +866,7 @@ export default function Alunos() {
                 <div className="flex items-center gap-2">
                   <Button
                     onClick={() => {
-                      const text = encodeURIComponent(`Olá! 🎵\n\nAqui está o seu link exclusivo para realizar sua matrícula na nossa escola de música:\n\n👉 ${generatedEnrollmentLink.fullUrl}\n\nAcesse o link para preencher seus dados e agendar suas aulas!`);
+                      const text = encodeURIComponent(`Olá! 🎵\n\nAqui está o seu link exclusivo para realizar sua matrícula na nossa escola de dança:\n\n👉 ${generatedEnrollmentLink.fullUrl}\n\nAcesse o link para preencher seus dados e agendar suas aulas!`);
                       window.open(`https://api.whatsapp.com/send?text=${text}`, "_blank");
                     }}
                     className="h-9 px-3.5 rounded-xl text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-bold gap-1.5"

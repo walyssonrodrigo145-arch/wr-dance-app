@@ -7,7 +7,7 @@ import {
   List,
   FileText,
   Video,
-  Music,
+  Headphones,
   Download,
   Play,
   Eye,
@@ -148,13 +148,13 @@ export default function StudentMaterials() {
     { id: 'todos', label: 'Todos', icon: Archive },
     { id: 'pdf', label: 'Apostilas', icon: FileText },
     { id: 'video', label: 'Vídeos', icon: Video },
-    { id: 'audio', label: 'Áudios', icon: Music },
+    { id: 'audio', label: 'Áudios', icon: Headphones },
   ];
 
   const getIcon = (cat: string) => {
     switch (cat) {
       case 'video': return <Video size={32} className="text-pink-500" />;
-      case 'audio': return <Music size={32} className="text-emerald-500" />;
+      case 'audio': return <Headphones size={32} className="text-emerald-500" />;
       case 'pdf': return <FileText size={32} className="text-blue-500" />;
       default: return <FileText size={32} className="text-slate-500" />;
     }
@@ -253,7 +253,7 @@ export default function StudentMaterials() {
         </div>
       </div>
 
-      {/* PRD Repertório — músicas do YouTube indicadas pelo professor (player embutido) */}
+      {/* PRD Repertório — vídeos de coreografia do YouTube indicadas pelo professor (player embutido) */}
       <RepertoireSection />
 
       {/* Materials Display Grouped by Folder */}
@@ -435,7 +435,7 @@ export default function StudentMaterials() {
                               className="flex-1 sm:flex-none h-12 md:h-14 rounded-xl md:rounded-2xl bg-primary text-white font-bold text-xs shadow-xl shadow-primary/20 hover:scale-[1.03] active:scale-95 transition-all border-none gap-2 md:gap-3 px-4 md:px-6"
                             >
                               {item.category === 'video' ? <Play size={16} fill="currentColor" /> : 
-                               item.category === 'audio' ? <Music size={16} /> : 
+                               item.category === 'audio' ? <Headphones size={16} /> : 
                                <Eye size={16} />}
                               {getActionLabel(item.category)}
                             </Button>
@@ -605,7 +605,7 @@ export default function StudentMaterials() {
                  {!urlLoading && !fileNotFound && previewFile?.category === 'audio' && (
                     <div className="flex flex-col items-center gap-6 md:gap-10 w-full max-w-2xl px-6 py-10 md:px-12 md:py-20 bg-card rounded-[2rem] md:rounded-[3rem] shadow-2xl border border-border/50">
                        <div className="w-24 h-24 md:w-40 md:h-40 rounded-[2rem] md:rounded-[3rem] bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center text-white shadow-2xl shadow-primary/30 relative">
-                          <Music size={48} className="relative z-10 md:w-16 md:h-16" />
+                          <Headphones size={48} className="relative z-10 md:w-16 md:h-16" />
                           <div className="absolute inset-0 bg-white/20 rounded-full animate-ping opacity-20" />
                        </div>
                        <div className="text-center space-y-2 w-full px-2">

@@ -655,7 +655,7 @@ export default function NovoAluno() {
   };
 
 
-  // Auto-preencher título quando instrumento ou nome do aluno mudar
+  // Auto-preencher título quando modalidade ou nome do aluno mudar
   useEffect(() => {
     if (!isEditMode) return;
     const instrument = instruments.find((i: any) => i.id.toString() === form.instrumentId);
@@ -1175,7 +1175,7 @@ export default function NovoAluno() {
                   </div>
                 </div>
 
-                {/* Duração + Instrumento */}
+                {/* Duração + Modalidade */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em] ml-1">Duração</label>
@@ -1200,7 +1200,7 @@ export default function NovoAluno() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em] ml-1">Instrumento</label>
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em] ml-1">Modalidade</label>
                     <Select
                       value={scheduleForm.instrumentId}
                       onValueChange={v => updateSchedule(p => ({ ...p, instrumentId: v }))}

@@ -109,7 +109,7 @@ export default function DashboardComercial() {
   // Preenchimento com Leads Padrão para visualização inicial (se não houver leads salvos)
   const displayLeads = leads.length > 0 ? leads : [
     { id: 1, name: "Escola Som & Tal", companyOrSchool: "Belo Horizonte - MG", planName: "Plano Pro", value: "199.00", stage: "novo", temperature: "morno", createdAt: new Date() },
-    { id: 2, name: "Vivace Escola de Música", companyOrSchool: "São Paulo - SP", planName: "Plano Pro", value: "199.00", stage: "contato", temperature: "quente", createdAt: new Date() },
+    { id: 2, name: "Vivace Escola de Dança", companyOrSchool: "São Paulo - SP", planName: "Plano Pro", value: "199.00", stage: "contato", temperature: "quente", createdAt: new Date() },
     { id: 3, name: "Academia do Som", companyOrSchool: "Salvador - BA", planName: "Plano Pro", value: "199.00", stage: "interessado", temperature: "quente", createdAt: new Date() },
     { id: 4, name: "Center Music", companyOrSchool: "Niterói - RJ", planName: "Plano Pro", value: "199.00", stage: "demonstracao", temperature: "quente", createdAt: new Date() },
     { id: 5, name: "Escola Allegro", companyOrSchool: "Niterói - RJ", planName: "Plano Pro", value: "199.00", stage: "proposta", temperature: "quente", createdAt: new Date() },
@@ -240,7 +240,7 @@ export default function DashboardComercial() {
             Dashboard Comercial
           </h1>
           <p className="text-xs text-muted-foreground font-medium mt-1">
-            Visão geral do funil de vendas e desempenho comercial do MusicPro.
+            Visão geral do funil de vendas e desempenho comercial do DancePro.
           </p>
         </div>
 

@@ -12,7 +12,7 @@ import { youtubeEmbedSrc } from "@/lib/youtubeEmbed";
 /**
  * PRD Repertório — Seção no portal do aluno (aba Materiais).
  * Player do YouTube EMBUTIDO + Cifra (só acordes — RN-007) com transposição,
- * autoscroll e diagramas. O aluno executa e estuda sem sair do MusicPro.
+ * autoscroll e diagramas. O aluno executa e estuda sem sair do DancePro.
  */
 
 // ─── Diagrama de acorde (SVG a partir do mount "X 0 2 0 1 0") ────────────────
@@ -367,7 +367,7 @@ export function RepertoireSection() {
         open={!!playingItem}
         onOpenChange={(o) => { if (!o) { setPlaying(null); setShowChord(false); } }}
         title={playingItem?.title || "Música"}
-        description={playingItem?.description || "Executando pelo MusicPro"}
+        description={playingItem?.description || "Executando pelo DancePro"}
       >
         <div className="space-y-3 pt-1">
           {/* Toggle Música | Cifra */}

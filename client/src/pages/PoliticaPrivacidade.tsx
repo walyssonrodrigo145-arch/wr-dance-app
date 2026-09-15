@@ -5,7 +5,7 @@ import { ArrowLeft, Shield } from "lucide-react";
 export default function PoliticaPrivacidade() {
   useEffect(() => {
     window.scrollTo({ top: 0 });
-    document.title = "Política de Privacidade — MusicPro";
+    document.title = "Política de Privacidade — DancePro";
   }, []);
 
   return (
@@ -19,7 +19,7 @@ export default function PoliticaPrivacidade() {
           </Link>
           <div className="flex items-center gap-2 text-primary font-black text-lg">
             <Shield size={20} />
-            MusicPro
+            DancePro
           </div>
         </div>
       </header>
@@ -45,7 +45,7 @@ export default function PoliticaPrivacidade() {
 
         <section className="prose prose-lg max-w-none">
           <p className="text-muted-foreground leading-relaxed text-lg">
-            A <strong className="text-foreground">MusicPro</strong> ("nós", "nossa", "plataforma") está comprometida em proteger a privacidade e os dados pessoais de todos os usuários. Esta Política de Privacidade explica como coletamos, usamos, armazenamos e protegemos suas informações, em conformidade com a <strong className="text-foreground">Lei Geral de Proteção de Dados (LGPD — Lei nº 13.709/2018)</strong>.
+            A <strong className="text-foreground">DancePro</strong> ("nós", "nossa", "plataforma") está comprometida em proteger a privacidade e os dados pessoais de todos os usuários. Esta Política de Privacidade explica como coletamos, usamos, armazenamos e protegemos suas informações, em conformidade com a <strong className="text-foreground">Lei Geral de Proteção de Dados (LGPD — Lei nº 13.709/2018)</strong>.
           </p>
         </section>
 
@@ -53,7 +53,7 @@ export default function PoliticaPrivacidade() {
           {
             num: "1",
             title: "Quem somos",
-            content: `A MusicPro é uma plataforma de gestão para escolas de música, desenvolvida e operada no Brasil. Somos o Controlador dos seus dados pessoais conforme definido pela LGPD. Para entrar em contato conosco sobre privacidade: contato via WhatsApp (33) 98405-5949.`
+            content: `A DancePro é uma plataforma de gestão para escolas de dança, desenvolvida e operada no Brasil. Somos o Controlador dos seus dados pessoais conforme definido pela LGPD. Para entrar em contato conosco sobre privacidade: contato via WhatsApp (33) 98405-5949.`
           },
           {
             num: "2",
@@ -155,7 +155,7 @@ export default function PoliticaPrivacidade() {
       {/* Footer */}
       <footer className="border-t border-border/50 py-10 mt-8 bg-muted/20">
         <div className="max-w-4xl mx-auto px-6 text-center text-muted-foreground font-medium text-sm">
-          <p>© {new Date().getFullYear()} MusicPro. Todos os direitos reservados.</p>
+          <p>© {new Date().getFullYear()} DancePro. Todos os direitos reservados.</p>
           <p className="mt-2">
             <Link href="/termos-de-uso" className="hover:text-primary transition-colors">Termos de Uso</Link>
             {" · "}
