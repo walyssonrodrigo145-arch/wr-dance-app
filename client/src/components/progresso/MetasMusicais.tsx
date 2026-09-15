@@ -16,15 +16,15 @@ export function MetasMusicais({ studentId, goals, createGoalMutation, updateGoal
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center justify-between">
          <div>
-            <h3 className="text-xl font-black text-foreground uppercase tracking-tighter">Metas Musicais</h3>
-            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-[0.2em] mt-1">Acompanhamento de Objetivos</p>
+            <h3 className="text-xl font-black text-foreground uppercase tracking-tighter">Metas de Dança & Coreografia</h3>
+            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-[0.2em] mt-1">Acompanhamento de Objetivos Corporais & Técnicos</p>
          </div>
       </div>
       <div className="bg-card border border-border rounded-[2.5rem] p-8 shadow-sm space-y-6">
         <div className="flex gap-4">
           <Input 
             value={title} onChange={e => setTitle(e.target.value)}
-            placeholder="Ex: Aprender o solo de Hotel California"
+            placeholder="Ex: Pirueta dupla en dehors, abertura zerada, sequência coreográfica de Jazz"
             className="flex-1 rounded-2xl h-12 bg-muted/50 border-border text-xs font-bold px-4"
           />
           <Button 

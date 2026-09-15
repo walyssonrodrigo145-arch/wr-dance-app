@@ -24,15 +24,15 @@ import DashboardComercial from './DashboardComercial';
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
 const TAB_CONFIG = [
-  { key: 'financeiro',   label: 'Financeiro',   icon: DollarSign },
-  { key: 'despesas',     label: 'Despesas & Lucro', icon: CreditCard },
-  { key: 'projecao',     label: 'Projeção 6M',   icon: TrendingUp },
-  { key: 'alunos',       label: 'Alunos',        icon: Users },
-  { key: 'aulas',        label: 'Aulas',         icon: CalendarDays },
-  { key: 'modalidades', label: 'Modalidades',  icon: PersonStanding },
-  { key: 'mensalidades', label: 'Mensalidades',  icon: FileText },
-  { key: 'modalidades',  label: 'Modalidades',   icon: Layers },
-  { key: 'engajamento',  label: 'Acessos',       icon: Activity },
+  { key: 'financeiro',   label: 'Financeiro',         icon: DollarSign },
+  { key: 'despesas',     label: 'Despesas & Lucro',   icon: CreditCard },
+  { key: 'projecao',     label: 'Projeção 6M',        icon: TrendingUp },
+  { key: 'alunos',       label: 'Alunos',              icon: Users },
+  { key: 'aulas',        label: 'Aulas',               icon: CalendarDays },
+  { key: 'formatos',     label: 'Formato de Aula',    icon: PersonStanding },
+  { key: 'mensalidades', label: 'Mensalidades',        icon: FileText },
+  { key: 'modalidades',  label: 'Estilos & Ritmos',   icon: Layers },
+  { key: 'engajamento',  label: 'Acessos',             icon: Activity },
 ] as const;
 
 type TabKey = typeof TAB_CONFIG[number]['key'];
@@ -1146,9 +1146,9 @@ const Relatorios: React.FC = () => {
             {activeTab === 'despesas'     && renderDespesas()}
             {activeTab === 'projecao'     && renderProjecao()}
             {activeTab === 'alunos'       && renderAlunos()}
-            {activeTab === 'modalidades'  && renderModalidades()}
+            {activeTab === 'formatos'     && renderModalidades()}
             {activeTab === 'aulas'        && renderAulas()}
-            {activeTab === 'modalidades' && renderInstrumentos()}
+            {activeTab === 'modalidades'  && renderInstrumentos()}
             {activeTab === 'mensalidades' && renderMensalidades()}
             {activeTab === 'engajamento'  && renderEngajamento()}
           </motion.div>

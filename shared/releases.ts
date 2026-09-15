@@ -26,6 +26,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.15.2",
+    date: "2026-09-15",
+    title: "✨ Especialização de Dança & Correção de Relatórios",
+    summary: "Separação inteligente das abas de relatórios e especialização de metas corporais e coreográficas.",
+    items: [
+      { type: "correcao", title: "Separação das Abas de Relatórios", description: "Corrigida duplicidade das abas de Modalidades: agora divididas em 'Formato de Aula' (Individual vs Turma) e 'Estilos & Ritmos' (Ballet, Jazz, Forró, etc.)." },
+      { type: "melhoria", title: "Metas de Dança & Objetivos Corporais", description: "Metas no painel de progresso agora focam em postura, piruetas, flexibilidade e domínio coreográfico." },
+      { type: "melhoria", title: "Dashboard do Aluno 100% Dança", description: "Remoção de referências residuais e foco total em trilhas, coreografias e constância nos ensaios." },
+    ],
+  },
+  {
     version: "2026.09.15",
     date: "2026-09-15",
     title: "🩰 DancePro — Rebranding Completo",

@@ -1,48 +1,43 @@
-# Auditoria Pré-Deploy — Resolução do Erro ao Gerar Plano Diário e Foco Estrito em Metas
+# Auditoria Pré-Deploy — Resolução das Abas Duplicadas de Modalidades e Especialização DancePro
 
-**Data:** 26/08/2026  
-**Auditor Responsável:** `wrauditor` (QA Sênior & Gerente de Projeto)  
-**Escopo:** Correção da tabela `student_pedagogical_memory`, blindagem defensiva e reestruturação do prompt da IA para geração anônima (sem nome do aluno) e foco exclusivo nas metas cadastradas.
+**Data:** 15/09/2026  
+**Auditor Responsável:** `wrauditor` (QA Sênior & Braço Direito)  
+**Escopo:** Correção da duplicidade de abas em `client/src/pages/Relatorios.tsx`, especialização de metas de dança em `client/src/components/progresso/MetasMusicais.tsx`, limpeza de referências no portal do aluno (`Dashboard.tsx`) e registro de novidades em `shared/releases.ts`.
 
 ---
 
 ## 1. Diagnóstico da Falha e Causa Raiz Estrutural
 
-- **Sintoma 1 (Erro de Banco):** Ao gerar plano diário na tela de Progresso, a aplicação disparava erro tRPC por tabela inexistente `student_pedagogical_memory`.
-- **Causa Raiz 1:** A tabela foi definida no schema mas não sincronizada no boot via `ensureSchemaConsistency` em `server/db.ts`.
-- **Sintoma 2 (Desvio Didático e Nome no Plano):** O prompt gerava textos contendo o nome do aluno e matérias dispersas não cadastradas nas metas da semana.
-- **Causa Raiz 2:** O prompt injetava `${student.name}` no schema JSON e permitia que a IA alucinasse tópicos complementares fora do array `studentGoals`.
+- **Sintoma:** Dois botões idênticos "Modalidades" na barra horizontal de navegação de relatórios (`/relatorios`).
+- **Causa Raiz Estrutural:** Durante o processo inicial de renomeação de termos, o antigo `instrumentos` e o existente `modalidades` foram ambos mapeados para a mesma chave `key: 'modalidades'` e label `Modalidades` no `TAB_CONFIG` de `Relatorios.tsx`. No switch de renderização, o segundo caso de `modalidades` sobrescrevia o primeiro e impedia alternância correta.
+- **Resolução:**
+  - Separado semanticamente em:
+    1. `formatos` ("Formato de Aula"): Distribuição e faturamento de matrículas *Individual vs Turma*.
+    2. `modalidades` ("Estilos & Ritmos"): Distribuição de alunos por estilo/ritmo (Ballet, Jazz, Forró, Danças Urbanas, etc.).
 
 ---
 
-## 2. Alterações Realizadas
+## 2. Especialização DancePro Aplicada
 
-1. **Auto-Criação de Tabelas no Startup (`server/db.ts`):**
-   - Inclusão com `safeExecute` de `student_pedagogical_memory` e seu índice `idx_student_pedagogical_memory_student_org`.
-   - Inclusão de todas as tabelas e enums recentes do schema.
-2. **Blindagem Defensiva na Geração do Plano Diário (`server/routers/progressRouters.ts`):**
-   - Adicionado `.catch()` com fallback para `[]` na query de `studentPedagogicalMemory`.
-   - Adicionado `try/catch` seguro ao deserializar `strongPoints`, `weakPoints` e `repertoireLearning`.
-3. **Reengenharia de Prompt para Anonimização e Foco em Metas (`server/routers/progressRouters.ts`):**
-   - Remoção de qualquer referência a `${student.name}` no prompt e no schema de saída.
-   - Regra absoluta e inviolável proibindo nomes de pessoas no corpo do plano e forçando foco exclusivo nas metas ativas cadastradas em `studentGoals`.
-4. **Blindagem no Router de IA Avançada (`server/advancedAiRouter.ts`):**
-   - Proteção defensiva com `.catch()` e tratamento de JSON no `getPedagogicalMemory`.
-5. **Migração Drizzle (`drizzle/0004_pedagogical_memory_and_missing_tables.sql`):**
-   - Arquivo SQL de migração adicionado para conformidade com o histórico Drizzle.
-6. **Especificação PRD (`PRD_PLANO_DIARIO_METAS.md`):**
-   - PRD completo estruturado conforme o padrão `/prdspec`.
+1. **Metas Corporais & Técnicas (`MetasMusicais.tsx`):**
+   - Título adaptado para "Metas de Dança & Coreografia".
+   - Subtítulo ajustado para "Acompanhamento de Objetivos Corporais & Técnicos".
+   - Placeholder com exemplos autênticos de dança (*"Ex: Pirueta dupla en dehors, abertura zerada, sequência coreográfica de Jazz"*).
+2. **Dashboard do Aluno (`student/Dashboard.tsx`):**
+   - Remoção de import residual de instrumento (`Guitar`).
+   - Adaptação dos cards para foco em ensaios, presença e ritmo.
+3. **Changelog Oficial (`shared/releases.ts`):**
+   - Inclusão do release `2026.09.15.2` documentando as correções e especialização de dança.
 
 ---
 
-## 3. Validações e Conformidade
+## 3. Validações Técnicas
 
-- **Regras de Negócio e Contratos de API:** Inalterados. Nenhuma assinatura de endpoint tRPC foi alterada.
-- **Risco de Quebra:** Baixo / Nulo.
-- **Testes de Banco:** Tabela `student_pedagogical_memory` e índices validados em produção.
+- **TypeScript (`pnpm check`):** Executado e finalizado com sucesso (código de saída 0).
+- **Contratos tRPC:** Preservados rigorosamente sem alteração de assinaturas.
 
 ---
 
 ## 4. Conclusão e Aval
 
-Auditoria **APROVADA**. Sistema blindado e pronto para deploy seguro via `devopsmaster`.
+Auditoria **APROVADA**. Sistema limpo e pronto para commit, push e deploy na VPS via `devopsmaster`.

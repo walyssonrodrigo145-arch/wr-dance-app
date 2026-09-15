@@ -22,7 +22,7 @@ import {
   QrCode,
   Bot,
   Target,
-  Guitar,
+  Sparkles,
   Image as ImageIcon
 } from "lucide-react";
 import { useLocation } from "wouter";
@@ -399,7 +399,7 @@ export default function StudentDashboard() {
                 <div className="space-y-4">
                   <div className="flex items-center gap-4 p-4 rounded-2xl bg-primary/5 border border-primary/10">
                     <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-lg shadow-primary/20">
-                      <Guitar size={20} />
+                      <Sparkles size={20} />
                     </div>
                     <div className="min-w-0">
                       <p className="text-base font-black text-foreground truncate">{nextLesson.title || "Aula"}</p>
