@@ -2148,7 +2148,8 @@ export const rankings = pgTable("rankings", {
   visibility: rankingVisibilityEnum("visibility").default("publico").notNull(),
   privacySettings: jsonb("privacySettings").$type<RankingPrivacySettings>().default(RANKING_DEFAULT_PRIVACY).notNull(),
   criteriaWeights: jsonb("criteriaWeights").$type<RankingWeights>().default(RANKING_DEFAULT_WEIGHTS).notNull(),
-  // Regra de participação (§12): todos | instrumento | nivel | manual
+  // Regra de participação (§12): todos | modalidade | nivel | manual
+  // (o valor legado "instrumento" do MusicPro continua aceito pelo engine)
   participantRule: varchar("participantRule", { length: 20 }).default("todos").notNull(),
   instrumentId: integer("instrumentId"),
   level: varchar("level", { length: 30 }),

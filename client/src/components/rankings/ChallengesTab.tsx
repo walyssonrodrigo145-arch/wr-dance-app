@@ -8,16 +8,16 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2, Clock, Users, Check, X, Swords, FileQuestion, Music, Timer, Target, Sparkles, ExternalLink } from "lucide-react";
+import { Loader2, Plus, Trash2, Clock, Users, Check, X, Swords, FileQuestion, Video, Timer, Target, Sparkles, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 const TIPOS = [
-  { id: "performance", label: "Performance", desc: "Aluno responde com vídeo/áudio", icon: Music },
-  { id: "quiz", label: "Quiz", desc: "Perguntas de teoria com alternativas", icon: FileQuestion },
-  { id: "pratica", label: "Prática", desc: "Meta de treino (minutos/dias)", icon: Timer },
+  { id: "performance", label: "Performance", desc: "Aluno responde com vídeo da coreografia", icon: Video },
+  { id: "quiz", label: "Quiz", desc: "Perguntas sobre dança e passos (alternativas)", icon: FileQuestion },
+  { id: "pratica", label: "Prática", desc: "Meta de treino/ensaio (minutos/dias)", icon: Timer },
   { id: "relampago", label: "Relâmpago", desc: "Prazo curto (24-48h)", icon: Sparkles },
   { id: "batalha", label: "Batalha 1v1", desc: "Dois alunos, mesmo desafio", icon: Swords },
   { id: "turma", label: "Turma", desc: "Alunos de uma turma", icon: Users },
@@ -146,7 +146,7 @@ export function ChallengesTab() {
         <div className="flex flex-col items-center justify-center py-16 bg-card/40 rounded-[2rem] border-2 border-dashed border-border/50 text-center px-6">
           <Target size={36} className="text-muted-foreground/30 mb-4" />
           <p className="text-sm font-black text-foreground">Nenhum desafio criado</p>
-          <p className="text-xs text-muted-foreground font-medium mt-1.5 max-w-sm">Crie desafios de performance (vídeo), quiz de teoria, metas de prática e mais. Aprovados, viram pontos e medalhas.</p>
+          <p className="text-xs text-muted-foreground font-medium mt-1.5 max-w-sm">Crie desafios de performance em vídeo, quiz de dança, metas de ensaio e mais. Aprovados, viram pontos e medalhas.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -228,7 +228,7 @@ export function ChallengesTab() {
 
               <div className="space-y-1.5">
                 <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Título *</Label>
-                <Input value={form.titulo} onChange={(e) => setForm(f => f && ({ ...f, titulo: e.target.value }))} placeholder="Ex: Grave a escala de Dó maior em 2 oitavas" className="h-11 rounded-xl font-semibold" />
+                <Input value={form.titulo} onChange={(e) => setForm(f => f && ({ ...f, titulo: e.target.value }))} placeholder="Ex: Grave sua coreografia do trecho 2" className="h-11 rounded-xl font-semibold" />
               </div>
 
               <div className="space-y-1.5">
@@ -316,7 +316,7 @@ export function ChallengesTab() {
               {form.tipo === "turma" && (
                 <div className="space-y-1.5 p-3.5 rounded-2xl bg-indigo-500/5 border border-indigo-500/20">
                   <Label className="text-[10px] font-black uppercase tracking-widest text-indigo-600">Turma (nome exato da aula em grupo)</Label>
-                  <Input value={form.turmaNome} onChange={(e) => setForm(f => f && ({ ...f, turmaNome: e.target.value }))} placeholder="Ex: Turma de Violão — Manhã" className="h-11 rounded-xl font-semibold" />
+                  <Input value={form.turmaNome} onChange={(e) => setForm(f => f && ({ ...f, turmaNome: e.target.value }))} placeholder="Ex: Ballet Infantil — Seg/Qua" className="h-11 rounded-xl font-semibold" />
                 </div>
               )}
 

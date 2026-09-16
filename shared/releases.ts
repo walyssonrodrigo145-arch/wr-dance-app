@@ -26,6 +26,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.16.2",
+    date: "2026-09-16",
+    title: "Turma no cadastro do aluno e Rankings com linguagem de dança",
+    summary: "Cadastre o aluno já escolhendo a turma da modalidade dele (com lista de espera automática) e o módulo de Rankings agora fala a língua da dança.",
+    items: [
+      { type: "novo", title: "Turma no cadastro do aluno", description: "Ao escolher a modalidade, aparecem só as turmas daquela dança, com vagas em tempo real. Turma lotada? O aluno entra automaticamente na lista de espera — e sobe sozinho quando abrir vaga." },
+      { type: "melhoria", title: "Trocar ou remover turma pela edição", description: "No cadastro do aluno também é possível ver a turma atual, trocar de turma (libera a vaga e promove a fila) ou deixar 'Sem turma' para definir depois." },
+      { type: "melhoria", title: "Rankings com linguagem de dança", description: "Critérios agora são Frequência, Metas, Ensaios em casa, Evolução técnica e Desafios — e a participação passa a ser 'Por modalidade', sem termos de escola de música." },
+      { type: "melhoria", title: "Desafios de dança", description: "Exemplos e textos dos desafios atualizados: performance em vídeo da coreografia, quiz de passos e metas de ensaio (sem referências a instrumentos)." },
+    ],
+  },
+  {
     version: "2026.09.16.1",
     date: "2026-09-16",
     title: "Menu do Portal do Aluno por categorias",

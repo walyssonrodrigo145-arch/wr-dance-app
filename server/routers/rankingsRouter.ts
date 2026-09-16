@@ -58,6 +58,18 @@ const weightsSchema = z.object({
   desafios: z.number().min(0).max(100).default(RANKING_DEFAULT_WEIGHTS.desafios),
 }).default(RANKING_DEFAULT_WEIGHTS);
 
+/**
+ * Normaliza a regra de participação: "instrumento" é o valor legado do MusicPro
+ * e passa a ser gravado como "modalidade" (dança). Rankings antigos continuam
+ * funcionando — o RankingEngine aceita os dois valores.
+ */
+function normalizeParticipantRule(rule: string | null | undefined): "todos" | "modalidade" | "nivel" | "manual" {
+  if (rule === "modalidade" || rule === "instrumento") return "modalidade";
+  if (rule === "nivel") return "nivel";
+  if (rule === "manual") return "manual";
+  return "todos";
+}
+
 const privacySchema = z.object({
   showFullName: z.boolean().default(RANKING_DEFAULT_PRIVACY.showFullName),
   showAvatar: z.boolean().default(RANKING_DEFAULT_PRIVACY.showAvatar),
@@ -74,7 +86,7 @@ const baseFields = {
   visibility: z.enum(["publico", "privado"]).default("publico"),
   privacySettings: privacySchema,
   criteriaWeights: weightsSchema,
-  participantRule: z.enum(["todos", "instrumento", "nivel", "manual"]).default("todos"),
+  participantRule: z.enum(["todos", "instrumento", "modalidade", "nivel", "manual"]).default("todos"),
   instrumentId: z.number().nullable().optional(),
   level: z.string().nullable().optional(),
   participantStudentIds: z.array(z.number()).default([]),
@@ -166,7 +178,7 @@ export const rankingsRouter = router({
       visibility: input.visibility,
       privacySettings: input.privacySettings,
       criteriaWeights: input.criteriaWeights,
-      participantRule: input.participantRule,
+      participantRule: normalizeParticipantRule(input.participantRule),
       instrumentId: input.instrumentId ?? null,
       level: input.level ?? null,
       participantStudentIds: input.participantStudentIds,
@@ -202,7 +214,7 @@ export const rankingsRouter = router({
       visibility: input.visibility ?? current.visibility,
       privacySettings: input.privacySettings ?? current.privacySettings,
       criteriaWeights: input.criteriaWeights ?? current.criteriaWeights,
-      participantRule: input.participantRule ?? current.participantRule,
+      participantRule: input.participantRule ? normalizeParticipantRule(input.participantRule) : current.participantRule,
       instrumentId: input.instrumentId !== undefined ? input.instrumentId : current.instrumentId,
       level: input.level !== undefined ? input.level : current.level,
       participantStudentIds: input.participantStudentIds ?? current.participantStudentIds,

@@ -31,6 +31,29 @@ async function resolveStudentId(db: any, ctx: { user: { id: number; studentId?: 
   return found?.id ?? null;
 }
 
+/** Promove o primeiro da lista de espera quando uma vaga é aberta (ordem da fila). */
+async function promoteNextFromWaitlist(db: any, turmaId: number) {
+  const [next] = await db.select({ id: turmaAlunos.id, studentId: turmaAlunos.studentId })
+    .from(turmaAlunos)
+    .where(and(eq(turmaAlunos.turmaId, turmaId), eq(turmaAlunos.status, "espera")))
+    .orderBy(asc(turmaAlunos.position), asc(turmaAlunos.id))
+    .limit(1);
+  if (!next) return null;
+  await db.update(turmaAlunos).set({ status: "ativa", position: 0, updatedAt: new Date() })
+    .where(eq(turmaAlunos.id, next.id));
+  return next;
+}
+
+/** Cancela a matrícula (soft) e promove o próximo da fila se a vaga foi aberta. */
+async function releaseEnrollmentSlot(db: any, enrollment: { id: number; turmaId: number; status: string }) {
+  await db.update(turmaAlunos).set({ status: "cancelada", position: 0, updatedAt: new Date() })
+    .where(eq(turmaAlunos.id, enrollment.id));
+  if (enrollment.status === "ativa") {
+    return promoteNextFromWaitlist(db, enrollment.turmaId);
+  }
+  return null;
+}
+
 const turmaInput = z.object({
   name: z.string().min(2, "Informe o nome da turma").max(255),
   modalidadeId: z.number().nullable().optional(),
@@ -410,6 +433,134 @@ export const turmasRouters = {
       await db.update(turmaAlunos).set({ status: "ativa", position: 0, updatedAt: new Date() })
         .where(eq(turmaAlunos.id, input.id));
       return { success: true };
+    }),
+
+    /** Matrícula atual (ativa ou em espera) do aluno — usada no cadastro/edição. */
+    studentEnrollment: protectedProcedure.input(z.object({ studentId: z.number() })).query(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) return null;
+      const orgId = ctx.user.organizationId!;
+
+      const [enrollment] = await db.select({
+        id: turmaAlunos.id,
+        turmaId: turmaAlunos.turmaId,
+        status: turmaAlunos.status,
+        position: turmaAlunos.position,
+        turmaName: turmas.name,
+        turmaStatus: turmas.status,
+        modalidadeId: turmas.modalidadeId,
+        timeStr: turmas.timeStr,
+        weekdays: turmas.weekdays,
+      })
+        .from(turmaAlunos)
+        .innerJoin(turmas, eq(turmas.id, turmaAlunos.turmaId))
+        .where(and(
+          eq(turmaAlunos.studentId, input.studentId),
+          eq(turmaAlunos.organizationId, orgId),
+          sql`${turmaAlunos.status} <> 'cancelada'`,
+        ))
+        .orderBy(asc(turmaAlunos.status), asc(turmaAlunos.id))
+        .limit(1);
+
+      return enrollment ?? null;
+    }),
+
+    /**
+     * Define (ou remove) a turma do aluno a partir do cadastro.
+     * - turmaId null → remove a matrícula atual (liberando vaga + promovendo a fila);
+     * - turmaId igual à atual → no-op idempotente;
+     * - turmaId diferente → transfere (libera a antiga e matricula na nova);
+     * - turma lotada → entra automaticamente na lista de espera.
+     */
+    setStudentTurma: protectedProcedure.input(z.object({
+      studentId: z.number(),
+      turmaId: z.number().nullable(),
+    })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+
+      const [student] = await db.select({ id: students.id }).from(students)
+        .where(and(eq(students.id, input.studentId), eq(students.organizationId, orgId))).limit(1);
+      if (!student) throw new TRPCError({ code: "NOT_FOUND", message: "Aluno não encontrado nesta escola." });
+
+      const [current] = await db.select({
+        id: turmaAlunos.id,
+        turmaId: turmaAlunos.turmaId,
+        status: turmaAlunos.status,
+      }).from(turmaAlunos)
+        .where(and(
+          eq(turmaAlunos.studentId, input.studentId),
+          eq(turmaAlunos.organizationId, orgId),
+          sql`${turmaAlunos.status} <> 'cancelada'`,
+        ))
+        .orderBy(asc(turmaAlunos.status), asc(turmaAlunos.id))
+        .limit(1);
+
+      // Remover turma
+      if (input.turmaId == null) {
+        if (!current) return { success: true, removed: false, waitlisted: false, turmaName: null };
+        const promoted = await releaseEnrollmentSlot(db, current);
+        return { success: true, removed: true, waitlisted: false, turmaName: null, promoted };
+      }
+
+      const [turma] = await db.select({
+        id: turmas.id,
+        name: turmas.name,
+        capacity: turmas.capacity,
+        status: turmas.status,
+        modalidadeId: turmas.modalidadeId,
+      }).from(turmas)
+        .where(and(eq(turmas.id, input.turmaId), eq(turmas.organizationId, orgId))).limit(1);
+      if (!turma) throw new TRPCError({ code: "NOT_FOUND", message: "Turma não encontrada nesta escola." });
+      if (turma.status === "encerrada") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Esta turma está encerrada e não aceita novas matrículas." });
+      }
+
+      // Já está na mesma turma → idempotente
+      if (current && current.turmaId === input.turmaId) {
+        return { success: true, unchanged: true, waitlisted: current.status === "espera", turmaName: turma.name };
+      }
+
+      // Transfere: libera a vaga antiga (e promove a fila dela)
+      if (current) {
+        await releaseEnrollmentSlot(db, current);
+      }
+
+      // Capacidade da turma de destino
+      const [ocupadas] = await db.select({ count: sql<number>`CAST(COUNT(*) AS INT)` })
+        .from(turmaAlunos)
+        .where(and(eq(turmaAlunos.turmaId, input.turmaId), eq(turmaAlunos.status, "ativa")));
+      const temVaga = (Number(ocupadas?.count) || 0) < turma.capacity;
+
+      const [{ maxPosition }] = await db.select({ maxPosition: sql<number>`COALESCE(MAX(${turmaAlunos.position}), 0)` })
+        .from(turmaAlunos)
+        .where(and(eq(turmaAlunos.turmaId, input.turmaId), eq(turmaAlunos.status, "espera")));
+
+      // Reaproveita linha cancelada da mesma turma (unique turmaId+studentId)
+      const [reusable] = await db.select({ id: turmaAlunos.id }).from(turmaAlunos)
+        .where(and(eq(turmaAlunos.turmaId, input.turmaId), eq(turmaAlunos.studentId, input.studentId)))
+        .limit(1);
+
+      const values = {
+        organizationId: orgId,
+        turmaId: input.turmaId,
+        studentId: input.studentId,
+        status: temVaga ? ("ativa" as const) : ("espera" as const),
+        position: temVaga ? 0 : (Number(maxPosition) || 0) + 1,
+        enrolledAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      if (reusable) {
+        await db.update(turmaAlunos).set(values).where(eq(turmaAlunos.id, reusable.id));
+      } else {
+        await db.insert(turmaAlunos).values(values);
+      }
+
+      return { success: true, waitlisted: !temVaga, turmaName: turma.name };
     }),
 
     searchAlunos: protectedProcedure.input(z.object({

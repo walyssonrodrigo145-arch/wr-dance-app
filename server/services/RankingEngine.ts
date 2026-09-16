@@ -93,7 +93,7 @@ export async function resolveParticipants(db: any, ranking: Ranking): Promise<nu
       target = await db.select({ id: students.id }).from(students)
         .where(and(eq(students.organizationId, orgId), eq(students.status, 'ativo'), inArray(students.id, ids)));
     }
-  } else if (ranking.participantRule === 'instrumento') {
+  } else if (ranking.participantRule === 'instrumento' || ranking.participantRule === 'modalidade') {
     target = await db.select({ id: students.id }).from(students)
       .where(and(
         eq(students.organizationId, orgId),

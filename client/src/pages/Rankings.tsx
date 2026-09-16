@@ -79,10 +79,10 @@ const LEVELS = [
 ];
 
 const WEIGHT_FIELDS = [
-  { key: "presenca", label: "Presença" },
-  { key: "atividades", label: "Atividades" },
-  { key: "pratica", label: "Prática" },
-  { key: "evolucao", label: "Evolução" },
+  { key: "presenca", label: "Frequência" },
+  { key: "atividades", label: "Metas" },
+  { key: "pratica", label: "Ensaios em casa" },
+  { key: "evolucao", label: "Evolução técnica" },
   { key: "desafios", label: "Desafios" },
 ] as const;
 
@@ -108,7 +108,7 @@ interface EditorState {
   description: string;
   startDate: string;
   endDate: string;
-  participantRule: "todos" | "instrumento" | "nivel" | "manual";
+  participantRule: "todos" | "instrumento" | "modalidade" | "nivel" | "manual";
   instrumentId: string;
   level: string;
   participantStudentIds: number[];
@@ -374,8 +374,8 @@ export default function Rankings() {
         privateTopRange: editor.privateTopRange,
       },
       criteriaWeights: editor.weights as any,
-      participantRule: editor.participantRule,
-      instrumentId: editor.participantRule === "instrumento" && editor.instrumentId ? Number(editor.instrumentId) : null,
+      participantRule: editor.participantRule === "instrumento" ? "modalidade" : editor.participantRule,
+      instrumentId: (editor.participantRule === "instrumento" || editor.participantRule === "modalidade") && editor.instrumentId ? Number(editor.instrumentId) : null,
       level: editor.participantRule === "nivel" ? editor.level : null,
       participantStudentIds: editor.participantRule === "manual" ? editor.participantStudentIds : [],
       startDate: new Date(`${editor.startDate}T00:00:00`).toISOString(),
@@ -677,7 +677,7 @@ export default function Rankings() {
                         </select>
                       </div>
                       <div className="flex items-center justify-between gap-3">
-                        <Label className="text-xs font-bold text-muted-foreground shrink-0">Instrumento</Label>
+                        <Label className="text-xs font-bold text-muted-foreground shrink-0">Modalidade</Label>
                         <select
                           value={instrumentFilter}
                           onChange={(e) => setInstrumentFilter(e.target.value)}
@@ -749,7 +749,7 @@ export default function Rankings() {
               <div className="h-full bg-gradient-to-br from-primary/10 to-purple-500/5 border border-primary/15 rounded-[1.5rem] p-5 md:p-6 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10 transition-all duration-300">
                 <Target size={20} className="text-primary mb-3" />
                 <h4 className="text-sm font-black tracking-tight mb-1.5">Como funciona?</h4>
-                <p className="text-[11px] font-medium text-muted-foreground leading-relaxed mb-4">Alunos ganham pontos ao cumprir desafios, frequentar aulas e evoluir nos estudos.</p>
+                <p className="text-[11px] font-medium text-muted-foreground leading-relaxed mb-4">Alunos ganham pontos ao cumprir desafios, frequentar aulas e ensaios e evoluir na técnica.</p>
                 <button onClick={() => setHowItWorksOpen(true)} className="text-[10px] font-black uppercase tracking-widest text-primary hover:gap-3 flex items-center gap-2 transition-all">
                   Saiba mais <ArrowRight size={12} />
                 </button>
@@ -919,7 +919,7 @@ export default function Rankings() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {[
                   { id: "todos", label: "Todos os alunos ativos" },
-                  { id: "instrumento", label: "Por modalidade" },
+                  { id: "modalidade", label: "Por modalidade" },
                   { id: "nivel", label: "Por nível" },
                   { id: "manual", label: "Seleção manual" },
                 ].map((opt) => (
@@ -929,14 +929,16 @@ export default function Rankings() {
                     onClick={() => setEditor((p) => ({ ...p, participantRule: opt.id as any }))}
                     className={cn(
                       "py-3.5 px-4 rounded-2xl border text-xs font-black transition-all text-left",
-                      editor.participantRule === opt.id ? "bg-primary text-white border-primary shadow-lg shadow-primary/20" : "bg-card border-border hover:border-primary/40"
+                      (editor.participantRule === opt.id || (opt.id === "modalidade" && editor.participantRule === "instrumento"))
+                        ? "bg-primary text-white border-primary shadow-lg shadow-primary/20"
+                        : "bg-card border-border hover:border-primary/40"
                     )}
                   >
                     {opt.label}
                   </button>
                 ))}
               </div>
-              {editor.participantRule === "instrumento" && (
+              {(editor.participantRule === "instrumento" || editor.participantRule === "modalidade") && (
                 <select value={editor.instrumentId} onChange={(e) => setEditor((p) => ({ ...p, instrumentId: e.target.value }))} className="w-full h-12 rounded-xl border border-border bg-background px-3 text-sm font-bold">
                   <option value="">Selecione a modalidade…</option>
                   {(instrumentsList as any[]).map((i) => (
@@ -1009,7 +1011,7 @@ export default function Rankings() {
               <div className="grid grid-cols-5 gap-2">
                 {WEIGHT_FIELDS.map((f) => (
                   <div key={f.key} className="space-y-1 min-w-0">
-                    <Label className="text-[8px] font-black uppercase text-muted-foreground/60 text-center block truncate">{f.label}</Label>
+                    <Label title={f.label} className="text-[8px] font-black uppercase text-muted-foreground/60 text-center block truncate">{f.label}</Label>
                     <Input
                       type="number"
                       min={0}
@@ -1217,10 +1219,10 @@ export default function Rankings() {
             </DialogDescription>
           </DialogHeader>
           <ul className="space-y-3 text-sm font-medium text-foreground/90">
-            <li className="flex items-start gap-2.5"><span className="text-lg leading-none mt-0.5">📅</span> Presença e participação nas aulas;</li>
+            <li className="flex items-start gap-2.5"><span className="text-lg leading-none mt-0.5">📅</span> Frequência e participação nas aulas e ensaios;</li>
             <li className="flex items-start gap-2.5"><span className="text-lg leading-none mt-0.5">🎯</span> Conclusão de metas e exercícios;</li>
-            <li className="flex items-start gap-2.5"><span className="text-lg leading-none mt-0.5">🎸</span> Prática com atividade real no plano diário;</li>
-            <li className="flex items-start gap-2.5"><span className="text-lg leading-none mt-0.5">🚀</span> Evolução e conquistas registradas.</li>
+            <li className="flex items-start gap-2.5"><span className="text-lg leading-none mt-0.5">🩰</span> Ensaios em casa registrados no plano diário;</li>
+            <li className="flex items-start gap-2.5"><span className="text-lg leading-none mt-0.5">🚀</span> Evolução técnica e conquistas registradas.</li>
           </ul>
           <p className="text-xs text-muted-foreground font-medium pt-2 border-t border-border/50">
             O sistema avalia o conjunto desses sinais — acompanhe a evolução pelo ranking. Dúvidas de pontuação podem ser auditadas aqui no painel.
