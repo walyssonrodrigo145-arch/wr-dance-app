@@ -74,6 +74,13 @@ export function buildDueDateSeries(
 // MH-004: Rate limiting — controle de tentativas de login por IP+email
 export const loginAttempts: Map<string, { count: number; resetAt: number }> = new Map();
 
+// SEGURANÇA: Rate limiting do pedido de recuperação de senha (IP+e-mail).
+// Limitação conhecida: em memória (multi-instância exigiria Redis) — mesma
+// característica do loginAttempts, já documentada na auditoria.
+export const passwordResetAttempts: Map<string, { count: number; resetAt: number }> = new Map();
+export const PASSWORD_RESET_WINDOW_MS = 15 * 60 * 1000;
+export const PASSWORD_RESET_MAX = 3;
+
 // SEGURANÇA: comparação de strings em tempo constante (evita timing attack)
 export function safeEqualStr(a: string, b: string): boolean {
   const ba = Buffer.from(a, "utf8");

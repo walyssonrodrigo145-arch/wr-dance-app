@@ -49,6 +49,32 @@ async function assertStudentInOrg(db: any, orgId: number, studentId: number) {
   if (!student) throw new TRPCError({ code: "NOT_FOUND", message: "Aluno não encontrado nesta escola." });
 }
 
+/**
+ * LGPD: saúde é dado pessoal sensível. Acesso restrito a admin/owner da escola
+ * e ao professor responsável pelo aluno (least privilege) — não a toda a equipe.
+ */
+async function assertHealthAccess(
+  db: any,
+  ctx: { user: { id: number; role: string; openId: string; organizationId?: number | null } },
+  studentId: number,
+) {
+  const orgId = ctx.user.organizationId!;
+  const [student] = await db.select({ id: students.id, professorId: students.professorId })
+    .from(students)
+    .where(and(eq(students.id, studentId), eq(students.organizationId, orgId)))
+    .limit(1);
+  if (!student) throw new TRPCError({ code: "NOT_FOUND", message: "Aluno não encontrado nesta escola." });
+
+  const isAdmin = ctx.user.role === "admin" || ctx.user.role === "superadmin" || ctx.user.openId === ENV.ownerOpenId;
+  if (!isAdmin && student.professorId !== ctx.user.id) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Dados de saúde são restritos à administração e ao professor responsável pelo aluno.",
+    });
+  }
+  return student;
+}
+
 export const saudeRouters = {
   saude: router({
     list: protectedProcedure.input(z.object({ studentId: z.number() })).query(async ({ ctx, input }) => {
@@ -56,7 +82,7 @@ export const saudeRouters = {
       const db = await getDb();
       if (!db) return [];
       const orgId = ctx.user.organizationId!;
-      await assertStudentInOrg(db, orgId, input.studentId);
+      await assertHealthAccess(db, ctx, input.studentId);
 
       return db.select().from(studentHealthRecords)
         .where(and(
@@ -71,7 +97,7 @@ export const saudeRouters = {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
       const orgId = ctx.user.organizationId!;
-      await assertStudentInOrg(db, orgId, input.studentId);
+      await assertHealthAccess(db, ctx, input.studentId);
 
       const [created] = await db.insert(studentHealthRecords).values({
         organizationId: orgId,
@@ -96,10 +122,11 @@ export const saudeRouters = {
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
       const orgId = ctx.user.organizationId!;
 
-      const [existing] = await db.select({ id: studentHealthRecords.id }).from(studentHealthRecords)
+      const [existing] = await db.select({ id: studentHealthRecords.id, studentId: studentHealthRecords.studentId }).from(studentHealthRecords)
         .where(and(eq(studentHealthRecords.id, input.id), eq(studentHealthRecords.organizationId, orgId)))
         .limit(1);
       if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Avaliação não encontrada." });
+      await assertHealthAccess(db, ctx, existing.studentId);
 
       await db.update(studentHealthRecords).set({
         recordDate: input.recordDate.toISOString().slice(0, 10),
@@ -121,10 +148,11 @@ export const saudeRouters = {
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
       const orgId = ctx.user.organizationId!;
 
-      const [existing] = await db.select({ id: studentHealthRecords.id }).from(studentHealthRecords)
+      const [existing] = await db.select({ id: studentHealthRecords.id, studentId: studentHealthRecords.studentId }).from(studentHealthRecords)
         .where(and(eq(studentHealthRecords.id, input.id), eq(studentHealthRecords.organizationId, orgId)))
         .limit(1);
       if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Avaliação não encontrada." });
+      await assertHealthAccess(db, ctx, existing.studentId);
 
       await db.delete(studentHealthRecords).where(eq(studentHealthRecords.id, input.id));
       return { success: true };

@@ -35,6 +35,8 @@ import { sendWhatsAppMessage, startWhatsAppSession, getWhatsAppSessionStatus, lo
 import { nanoid } from "nanoid";
 import { sdk } from "../_core/sdk";
 import { sendVerificationEmail, sendPasswordResetEmail, sendSimpleEmail } from "../_core/email";
+import { logSecurityEvent } from "../_core/rateLimiter";
+import { hashResetToken } from "../utils/securityTokens";
 import { ENV } from "../_core/env";
 import { storagePut } from "../storage";
 import { superAdminRouter } from "../superAdminRouter";
@@ -51,7 +53,7 @@ import { chatbotFlowRouter } from "../chatbotFlowRouter";
 import { schoolAiRouter } from "../schoolAiRouter";
 import { fiscalRouter } from "../fiscalRouter";
 import { FiscalService } from "../services/fiscal/FiscalService";
-import { loginAttempts, safeEqualStr, isReservedSuperAdminEmail, getOrgPlanLimits, syncOrgAsaasSubscription, reconcileOrgAsaasCharges, runCreateAssinafyContract } from "./helpers";
+import { loginAttempts, passwordResetAttempts, PASSWORD_RESET_MAX, PASSWORD_RESET_WINDOW_MS, safeEqualStr, isReservedSuperAdminEmail, getOrgPlanLimits, syncOrgAsaasSubscription, reconcileOrgAsaasCharges, runCreateAssinafyContract } from "./helpers";
 export const authRouters = {
   publicData: router({
     getHeroSlides: publicProcedure.query(async () => {
@@ -320,10 +322,36 @@ export const authRouters = {
     /** Solicita link de recuperação de senha por e-mail (resposta genérica — sem enumeração de e-mails). */
     requestPasswordReset: publicProcedure
       .input(z.object({ email: z.string().email("E-mail inválido") }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
         const db = await getDb();
         if (!db) return { success: true };
         const email = input.email.toLowerCase().trim();
+
+        // SEGURANÇA: rate limit dedicado (3 pedidos / 15 min por IP+e-mail).
+        // Sem isso, o endpoint vira vetor de flood de e-mails e queima de cota do provedor.
+        const ip = ((ctx.req.headers["x-forwarded-for"] as string) || (ctx.req as any).socket?.remoteAddress || "unknown").split(",")[0].trim();
+        const resetKey = `${ip}:${email}`;
+        const now = Date.now();
+        const attempt = passwordResetAttempts.get(resetKey);
+        if (attempt && now < attempt.resetAt && attempt.count >= PASSWORD_RESET_MAX) {
+          logSecurityEvent({
+            ip,
+            route: "/api/trpc/auth.requestPasswordReset",
+            method: "POST",
+            statusCode: 429,
+            eventCategory: "password_reset_rate_limited",
+            severity: "medium",
+            userAgent: ctx.req.headers["user-agent"] as string,
+            details: `Bloqueado: ${attempt.count} pedidos de recuperação para ${email} em 15 min.`,
+          });
+          return { success: true }; // resposta genérica — não revela bloqueio nem existência da conta
+        }
+        passwordResetAttempts.set(
+          resetKey,
+          attempt && now < attempt.resetAt
+            ? { count: attempt.count + 1, resetAt: attempt.resetAt }
+            : { count: 1, resetAt: now + PASSWORD_RESET_WINDOW_MS },
+        );
 
         const [user] = await db.select({ id: users.id, email: users.email })
           .from(users)
@@ -331,15 +359,18 @@ export const authRouters = {
           .limit(1);
 
         if (user?.email) {
-          const token = crypto.randomBytes(32).toString("hex");
+          // SEGURANÇA: o banco guarda apenas o HASH do token (SHA-256).
+          // Vazamento do banco não permite redefinir a senha de ninguém.
+          const rawToken = crypto.randomBytes(32).toString("hex");
+          const tokenHash = hashResetToken(rawToken);
           await db.update(users)
             .set({
-              resetPasswordToken: token,
+              resetPasswordToken: tokenHash,
               resetPasswordTokenExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
             })
             .where(eq(users.id, user.id));
           try {
-            await sendPasswordResetEmail(user.email, token);
+            await sendPasswordResetEmail(user.email, rawToken);
           } catch (error) {
             // best-effort: nunca revela se o e-mail existe
             console.error("[Auth] Falha ao enviar e-mail de recuperação:", (error as any)?.message);
@@ -361,10 +392,13 @@ export const authRouters = {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
 
+        // Aceita o hash (novo padrão) e, por compatibilidade, tokens legados em texto puro.
+        const tokenHash = hashResetToken(input.token);
+
         const [user] = await db.select({ id: users.id })
           .from(users)
           .where(and(
-            eq(users.resetPasswordToken, input.token),
+            or(eq(users.resetPasswordToken, tokenHash), eq(users.resetPasswordToken, input.token)),
             gt(users.resetPasswordTokenExpiresAt, new Date()),
           ))
           .limit(1);
@@ -415,7 +449,7 @@ export const authRouters = {
         // Sem este fix, um aluno e um professor com o mesmo email em orgs diferentes
         // causavam cross-tenant — o limit(1) retornava o usuário errado.
         const allUsersWithEmail = await db.select().from(users)
-          .where(eq(users.email, input.email));
+          .where(sql`LOWER(${users.email}) = ${input.email.toLowerCase().trim()}`);
 
         // Prioriza o user cujo role bate com o loginType; caso contrário, usa o primeiro encontrado
         let user = allUsersWithEmail.find(u => {
@@ -518,6 +552,16 @@ export const authRouters = {
 
         const db = await getDb();
         if (!db) throw new Error("Banco de dados não disponível");
+
+        // SEGURANÇA (multi-tenant): impede contas duplicadas com o mesmo e-mail
+        // (mesmo com caixa diferente) — evita ambiguidade de login e sequestro de e-mail.
+        const normalizedEmail = input.email.toLowerCase().trim();
+        const [duplicateEmail] = await db.select({ id: users.id }).from(users)
+          .where(sql`LOWER(${users.email}) = ${normalizedEmail}`)
+          .limit(1);
+        if (duplicateEmail) {
+          throw new Error("Este e-mail já está cadastrado. Faça login ou use outro e-mail.");
+        }
         
         const salt = crypto.randomBytes(16).toString("hex");
         const derivedKey = crypto.scryptSync(input.password, salt, 64).toString("hex");
@@ -589,7 +633,7 @@ export const authRouters = {
         const db = await getDb();
         if (!db) throw new Error("Banco de dados não disponível");
         
-        const [existing] = await db.select().from(users).where(eq(users.email, input.email)).limit(1);
+        const [existing] = await db.select().from(users).where(sql`LOWER(${users.email}) = ${input.email.toLowerCase().trim()}`).limit(1);
         if (existing) {
           throw new Error("Este e-mail já está em uso.");
         }
