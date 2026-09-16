@@ -26,6 +26,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.15.3",
+    date: "2026-09-15",
+    title: "Coreografias, Eventos, Figurinos, Turmas e mais",
+    summary: "O DancePro agora cobre a operação completa de palco: coreografias com elenco, eventos/espetáculos com autorização de imagem, acervo de figurinos com empréstimos, turmas com vagas e lista de espera, saúde do bailarino e pesquisa de satisfação (NPS).",
+    items: [
+      { type: "novo", title: "Coreografias com elenco", description: "Cadastre cada coreografia com modalidade, nível, formação (solo/duo/grupo), trilha, vídeo de marcação do YouTube e escale os alunos. Acompanhe o % de domínio de cada bailarino. O aluno vê suas coreografias no portal." },
+      { type: "novo", title: "Eventos & Espetáculos", description: "Organize recitais, festivais, competições e workshops: programa com ordem de apresentação, participantes e controle de autorização de imagem/participação (recomendado para menores). O aluno confirma presença pelo portal." },
+      { type: "novo", title: "Figurinos & Estoque", description: "Acervo de figurinos com tipo, tamanho, cor, estado e custo. Empréstimo por aluno/coreografia com data de devolução, alerta de atrasados e disponibilidade em tempo real. O aluno vê os figurinos em sua posse." },
+      { type: "novo", title: "Turmas & Vagas com lista de espera", description: "Turmas fixas com grade semanal (dias + horário), capacidade e fila de espera. Quando uma vaga abre, o próximo da fila é promovido automaticamente. O aluno acompanha suas turmas no portal." },
+      { type: "novo", title: "Saúde & Condicionamento Físico", description: "Nas abas do Progresso do aluno: avaliações periódicas com peso, altura, flexibilidade, condicionamento e histórico de lesões/restrições." },
+      { type: "novo", title: "Satisfação (NPS)", description: "O aluno responde de 0 a 10 pelo portal (com comentário opcional) e a escola acompanha o NPS, promotores/detratores e respostas — também é possível registrar respostas recebidas por WhatsApp ou presencialmente." },
+      { type: "novo", title: "Mensagens no Portal do Aluno", description: "O aluno agora conversa diretamente com seu professor pela aba Mensagens, respeitando as permissões do portal." },
+      { type: "correcao", title: "Menu do professor respeita permissões", description: "O menu lateral e a barra mobile agora ocultam as páginas que o professor não tem permissão de acessar (antes o item aparecia e só a página bloqueava)." },
+      { type: "correcao", title: "Notas Fiscais acessíveis", description: "A tela de NFS-e (Focus NFe) aparecia apenas internamente — agora há a rota /notas-fiscais e as abas Salas & Tablados e Notas Fiscais em Configurações." },
+      { type: "correcao", title: "Recuperação de senha por e-mail", description: "O botão 'Esqueceu?' agora funciona: o usuário informa o e-mail e recebe um link seguro (1h) para criar uma nova senha." },
+      { type: "correcao", title: "Robustez dos novos módulos", description: "Editar coreografia/figurino não apaga mais descrição/foto, datas aparecem sem deslocamento de fuso, o slider de domínio não dispara requisições em excesso e o NPS tem limite anti-spam." },
+    ],
+  },
+  {
     version: "2026.09.15.2",
     date: "2026-09-15",
     title: "✨ Especialização de Dança & Correção de Relatórios",
@@ -51,7 +70,7 @@ export const RELEASES: Release[] = [
   },
   {
     version: "2026.09.16",
-    date: "2026-09-16",
+    date: "2026-09-15",
     title: "DancePro — Sistema de Gestão para Escolas e Estúdios de Dança",
     summary: "Plataforma especializada e desacoplada com vocabulário de ritmos, modalidades, coreografias, salas de ensaio e tablados.",
     items: [
@@ -61,7 +80,7 @@ export const RELEASES: Release[] = [
     ],
   },
   {
-    version: "2026.09.15",
+    version: "2026.09.15.1",
     date: "2026-09-15",
     title: "Renovação pelo portal e avaliações de professores",
     summary: "Aluno renova o contrato com 1 toque (vigência pelo plano) e pode avaliar seu professor — nota sigilosa para a administração.",

@@ -45,11 +45,17 @@ const AnalyticsDashboard = lazy(() => import('./pages/analytics/AnalyticsDashboa
 const LeadsApp = lazy(() => import('./pages/leads/LeadsApp'));
 const TermosDeUso = lazy(() => import("./pages/TermosDeUso"));
 const PoliticaPrivacidade = lazy(() => import("./pages/PoliticaPrivacidade"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const SalasEstudio = lazy(() => import("./pages/SalasEstudio"));
 const ChatbotFlowBuilder = lazy(() => import("./pages/ChatbotFlowBuilder"));
 const BaseConhecimentoIA = lazy(() => import("./pages/BaseConhecimentoIA"));
 const Contratos = lazy(() => import("./pages/Contratos"));
 const NotasFiscais = lazy(() => import("./pages/NotasFiscais"));
+const Coreografias = lazy(() => import("./pages/Coreografias"));
+const Eventos = lazy(() => import("./pages/Eventos"));
+const Figurinos = lazy(() => import("./pages/Figurinos"));
+const Turmas = lazy(() => import("./pages/Turmas"));
+const Nps = lazy(() => import("./pages/Nps"));
 const Tutoriais = lazy(() => import("./pages/Tutoriais"));
 const Novidades = lazy(() => import("./pages/Novidades"));
 const Professores = lazy(() => import("./pages/Professores"));
@@ -65,8 +71,13 @@ const StudentProfile = lazy(() => import("./pages/student/Perfil"));
 const StudentAgenda = lazy(() => import("./pages/student/Agenda"));
 
 const StudentAnnouncements = lazy(() => import("./pages/student/Avisos"));
+const StudentMessages = lazy(() => import("./pages/student/Mensagens"));
 const StudentContracts = lazy(() => import("./pages/student/Contratos"));
 const StudentResults = lazy(() => import("./pages/student/Resultados"));
+const StudentCoreografias = lazy(() => import("./pages/student/Coreografias"));
+const StudentEventos = lazy(() => import("./pages/student/Eventos"));
+const StudentFigurinos = lazy(() => import("./pages/student/Figurinos"));
+const StudentTurmas = lazy(() => import("./pages/student/Turmas"));
 
 const PageLoader = () => (
   <div className="flex-1 h-full min-h-[50vh] flex flex-col items-center justify-center text-muted-foreground gap-4">
@@ -150,6 +161,7 @@ function Router() {
           <Route path="/cadastro" component={Cadastro} />
           <Route path="/termos-de-uso" component={TermosDeUso} />
           <Route path="/politica-de-privacidade" component={PoliticaPrivacidade} />
+          <Route path="/reset-password" component={ResetPassword} />
           <Route>
             <Redirect to="/login" />
           </Route>
@@ -171,10 +183,15 @@ function Router() {
             <Route path="/aluno/exercicios" component={StudentExercises} />
             <Route path="/aluno/progresso" component={StudentProgress} />
             <Route path="/aluno/resultados" component={StudentResults} />
+            <Route path="/aluno/coreografias" component={StudentCoreografias} />
+            <Route path="/aluno/eventos" component={StudentEventos} />
+            <Route path="/aluno/figurinos" component={StudentFigurinos} />
+            <Route path="/aluno/turmas" component={StudentTurmas} />
 
             <Route path="/aluno/pagamentos" component={StudentPayments} />
             <Route path="/aluno/perfil" component={StudentProfile} />
             <Route path="/aluno/avisos" component={StudentAnnouncements} />
+            <Route path="/aluno/mensagens" component={StudentMessages} />
             <Route path="/aluno/contratos" component={StudentContracts} />
             <Route path="/aluno/scanner" component={QRScanner} />
             <Route>
@@ -220,6 +237,11 @@ function Router() {
           <Route path="/alunos/novo" component={NovoAluno} />
           <Route path="/alunos/:id/editar" component={NovoAluno} />
           <Route path="/aulas" component={Aulas} />
+          <Route path="/coreografias" component={Coreografias} />
+          <Route path="/eventos" component={Eventos} />
+          <Route path="/figurinos" component={Figurinos} />
+          <Route path="/turmas" component={Turmas} />
+          <Route path="/nps" component={Nps} />
           <Route path="/reposicoes" component={Reposicoes} />
           <Route path="/instrumentos" component={Instrumentos} />
           <Route path="/relatorios" component={Relatorios} />
@@ -248,6 +270,7 @@ function Router() {
           <Route path="/comercial" component={LeadsApp} />
           <Route path="/leads" component={LeadsApp} />
           <Route path="/contratos" component={Contratos} />
+          <Route path="/notas-fiscais" component={NotasFiscais} />
           <Route path="/tutoriais" component={Tutoriais} />
           <Route path="/novidades" component={Novidades} />
           <Route path="/salas" component={SalasEstudio} />

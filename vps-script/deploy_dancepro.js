@@ -5,7 +5,9 @@ const config = {
   host: '179.197.76.174',
   port: 22,
   username: 'root',
-  password: process.env.VPS_PASSWORD || 'Walysson2003@',
+  // SEGURANÇA: senha hardcoded removida (estava vazando no repo).
+  // Defina VPS_PASSWORD no ambiente antes de rodar:  $env:VPS_PASSWORD='...'; node vps-script/deploy_dancepro.js
+  password: process.env.VPS_PASSWORD,
   readyTimeout: 30000
 };
 

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { trpc } from '../lib/trpc';
 import { formatBRL } from '../lib/money';
+import { formatDateOnly } from '../lib/dates';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -881,7 +882,21 @@ const Relatorios: React.FC = () => {
                         </span>
                       </td>
                       <td className="py-5 px-4 text-right">
-                        <button className="bg-primary/10 hover:bg-primary/20 text-primary px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all hover:scale-105 active:scale-95">
+                        <button
+                          onClick={() => {
+                            const phone = String(pay.studentPhone || "").replace(/\D/g, "");
+                            if (!phone) {
+                              toast.error("Aluno sem telefone cadastrado — não é possível cobrar via WhatsApp.");
+                              return;
+                            }
+                            const valor = formatBRL(Number(pay.amount) || 0);
+                            const vencimento = formatDateOnly(pay.dueDate);
+                            const situacao = pay.status === "atrasado" ? "vencida" : "pendente";
+                            const mensagem = `Olá, ${pay.studentName}! Tudo bem? 😊%0A%0APassando para lembrar da mensalidade ${situacao} no valor de ${valor}, com vencimento em ${vencimento}.%0A%0AQualquer dúvida estamos à disposição!`;
+                            window.open(`https://wa.me/55${phone}?text=${mensagem}`, "_blank", "noopener,noreferrer");
+                          }}
+                          className="bg-primary/10 hover:bg-primary/20 text-primary px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all hover:scale-105 active:scale-95"
+                        >
                           Cobrar
                         </button>
                       </td>

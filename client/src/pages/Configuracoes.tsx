@@ -47,7 +47,9 @@ type Tab = "perfil" | "escola" | "fiscal" | "salas" | "financeiro" | "planos" | 
 const TABS: { id: Tab; label: string; icon: React.ElementType; href?: string }[] = [
   { id: "perfil", label: "Perfil", icon: User },
   { id: "escola", label: "Escola", icon: Building2 },
+  { id: "salas", label: "Salas & Tablados", icon: Building2 },
   { id: "financeiro", label: "Financeiro", icon: DollarSign },
+  { id: "fiscal", label: "Notas Fiscais", icon: Receipt },
   { id: "planos", label: "Planos & Bolsas", icon: GraduationCap },
   { id: "modelos_contrato", label: "Modelos de Contrato", icon: FileSignature },
   { id: "reposicoes", label: "Reposições", icon: Repeat },

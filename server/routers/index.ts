@@ -34,6 +34,11 @@ import { repertoireRouters } from "./repertoireRouters";
 import { tutorialsRouters } from "./tutorialsRouters";
 import { teacherPaymentRulesRouters } from "./teacherPaymentRulesRouters";
 import { avaliacoesRouter } from "./avaliacoesRouters";
+import { coreografiasRouters } from "./coreografiasRouters";
+import { eventosRouters } from "./eventosRouters";
+import { figurinosRouters } from "./figurinosRouters";
+import { turmasRouters } from "./turmasRouters";
+import { saudeRouters } from "./saudeRouters";
 import { supportRouter } from "../supportRouter";
 import { releasesRouter } from "../releasesRouter";
 
@@ -76,6 +81,16 @@ export const appRouter = router({
   ...teacherPaymentRulesRouters,
   // ── ⭐ Avaliações de Professores (novas chaves no fim — não reordenar as existentes) ──
   avaliacoes: avaliacoesRouter,
+  // ── 🩰 Coreografias (novas chaves no fim — não reordenar as existentes) ──
+  ...coreografiasRouters,
+  // ── 🎭 Eventos / Espetáculos (novas chaves no fim — não reordenar as existentes) ──
+  ...eventosRouters,
+  // ── 👗 Figurinos / Estoque (novas chaves no fim — não reordenar as existentes) ──
+  ...figurinosRouters,
+  // ── 🧑‍🤝‍🧑 Turmas com vagas e lista de espera (novas chaves no fim — não reordenar) ──
+  ...turmasRouters,
+  // ── 🩺 Saúde física + 📊 NPS (novas chaves no fim — não reordenar as existentes) ──
+  ...saudeRouters,
 });
 
 export type AppRouter = typeof appRouter;

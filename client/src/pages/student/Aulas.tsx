@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   AlertCircle,
   History,
-  LayoutGrid,
   CalendarDays,
   MoreVertical,
   MapPin,
@@ -171,9 +170,6 @@ export default function StudentLessons() {
           <p className="text-muted-foreground font-medium mt-2 max-w-md">Gerencie seu cronograma e revise seu histórico de aulas de dança.</p>
         </div>
         <div className="relative z-10 flex items-center gap-4">
-          <button className="w-12 h-12 rounded-2xl bg-muted border border-border flex items-center justify-center text-foreground hover:bg-muted/80 transition-all shadow-sm">
-            <LayoutGrid size={16} />
-          </button>
           <button onClick={() => setLocation('/aluno/agenda')} className="bg-primary text-primary-foreground px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2">
             <CalendarDays size={14} />
             Ver Agenda

@@ -2512,3 +2512,318 @@ export const systemTutorials = pgTable("system_tutorials", {
 export type SystemTutorial = typeof systemTutorials.$inferSelect;
 export type InsertSystemTutorial = typeof systemTutorials.$inferInsert;
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// COREOGRAFIAS (DancePro) — núcleo pedagógico de dança
+// A coreografia é a entidade central do espetáculo: reúne elenco (alunos),
+// modalidade/ritmo, nível, formação, vídeo de marcação e vínculo com evento.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const coreografias = pgTable("coreografias", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").notNull(),
+  createdByUserId: integer("createdByUserId").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  // FK lógica → instruments.id (modalidade/ritmo de dança)
+  modalidadeId: integer("modalidadeId"),
+  // iniciante | intermediario | avancado | todas
+  nivel: varchar("nivel", { length: 30 }).default("todas").notNull(),
+  // solo | duo | grupo | formacao
+  formacao: varchar("formacao", { length: 30 }).default("grupo").notNull(),
+  // FK lógica → users.id (professor/coreógrafo responsável)
+  professorId: integer("professorId"),
+  musica: varchar("musica", { length: 255 }),
+  descricao: text("descricao"),
+  // Vídeo de marcação (YouTube — videoId extraído/validado server-side)
+  videoUrl: text("videoUrl"),
+  videoId: varchar("videoId", { length: 20 }),
+  // em_montagem | ensaiando | pronta | arquivada
+  status: varchar("status", { length: 30 }).default("em_montagem").notNull(),
+  // FK lógica → events.id (espetáculo/apresentação vinculada)
+  eventId: integer("eventId"),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdateFn(() => new Date()).notNull(),
+}, (table) => [
+  index("coreografias_org_idx").on(table.organizationId, table.status),
+  index("coreografias_org_modalidade_idx").on(table.organizationId, table.modalidadeId),
+]);
+
+export type Coreografia = typeof coreografias.$inferSelect;
+export type InsertCoreografia = typeof coreografias.$inferInsert;
+
+/** Elenco da coreografia: aluno escalado + progresso de domínio da coreografia. */
+export const coreografiaAlunos = pgTable("coreografia_alunos", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").notNull(),
+  coreografiaId: integer("coreografiaId").notNull(),
+  studentId: integer("studentId").notNull(),
+  // Papel no elenco (ex.: "Solo", "Primeiro plano", "Corpo de baile")
+  papel: varchar("papel", { length: 120 }),
+  // convidado | confirmado | desistiu | substituto
+  status: varchar("status", { length: 30 }).default("convidado").notNull(),
+  // Domínio da coreografia: 0 a 100 (%)
+  progresso: integer("progresso").default(0).notNull(),
+  observacoes: text("observacoes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdateFn(() => new Date()).notNull(),
+}, (table) => [
+  uniqueIndex("coreografia_alunos_unique").on(table.coreografiaId, table.studentId),
+  index("coreografia_alunos_student_idx").on(table.studentId),
+  index("coreografia_alunos_org_idx").on(table.organizationId),
+]);
+
+export type CoreografiaAluno = typeof coreografiaAlunos.$inferSelect;
+export type InsertCoreografiaAluno = typeof coreografiaAlunos.$inferInsert;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EVENTOS / ESPETÁCULOS (DancePro) — recitais, festivais, competições e workshops
+// Reúne coreografias (ordem de apresentação) e participantes com controle de
+// autorização de imagem/participação (menores de idade).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const events = pgTable("events", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").notNull(),
+  createdByUserId: integer("createdByUserId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  // recital | festival | competicao | workshop | audicao | ensaio_geral | outro
+  type: varchar("type", { length: 30 }).default("recital").notNull(),
+  description: text("description"),
+  venueName: varchar("venueName", { length: 255 }),
+  venueAddress: text("venueAddress"),
+  startsAt: timestamp("startsAt").notNull(),
+  endsAt: timestamp("endsAt"),
+  // planejado | confirmado | realizado | cancelado
+  status: varchar("status", { length: 30 }).default("planejado").notNull(),
+  // Exige autorização de imagem/participação dos participantes
+  requiresAuthorization: boolean("requiresAuthorization").default(true).notNull(),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdateFn(() => new Date()).notNull(),
+}, (table) => [
+  index("events_org_idx").on(table.organizationId, table.startsAt),
+  index("events_org_status_idx").on(table.organizationId, table.status),
+]);
+
+export type DanceEvent = typeof events.$inferSelect;
+export type InsertDanceEvent = typeof events.$inferInsert;
+
+/** Coreografias do evento + ordem de apresentação no palco. */
+export const eventChoreographies = pgTable("event_choreographies", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").notNull(),
+  eventId: integer("eventId").notNull(),
+  coreografiaId: integer("coreografiaId").notNull(),
+  ordem: integer("ordem").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("event_choreographies_unique").on(table.eventId, table.coreografiaId),
+  index("event_choreographies_event_idx").on(table.eventId),
+]);
+
+export type EventChoreography = typeof eventChoreographies.$inferSelect;
+export type InsertEventChoreography = typeof eventChoreographies.$inferInsert;
+
+/** Participantes do evento + autorizações (imagem/participação) e confirmação. */
+export const eventParticipants = pgTable("event_participants", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").notNull(),
+  eventId: integer("eventId").notNull(),
+  studentId: integer("studentId").notNull(),
+  // convidado | confirmado | recusado
+  status: varchar("status", { length: 30 }).default("convidado").notNull(),
+  imageAuthorization: boolean("imageAuthorization").default(false).notNull(),
+  participationAuthorization: boolean("participationAuthorization").default(false).notNull(),
+  // Responsável que autorizou (para menores)
+  guardianName: varchar("guardianName", { length: 255 }),
+  costumeNotes: text("costumeNotes"),
+  notes: text("notes"),
+  confirmedAt: timestamp("confirmedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdateFn(() => new Date()).notNull(),
+}, (table) => [
+  uniqueIndex("event_participants_unique").on(table.eventId, table.studentId),
+  index("event_participants_student_idx").on(table.studentId),
+  index("event_participants_org_idx").on(table.organizationId),
+]);
+
+export type EventParticipant = typeof eventParticipants.$inferSelect;
+export type InsertEventParticipant = typeof eventParticipants.$inferInsert;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FIGURINOS / VESTUÁRIO (DancePro) — acervo + empréstimos por aluno/coreografia
+// Controle de saída e devolução com disponibilidade calculada em tempo real.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const costumes = pgTable("costumes", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").notNull(),
+  createdByUserId: integer("createdByUserId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  // Código/tombamento interno (ex.: "FIG-001")
+  code: varchar("code", { length: 60 }),
+  // saia | collant | sapatilha | top | calca | acessorio | uniforme | outro
+  type: varchar("type", { length: 60 }).default("outro").notNull(),
+  size: varchar("size", { length: 30 }),
+  color: varchar("color", { length: 60 }),
+  // Quantidade de unidades deste item
+  quantity: integer("quantity").default(1).notNull(),
+  // novo | bom | usado | danificado
+  condition: varchar("condition", { length: 30 }).default("bom").notNull(),
+  cost: decimal("cost", { precision: 10, scale: 2 }).default("0.00").notNull(),
+  photoUrl: text("photoUrl"),
+  notes: text("notes"),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdateFn(() => new Date()).notNull(),
+}, (table) => [
+  index("costumes_org_idx").on(table.organizationId, table.active),
+  index("costumes_org_name_idx").on(table.organizationId, table.name),
+]);
+
+export type Costume = typeof costumes.$inferSelect;
+export type InsertCostume = typeof costumes.$inferInsert;
+
+/** Empréstimo de figurino: saída, devolução prevista e devolução efetiva. */
+export const costumeLoans = pgTable("costume_loans", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").notNull(),
+  createdByUserId: integer("createdByUserId").notNull(),
+  costumeId: integer("costumeId").notNull(),
+  studentId: integer("studentId").notNull(),
+  // Vínculos opcionais (coreografia/espetáculo)
+  coreografiaId: integer("coreografiaId"),
+  eventId: integer("eventId"),
+  quantity: integer("quantity").default(1).notNull(),
+  checkedOutAt: timestamp("checkedOutAt").defaultNow().notNull(),
+  dueDate: date("dueDate"),
+  returnedAt: timestamp("returnedAt"),
+  // Condição na devolução (novo|bom|usado|danificado)
+  conditionOnReturn: varchar("conditionOnReturn", { length: 30 }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdateFn(() => new Date()).notNull(),
+}, (table) => [
+  index("costume_loans_costume_idx").on(table.costumeId),
+  index("costume_loans_student_idx").on(table.studentId),
+  index("costume_loans_org_idx").on(table.organizationId, table.returnedAt),
+]);
+
+export type CostumeLoan = typeof costumeLoans.$inferSelect;
+export type InsertCostumeLoan = typeof costumeLoans.$inferInsert;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TURMAS (DancePro) — turmas fixas com vagas e lista de espera
+// Diferente da aula (lessons): a turma é o "contrato coletivo" com grade semanal,
+// capacidade e fila de espera. A promoção da espera é automática ao abrir vaga.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const turmas = pgTable("turmas", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").notNull(),
+  createdByUserId: integer("createdByUserId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  // FK lógica → instruments.id (modalidade/ritmo)
+  modalidadeId: integer("modalidadeId"),
+  // FK lógica → users.id (professor responsável)
+  professorId: integer("professorId"),
+  // FK lógica → studio_rooms.id
+  studioRoomId: integer("studioRoomId"),
+  // Grade semanal: 0=Dom ... 6=Sáb
+  weekdays: jsonb("weekdays").$type<number[]>().default([]).notNull(),
+  timeStr: varchar("timeStr", { length: 5 }),
+  durationMinutes: integer("durationMinutes").default(60).notNull(),
+  capacity: integer("capacity").default(20).notNull(),
+  // iniciante | intermediario | avancado | todas
+  level: varchar("level", { length: 30 }).default("todas").notNull(),
+  // ativa | pausada | encerrada
+  status: varchar("status", { length: 30 }).default("ativa").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdateFn(() => new Date()).notNull(),
+}, (table) => [
+  index("turmas_org_idx").on(table.organizationId, table.status),
+  index("turmas_org_modalidade_idx").on(table.organizationId, table.modalidadeId),
+]);
+
+export type Turma = typeof turmas.$inferSelect;
+export type InsertTurma = typeof turmas.$inferInsert;
+
+/** Matrícula em turma: ativa (vaga) ou espera (fila com posição). */
+export const turmaAlunos = pgTable("turma_alunos", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").notNull(),
+  turmaId: integer("turmaId").notNull(),
+  studentId: integer("studentId").notNull(),
+  // ativa | espera | cancelada
+  status: varchar("status", { length: 30 }).default("ativa").notNull(),
+  position: integer("position").default(0).notNull(),
+  enrolledAt: timestamp("enrolledAt").defaultNow().notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdateFn(() => new Date()).notNull(),
+}, (table) => [
+  uniqueIndex("turma_alunos_unique").on(table.turmaId, table.studentId),
+  index("turma_alunos_student_idx").on(table.studentId),
+  index("turma_alunos_org_idx").on(table.organizationId, table.status),
+]);
+
+export type TurmaAluno = typeof turmaAlunos.$inferSelect;
+export type InsertTurmaAluno = typeof turmaAlunos.$inferInsert;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SAÚDE & CONDICIONAMENTO FÍSICO (DancePro) — interno da escola
+// Avaliações periódicas (peso, flexibilidade, condicionamento) e histórico de
+// lesões/restrições — segurança e evolução técnica do bailarino.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const studentHealthRecords = pgTable("student_health_records", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").notNull(),
+  studentId: integer("studentId").notNull(),
+  recordedByUserId: integer("recordedByUserId").notNull(),
+  recordDate: date("recordDate").notNull(),
+  weightKg: decimal("weightKg", { precision: 5, scale: 2 }),
+  heightCm: integer("heightCm"),
+  flexibilityCm: decimal("flexibilityCm", { precision: 5, scale: 1 }),
+  // ruim | regular | bom | excelente
+  conditioning: varchar("conditioning", { length: 20 }),
+  injuryNotes: text("injuryNotes"),
+  restrictions: text("restrictions"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  index("student_health_records_student_idx").on(table.studentId, table.recordDate),
+  index("student_health_records_org_idx").on(table.organizationId),
+]);
+
+export type StudentHealthRecord = typeof studentHealthRecords.$inferSelect;
+export type InsertStudentHealthRecord = typeof studentHealthRecords.$inferInsert;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NPS — PESQUISA DE SATISFAÇÃO (DancePro)
+// Resposta única por aluno (0–10) + comentário. Cálculo: promotores 9–10,
+// neutros 7–8, detratores 0–6; NPS = %promotores − %detratores.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const npsResponses = pgTable("nps_responses", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").notNull(),
+  studentId: integer("studentId"),
+  // 0 a 10 (obrigatório)
+  score: integer("score").notNull(),
+  comment: text("comment"),
+  // portal | manual | whatsapp
+  source: varchar("source", { length: 30 }).default("portal").notNull(),
+  // quem registrou (null = resposta do próprio aluno pelo portal)
+  createdByUserId: integer("createdByUserId"),
+  respondedAt: timestamp("respondedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  index("nps_responses_org_idx").on(table.organizationId, table.respondedAt),
+  index("nps_responses_student_idx").on(table.studentId),
+]);
+
+export type NpsResponse = typeof npsResponses.$inferSelect;
+export type InsertNpsResponse = typeof npsResponses.$inferInsert;
+

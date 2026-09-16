@@ -63,7 +63,7 @@ server/
 └── automationJob.ts        # automações + agendamento
 
 drizzle/
-├── schema.ts               # 74 tabelas (fonte única de tipos de banco)
+├── schema.ts               # 114 tabelas (fonte única de tipos de banco)
 └── migrations/
 
 shared/                     # const.ts (cookie/chaves) + types.ts (re-export schema + erros)

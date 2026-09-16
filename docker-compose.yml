@@ -37,7 +37,10 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password_seguro_db_local
+      # ⚠️ SEGURANÇA: defina POSTGRES_PASSWORD no .env da VPS.
+      # O fallback existe apenas para não quebrar volumes de banco JÁ inicializados
+      # (o Postgres só usa esta variável no primeiro initdb).
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password_seguro_db_local}
       POSTGRES_DB: wrdance
     volumes:
       - db_data:/var/lib/postgresql/data

@@ -9,6 +9,13 @@ import { Label } from "@/components/ui/label";
 import { AlertCircle, ArrowRight, Loader2, Mail, CheckCircle2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -24,6 +31,10 @@ export default function Login() {
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotError, setForgotError] = useState("");
 
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: (data) => {
@@ -52,6 +63,14 @@ export default function Login() {
       }, 1500);
     },
     onError: (err) => setErrorMsg(err.message)
+  });
+
+  const requestPasswordReset = trpc.auth.requestPasswordReset.useMutation({
+    onSuccess: () => {
+      setForgotSent(true);
+      setForgotError("");
+    },
+    onError: (err) => setForgotError(err.message || "Não foi possível enviar o e-mail. Tente novamente."),
   });
 
   const handleResetPassword = (e: React.FormEvent) => {
@@ -226,7 +245,16 @@ export default function Login() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between ml-1">
                   <Label className="text-white/70 font-semibold uppercase tracking-wider text-xs">Sua Senha</Label>
-                  <button type="button" className="text-xs text-primary font-bold hover:text-primary/80 transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForgotEmail(email);
+                      setForgotSent(false);
+                      setForgotError("");
+                      setForgotOpen(true);
+                    }}
+                    className="text-xs text-primary font-bold hover:text-primary/80 transition-colors"
+                  >
                     Esqueceu?
                   </button>
                 </div>
@@ -295,9 +323,7 @@ export default function Login() {
                   <button 
                     type="button" 
                     onClick={() => {
-                      if (loginType === 'professor') {
-                        window.location.href = "/cadastro";
-                      }
+                      window.location.href = "/cadastro";
                     }} 
                     className="text-primary font-bold hover:underline transition-all"
                   >
@@ -310,6 +336,65 @@ export default function Login() {
           )}
         </motion.div>
       </div>
+
+      {/* Recuperação de senha */}
+      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black">Recuperar senha</DialogTitle>
+            <DialogDescription>
+              Informe o e-mail da sua conta. Enviaremos um link para você criar uma nova senha (válido por 1 hora).
+            </DialogDescription>
+          </DialogHeader>
+
+          {forgotSent ? (
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+                <CheckCircle2 size={18} className="text-emerald-600 shrink-0 mt-0.5" />
+                <p className="text-sm font-medium text-foreground">
+                  Se existir uma conta com <strong>{forgotEmail}</strong>, o link de recuperação já foi enviado. Verifique sua caixa de entrada e o spam.
+                </p>
+              </div>
+              <Button className="w-full" onClick={() => setForgotOpen(false)}>Fechar</Button>
+            </div>
+          ) : (
+            <form
+              className="space-y-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                setForgotError("");
+                if (!forgotEmail.trim()) {
+                  setForgotError("Informe seu e-mail.");
+                  return;
+                }
+                requestPasswordReset.mutate({ email: forgotEmail.trim() });
+              }}
+            >
+              <div className="space-y-2">
+                <Label>E-mail</Label>
+                <Input
+                  type="email"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  placeholder="seu@email.com"
+                  autoFocus
+                />
+              </div>
+
+              {forgotError && (
+                <p className="text-xs font-bold text-rose-600 flex items-center gap-1.5">
+                  <AlertCircle size={13} /> {forgotError}
+                </p>
+              )}
+
+              <Button type="submit" className="w-full" disabled={requestPasswordReset.isPending}>
+                {requestPasswordReset.isPending ? <Loader2 size={16} className="animate-spin mr-2" /> : null}
+                Enviar link de recuperação
+              </Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

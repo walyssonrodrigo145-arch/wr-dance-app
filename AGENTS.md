@@ -21,7 +21,7 @@ pnpm vitest run server/critical.regression.test.ts server/settings.test.ts serve
 
 ## Baseline de erros TS (importante)
 
-- Existem **33–41 erros TS únicos pré-existentes**, TODOS no client, capturados em `tsc_baseline.txt` (em `%TEMP%/opencode/`).
+- Baseline atual: **0 erros** (`pnpm check` limpo, revalidado em 15/09/2026 — os antigos 33–41 erros foram zerados).
 - Regra: uma mudança NÃO pode **adicionar** erros novos. Compare normalizando: `path | código | mensagem` (ignorando `(linha,col)`); erros relocados por split de arquivo contam como iguais.
 - Se o `pnpm check` mostrar erro num arquivo que você NÃO tocou, verifique se ele já existia no baseline antes de "corrigir".
 

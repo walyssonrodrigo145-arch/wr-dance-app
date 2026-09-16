@@ -40,6 +40,9 @@ import {
   Repeat,
   GraduationCap,
   MessageCircle,
+  Theater,
+  Shirt,
+  Gauge,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SUPPORT_WHATSAPP_URL } from "@/lib/support";
@@ -96,6 +99,29 @@ export function AppSidebar({ collapsed, onToggle, onNavigate }: AppSidebarProps)
   const hiddenTabs = settings?.hiddenTabs ? settings.hiddenTabs.split(",") : [];
   const { hasUnseen: hasUnseenRelease, isAllowed: whatsNewAllowed } = useWhatsNew();
 
+  // ── Professor: filtra o menu pelas permissões granulares cadastradas pelo admin ──
+  // `auth.me` devolve permissions como rotas normalizadas (ex.: "/aulas").
+  // Sem permissões cadastradas, aplica o conjunto padrão de professor.
+  const rawPermissions = (user as any)?.permissions as string[] | undefined;
+  const DEFAULT_PROFESSOR_PERMISSIONS = ["/aulas", "/coreografias", "/progresso", "/recepcao-qr", "/ia", "/lembretes", "/relatorios"];
+  const permissionAliases: Record<string, string> = { "/recepcao": "/recepcao-qr" };
+  const ALWAYS_VISIBLE = ["/novidades", "/tutoriais"];
+  const professorPermissions =
+    user?.role === "professor"
+      ? Array.isArray(rawPermissions) && rawPermissions.length > 0
+        ? rawPermissions
+        : DEFAULT_PROFESSOR_PERMISSIONS
+      : null;
+
+  const canSeeByPermission = (href: string) => {
+    if (!professorPermissions) return true;
+    if (ALWAYS_VISIBLE.includes(href)) return true;
+    return professorPermissions.some((p) => {
+      const allowed = permissionAliases[p] || p;
+      return href === allowed || href.startsWith(allowed + "/");
+    });
+  };
+
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => { window.location.href = "/"; },
   });
@@ -113,6 +139,10 @@ export function AppSidebar({ collapsed, onToggle, onNavigate }: AppSidebarProps)
         // Gestão de Professores / Coreógrafos: EXCLUSIVO do admin
         ...(user?.role === "admin" ? [{ label: "Professores / Coreógrafos", href: "/professores", icon: Users }] : []),
         { label: "Aulas & Ensaios", href: "/aulas", icon: Calendar },
+        { label: "Turmas & Vagas", href: "/turmas", icon: Users },
+        { label: "Coreografias", href: "/coreografias", icon: Music },
+        { label: "Eventos & Espetáculos", href: "/eventos", icon: Theater },
+        { label: "Figurinos", href: "/figurinos", icon: Shirt },
         { label: "Reposições", href: "/reposicoes", icon: Repeat, badge: repositionCount > 0 ? repositionCount : undefined },
         { label: "Modalidades / Ritmos", href: "/instrumentos", icon: Activity },
         { label: "Salas de Ensaio", href: "/salas", icon: DoorOpen },
@@ -155,6 +185,7 @@ export function AppSidebar({ collapsed, onToggle, onNavigate }: AppSidebarProps)
       textColor: "text-purple-400",
       items: [
         { label: "Solicitações", href: "/solicitacoes", icon: Inbox, badge: (requestCount + extraRequestCount) > 0 ? requestCount + extraRequestCount : undefined },
+        { label: "Satisfação (NPS)", href: "/nps", icon: Gauge },
         { label: "Progresso", href: "/progresso", icon: Activity },
         { label: "Recepção QR", href: "/recepcao-qr", icon: LayoutDashboard },
         { label: "Tutoriais", href: "/tutoriais", icon: GraduationCap },
@@ -346,8 +377,8 @@ export function AppSidebar({ collapsed, onToggle, onNavigate }: AppSidebarProps)
       {/* NAVEGAÇÃO CATEGORIZADA COM ÍCONES E ACORDEÃO */}
       <nav className="flex-1 px-3 py-3 space-y-4 overflow-y-auto overflow-x-hidden no-scrollbar">
         {navGroups.map((group) => {
-          // Filtrar itens ocultos
-          const visibleItems = group.items.filter((item) => !hiddenTabs.includes(item.href));
+          // Filtrar itens ocultos e itens sem permissão (professor)
+          const visibleItems = group.items.filter((item) => !hiddenTabs.includes(item.href) && canSeeByPermission(item.href));
           if (visibleItems.length === 0) return null;
           const isGroupCollapsed = !collapsed && !!collapsedGroups[group.groupName];
           const GroupIcon = group.groupIcon;

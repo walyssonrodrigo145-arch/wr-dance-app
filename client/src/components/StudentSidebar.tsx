@@ -22,6 +22,9 @@ import {
   Target,
   FileSignature,
   Trophy,
+  Theater,
+  Shirt,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -37,8 +40,13 @@ interface NavItem {
 const mainNavItems: NavItem[] = [
   { label: "Dashboard", href: "/aluno", icon: LayoutDashboard },
   { label: "Avisos", href: "/aluno/avisos", icon: Bell },
+  { label: "Mensagens", href: "/aluno/mensagens", icon: MessageSquare },
   { label: "Aulas / Agenda", href: "/aluno/aulas", icon: CalendarDays },
+  { label: "Turmas", href: "/aluno/turmas", icon: Users },
   { label: "Materiais", href: "/aluno/materiais", icon: Library },
+  { label: "Coreografias", href: "/aluno/coreografias", icon: Music },
+  { label: "Eventos", href: "/aluno/eventos", icon: Theater },
+  { label: "Figurinos", href: "/aluno/figurinos", icon: Shirt },
   { label: "Exercícios", href: "/aluno/exercicios", icon: ClipboardCheck },
   { label: "Plano Diário", href: "/aluno/progresso", icon: Target },
   { label: "Resultados", href: "/aluno/resultados", icon: Trophy },
@@ -78,6 +86,7 @@ export function StudentSidebar({ collapsed, onToggle, onNavigate }: StudentSideb
     if (item.href === "/aluno/materiais" && perms.canSeeFiles === false) return false;
     if (item.href === "/aluno/exercicios" && perms.canSeeProgress === false) return false;
     if (item.href === "/aluno/progresso" && perms.canSeeProgress === false) return false;
+    if (item.href === "/aluno/mensagens" && perms.canSeeMessages === false) return false;
 
     return true;
   });
@@ -181,7 +190,11 @@ export function StudentSidebar({ collapsed, onToggle, onNavigate }: StudentSideb
                   {!collapsed && (
                     <div className="flex-1 flex items-center justify-between min-w-0 z-10 relative">
                       <span className="truncate tracking-tight">{item.label}</span>
-                      {item.href === "/aluno/mensagens" && messageCount > 0 && null}
+                      {item.href === "/aluno/mensagens" && messageCount > 0 && (
+                        <span className="ml-2 bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
+                          {messageCount}
+                        </span>
+                      )}
                     </div>
                   )}
                   

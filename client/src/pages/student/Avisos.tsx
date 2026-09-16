@@ -1,5 +1,5 @@
 import { trpc } from "@/lib/trpc";
-import { 
+import {
   Bell, 
   Search, 
   Calendar, 
@@ -8,18 +8,48 @@ import {
   ChevronRight,
   Info,
   AlertTriangle,
-  Megaphone
+  Megaphone,
+  CheckCircle2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useState } from "react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
+import { NpsCard } from "@/components/student/NpsCard";
+
+const READ_STORAGE_KEY = "student_read_announcements";
+
+function loadReadIds(): number[] {
+  try {
+    const raw = localStorage.getItem(READ_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === "number") : [];
+  } catch {
+    return [];
+  }
+}
 
 export default function StudentAnnouncements() {
   const { data: announcements = [], isLoading: isLoadingAnnouncements } = trpc.studentPortal.getAnnouncements.useQuery();
   const { data: profile } = trpc.studentPortal.getProfile.useQuery();
   const [search, setSearch] = useState("");
+  const [readIds, setReadIds] = useState<number[]>(loadReadIds);
+
+  const markAsRead = (id: number) => {
+    setReadIds((prev) => {
+      if (prev.includes(id)) return prev;
+      const next = [...prev, id];
+      try {
+        localStorage.setItem(READ_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // armazenamento indisponível — mantém apenas em memória
+      }
+      return next;
+    });
+    toast.success("Aviso marcado como lido!");
+  };
 
   if (isLoadingAnnouncements) return <div>Carregando avisos...</div>;
 
@@ -30,6 +60,8 @@ export default function StudentAnnouncements() {
 
   return (
     <div className="space-y-8 pb-10">
+      <NpsCard />
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-foreground">Avisos e Comunicados</h1>
@@ -97,9 +129,18 @@ export default function StudentAnnouncements() {
                   </div>
                   
                   <div className="w-full sm:w-auto flex items-center justify-end">
-                    <button className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary hover:opacity-80 px-4 py-2 rounded-xl border border-primary/20 bg-primary/5 transition-all">
-                      Marcar como lido
-                    </button>
+                    {readIds.includes(aviso.id) ? (
+                      <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-600 px-4 py-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
+                        <CheckCircle2 size={13} /> Lido
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => markAsRead(aviso.id)}
+                        className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary hover:opacity-80 px-4 py-2 rounded-xl border border-primary/20 bg-primary/5 transition-all"
+                      >
+                        Marcar como lido
+                      </button>
+                    )}
                   </div>
                 </div>
               </CardContent>

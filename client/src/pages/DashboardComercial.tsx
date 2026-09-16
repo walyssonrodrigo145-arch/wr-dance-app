@@ -484,10 +484,6 @@ export default function DashboardComercial() {
                 </div>
               ))}
             </div>
-
-            <button className="w-full text-center text-xs font-bold text-violet-600 hover:underline pt-2">
-              Ver todas as atividades
-            </button>
           </div>
 
           {/* METAS DO MÊS */}

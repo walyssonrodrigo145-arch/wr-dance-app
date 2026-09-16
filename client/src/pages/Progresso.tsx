@@ -34,6 +34,7 @@ import {
   Flame,
   Sparkles,
   Users,
+  HeartPulse,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,6 +62,7 @@ import { MetasMusicais } from "@/components/progresso/MetasMusicais";
 import { RepertoireTab } from "@/components/progresso/RepertoireTab";
 import { Observacoes } from "@/components/progresso/Observacoes";
 import { PlanEditor } from "@/components/progresso/PlanEditor";
+import { SaudeTab } from "@/components/progresso/SaudeTab";
 
 // --- Components ---
 
@@ -70,7 +72,7 @@ export default function Progresso() {
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<"jornada" | "biblioteca" | "observacoes" | "metas" | "desempenho" | "coreografias">("jornada");
+  const [activeTab, setActiveTab] = useState<"jornada" | "biblioteca" | "observacoes" | "metas" | "desempenho" | "coreografias" | "saude">("jornada");
   const [isListCollapsed, setIsListCollapsed] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
@@ -834,6 +836,7 @@ export default function Progresso() {
                       { id: "jornada", label: "Jornada", icon: Activity },
                       { id: "biblioteca", label: "Biblioteca", icon: Folder },
                       { id: "coreografias", label: "Coreografias", icon: PersonStanding },
+                      { id: "saude", label: "Saúde", icon: HeartPulse },
                       { id: "observacoes", label: "Notas", icon: BookOpen },
                       { id: "metas", label: "Metas", icon: Target },
                     ].map((tab) => {
@@ -1227,7 +1230,18 @@ export default function Progresso() {
                             studentName={students.find((s: any) => s.id === selectedStudentId)?.name}
                           />
                        </motion.div>
-                     )}
+                      )}
+
+                      {activeTab === "saude" && selectedStudentId != null && (
+                        <motion.div
+                          key="saude"
+                          initial={{ opacity: 0, scale: 0.98 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.98 }}
+                        >
+                          <SaudeTab studentId={selectedStudentId} />
+                        </motion.div>
+                      )}
 
                      {activeTab === "metas" && (
                       <motion.div 

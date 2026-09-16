@@ -20,7 +20,7 @@ import {
   getExperimentalStats,
 } from "../db";
 import { organizations, users, students, lessons, instruments, reminders, reminderTemplates, paymentDues, asaasCustomers, settings, studentGoals, studentTimeline, studentFiles, announcements, chatMessages, rescheduleRequests, studentEvolution, aiConversations, aiMessages, aiDocuments, expenses, dailyStudyPlans, notifications, professores, professorPayments, attendanceTokens, attendanceLogs, contracts, fileComments, studioRooms, schoolIntegrations, contractTemplates, contractEvents, crmLeads, crmGoals, crmActivities, fiscalCompanies, fiscalInvoices, fiscalServices, fiscalJobs, fiscalLogs } from "../../drizzle/schema";
-import { eq, desc, sql, and, gte, lt, lte, asc, ne, or, inArray, aliasedTable, ilike, isNull } from "drizzle-orm";
+import { eq, desc, sql, and, gte, gt, lt, lte, asc, ne, or, inArray, aliasedTable, ilike, isNull } from "drizzle-orm";
 import { notifyOwner, notifyUser } from "../_core/notification";
 import { handleDbError } from "../utils/error_handler";
 import { TRPCError } from "@trpc/server";
@@ -34,7 +34,7 @@ import { BillingEngine } from "../services/BillingEngine";
 import { sendWhatsAppMessage, startWhatsAppSession, getWhatsAppSessionStatus, logoutWhatsAppSession } from "../utils/whatsapp";
 import { nanoid } from "nanoid";
 import { sdk } from "../_core/sdk";
-import { sendVerificationEmail, sendSimpleEmail } from "../_core/email";
+import { sendVerificationEmail, sendPasswordResetEmail, sendSimpleEmail } from "../_core/email";
 import { ENV } from "../_core/env";
 import { storagePut } from "../storage";
 import { superAdminRouter } from "../superAdminRouter";
@@ -315,6 +315,74 @@ export const authRouters = {
           }
         } catch { /* e-mail de confirmação é best-effort */ }
           
+        return { success: true };
+      }),
+    /** Solicita link de recuperação de senha por e-mail (resposta genérica — sem enumeração de e-mails). */
+    requestPasswordReset: publicProcedure
+      .input(z.object({ email: z.string().email("E-mail inválido") }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return { success: true };
+        const email = input.email.toLowerCase().trim();
+
+        const [user] = await db.select({ id: users.id, email: users.email })
+          .from(users)
+          .where(sql`LOWER(${users.email}) = ${email}`)
+          .limit(1);
+
+        if (user?.email) {
+          const token = crypto.randomBytes(32).toString("hex");
+          await db.update(users)
+            .set({
+              resetPasswordToken: token,
+              resetPasswordTokenExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+            })
+            .where(eq(users.id, user.id));
+          try {
+            await sendPasswordResetEmail(user.email, token);
+          } catch (error) {
+            // best-effort: nunca revela se o e-mail existe
+            console.error("[Auth] Falha ao enviar e-mail de recuperação:", (error as any)?.message);
+          }
+        }
+
+        return { success: true };
+      }),
+    /** Redefine a senha a partir do token do e-mail (expira em 1 hora). */
+    resetPassword: publicProcedure
+      .input(z.object({
+        token: z.string().min(10, "Token inválido"),
+        newPassword: z.string()
+          .min(8, "A senha deve ter no mínimo 8 caracteres")
+          .regex(/[a-zA-Z]/, "A senha deve conter letras")
+          .regex(/[0-9]/, "A senha deve conter números"),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+
+        const [user] = await db.select({ id: users.id })
+          .from(users)
+          .where(and(
+            eq(users.resetPasswordToken, input.token),
+            gt(users.resetPasswordTokenExpiresAt, new Date()),
+          ))
+          .limit(1);
+        if (!user) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Link inválido ou expirado. Solicite a recuperação novamente." });
+        }
+
+        const salt = crypto.randomBytes(16).toString("hex");
+        const derivedKey = crypto.scryptSync(input.newPassword, salt, 64).toString("hex");
+        await db.update(users)
+          .set({
+            passwordHash: `${salt}:${derivedKey}`,
+            resetPasswordToken: null,
+            resetPasswordTokenExpiresAt: null,
+            mustChangePassword: false,
+          })
+          .where(eq(users.id, user.id));
+
         return { success: true };
       }),
     login: publicProcedure

@@ -39,6 +39,12 @@
 | Metrônomo | `client/src/lib/metronomeEngine.ts` (singleton com scheduler Web Audio) + `client/src/components/metronome/Metronome.tsx` (usado no Plano Diário do aluno; `bpm` por exercício vem do JSON do plano) | criar nova instância de AudioContext/loop fora do singleton `metronome` |
 | Repertório (YouTube) | `server/routers/repertoireRouters.ts` + `server/utils/youtubeUrl.ts` (parser puro — iframe usa SÓ videoId validado) + `components/progresso/RepertoireTab.tsx` (professor) + `components/student/RepertoireSection.tsx` (portal) + `components/ui/VideoFacade.tsx` (capa antes do iframe — Erro 153; player alternativo = nocookie via `youtubeEmbedSrc` altHost) | montar iframe com URL crua do usuário; montar iframe sem clique (facade exige gesto); o aluno nunca edita título/URL (só viewed/learned próprios) |
 | Cifras (Repertório) | `server/services/ChordTransposer.ts` (transposição pura) + `server/services/CifraClubImporter.ts` (import: só acordes/tom/diagramas — **NUNCA letra** — RN-007) + `getChord`/`transposeChord`/`importCifraClub` no repertoireRouters; visualizador no RepertoireSection (tabs Música\|Cifra) | armazenar letra (direito autoral); transpor no client (RN-003: server-only); iframe do cifraclub (fora de escopo) |
+| Coreografias (núcleo de dança) | `server/routers/coreografiasRouters.ts` (router `coreografias`) + `components/…`/`pages/Coreografias.tsx` (admin) + `pages/student/Coreografias.tsx` (portal) + abas do Progresso (`components/progresso/RepertoireTab.tsx` para material do aluno) | duplicar elenco fora de `coreografia_alunos` (unique por coreografia+aluno); criar coluna separada para progresso (é `progresso` 0–100) |
+| Eventos / Espetáculos | `server/routers/eventosRouters.ts` (router `eventos`) + `pages/Eventos.tsx` (programa + participantes + autorizações) + `pages/student/Eventos.tsx` (confirmação de presença) | ignorar `requiresAuthorization` ao exibir pendências; deixar menor sem `guardianName` quando exigido |
+| Figurinos / Estoque | `server/routers/figurinosRouters.ts` (router `figurinos`: acervo + `costume_loans`) + `pages/Figurinos.tsx` + `pages/student/Figurinos.tsx` | calcular disponibilidade fora do padrão (total − soma de empréstimos sem `returnedAt`); excluir peça com histórico (arquiva) |
+| Turmas & Vagas | `server/routers/turmasRouters.ts` (router `turmas`: capacidade + lista de espera com promoção automática em `cancelEnrollment`) + `pages/Turmas.tsx` + `pages/student/Turmas.tsx` | promover aluno acima da capacidade; duplicar semana (0=Dom…6=Sáb, mesmo padrão de `student_enrollments`) |
+| Saúde do bailarino | `server/routers/saudeRouters.ts` (router `saude`, tabela `student_health_records`) + aba "Saúde" em `pages/Progresso.tsx` (`components/progresso/SaudeTab.tsx`) | expor dados de saúde/lesão no portal do aluno (uso interno da escola) |
+| NPS | `server/routers/saudeRouters.ts` (router `nps`, tabela `nps_responses`) + `pages/Nps.tsx` (painel) + `components/student/NpsCard.tsx` (portal, reaparece a cada 90 dias) | recalcular NPS no client (regra: promotores 9–10, neutros 7–8, detratores 0–6) |
 
 ## Regras anti-duplicação (violar = bug financeiro)
 
@@ -69,6 +75,6 @@ Testes focados de server (rápidos): `pnpm vitest run server/critical.regression
 - **Não apagar `Audit`/`ARCHITECTURE_AUDIT.md`**: são o histórico do projeto.
 - **ssh2** é dependência de deploy (`vps-script/`) — não remover.
 
-## Estado (18/08/2026)
+## Estado (15/09/2026)
 
-Fases 0-4 + F6 concluídas: código morto removido, libs centralizadas, páginas fatiadas, monólito de routers dividido por domínio, useAuth movido para `hooks/`. Baseline TS: 33-41 erros únicos pré-existentes (client) — qualquer mudança não deve ADICIONAR erros novos (normalizar por path+mensagem para comparar).
+Fases 0-4 + F6 concluídas: código morto removido, libs centralizadas, páginas fatiadas, monólito de routers dividido por domínio, useAuth movido para `hooks/`. Baseline TS atual: **0 erros** (`pnpm check`) — qualquer mudança não deve ADICIONAR erros novos. Módulos de dança adicionados em 15/09/2026: coreografias, eventos, figurinos, turmas/vagas, saúde física e NPS (ver `shared/releases.ts` v2026.09.15.3).

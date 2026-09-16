@@ -1,20 +1,41 @@
 import { Link, useLocation } from "wouter";
 import { LayoutDashboard, Users, Calendar, DollarSign, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 interface MobileTabBarProps {
   onMenuClick: () => void;
 }
 
+const DEFAULT_PROFESSOR_PERMISSIONS = ["/aulas", "/progresso", "/recepcao-qr", "/ia", "/lembretes", "/relatorios"];
+
 export function MobileTabBar({ onMenuClick }: MobileTabBarProps) {
   const [location] = useLocation();
+  const { user } = useAuth();
+
+  // Professor: respeita as permissões granulares (mesma regra do AppSidebar)
+  const rawPermissions = (user as any)?.permissions as string[] | undefined;
+  const professorPermissions =
+    user?.role === "professor"
+      ? Array.isArray(rawPermissions) && rawPermissions.length > 0
+        ? rawPermissions
+        : DEFAULT_PROFESSOR_PERMISSIONS
+      : null;
+
+  const canSee = (href: string) => {
+    if (!professorPermissions) return true;
+    return professorPermissions.some((p) => {
+      const allowed = p === "/recepcao" ? "/recepcao-qr" : p;
+      return href === allowed || href.startsWith(allowed + "/");
+    });
+  };
 
   const tabs = [
-    { label: "Início", href: "/dashboard", icon: LayoutDashboard },
-    { label: "Alunos", href: "/alunos", icon: Users },
-    { label: "Aulas", href: "/aulas", icon: Calendar },
-    { label: "Finanças", href: "/financeiro", icon: DollarSign },
-  ];
+    { label: "Início", href: "/dashboard", icon: LayoutDashboard, always: true },
+    { label: "Alunos", href: "/alunos", icon: Users, always: false },
+    { label: "Aulas", href: "/aulas", icon: Calendar, always: false },
+    { label: "Finanças", href: "/financeiro", icon: DollarSign, always: false },
+  ].filter((tab) => tab.always || canSee(tab.href));
 
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border px-2 py-2 flex items-center justify-between" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.5rem)' }}>
