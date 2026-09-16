@@ -756,6 +756,33 @@ export async function runAutoMigrations() {
       );` },
       { table: 'nps_responses', sql: `CREATE INDEX IF NOT EXISTS "nps_responses_org_idx" ON "nps_responses" ("organizationId", "respondedAt")` },
       { table: 'nps_responses', sql: `CREATE INDEX IF NOT EXISTS "nps_responses_student_idx" ON "nps_responses" ("studentId")` },
+
+      // ═══ CRM — tabelas ausentes em bancos antigos (follow-ups e configurações) ═══
+      { table: 'crm_follow_ups', sql: `CREATE TABLE IF NOT EXISTS "crm_follow_ups" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "organization_id" integer NOT NULL,
+        "lead_id" integer NOT NULL,
+        "title" text NOT NULL,
+        "due_date" timestamp NOT NULL,
+        "due_time" varchar(10),
+        "assigned_to_user_id" integer,
+        "assigned_user_name" text,
+        "contact_type" text DEFAULT 'whatsapp' NOT NULL,
+        "notes" text,
+        "completed" boolean DEFAULT false NOT NULL,
+        "completed_at" timestamp,
+        "created_at" timestamp DEFAULT now() NOT NULL
+      );` },
+      { table: 'crm_follow_ups', sql: `CREATE INDEX IF NOT EXISTS "crm_follow_ups_org_idx" ON "crm_follow_ups" ("organization_id")` },
+      { table: 'crm_follow_ups', sql: `CREATE INDEX IF NOT EXISTS "crm_follow_ups_lead_idx" ON "crm_follow_ups" ("lead_id")` },
+      { table: 'crm_settings', sql: `CREATE TABLE IF NOT EXISTS "crm_settings" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "organization_id" integer NOT NULL UNIQUE,
+        "custom_origins" jsonb DEFAULT '[]'::jsonb,
+        "custom_loss_reasons" jsonb DEFAULT '[]'::jsonb,
+        "custom_tags" jsonb DEFAULT '[]'::jsonb,
+        "updated_at" timestamp DEFAULT now() NOT NULL
+      );` },
     ];
 
     for (const m of migrations) {
