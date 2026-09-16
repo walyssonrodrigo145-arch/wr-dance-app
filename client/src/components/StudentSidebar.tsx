@@ -1,8 +1,7 @@
-import { DanceProLogo } from '@/components/DanceProLogo';
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
-  Calendar,
   Library,
   ClipboardCheck,
   Activity,
@@ -12,19 +11,21 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Music,
   X,
   CalendarDays,
   Bell,
-  RefreshCcw,
-  Clock,
-  PlusCircle,
   Target,
   FileSignature,
   Trophy,
   Theater,
   Shirt,
   Users,
+  Compass,
+  HeartHandshake,
+  Wallet,
+  PersonStanding,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -37,24 +38,77 @@ interface NavItem {
   icon: React.ElementType;
 }
 
-const mainNavItems: NavItem[] = [
-  { label: "Dashboard", href: "/aluno", icon: LayoutDashboard },
-  { label: "Avisos", href: "/aluno/avisos", icon: Bell },
-  { label: "Mensagens", href: "/aluno/mensagens", icon: MessageSquare },
-  { label: "Aulas / Agenda", href: "/aluno/aulas", icon: CalendarDays },
-  { label: "Turmas", href: "/aluno/turmas", icon: Users },
-  { label: "Materiais", href: "/aluno/materiais", icon: Library },
-  { label: "Coreografias", href: "/aluno/coreografias", icon: Music },
-  { label: "Eventos", href: "/aluno/eventos", icon: Theater },
-  { label: "Figurinos", href: "/aluno/figurinos", icon: Shirt },
-  { label: "Exercícios", href: "/aluno/exercicios", icon: ClipboardCheck },
-  { label: "Plano Diário", href: "/aluno/progresso", icon: Target },
-  { label: "Resultados", href: "/aluno/resultados", icon: Trophy },
-  { label: "Financeiro", href: "/aluno/pagamentos", icon: DollarSign },
-  { label: "Contratos", href: "/aluno/contratos", icon: FileSignature },
-  { label: "Meu Perfil", href: "/aluno/perfil", icon: User },
-];
+interface NavGroup {
+  groupName: string;
+  groupIcon: React.ElementType;
+  textColor: string;
+  items: NavItem[];
+}
 
+/**
+ * Menu do portal do aluno organizado por repartições (mesmo padrão do painel
+ * administrativo), com accordion e estado persistido — evita a lista corrida
+ * e extensa que existia antes.
+ */
+const navGroups: NavGroup[] = [
+  {
+    groupName: "PRINCIPAL",
+    groupIcon: Compass,
+    textColor: "text-indigo-400",
+    items: [
+      { label: "Dashboard", href: "/aluno", icon: LayoutDashboard },
+      { label: "Aulas / Agenda", href: "/aluno/aulas", icon: CalendarDays },
+      { label: "Turmas", href: "/aluno/turmas", icon: Users },
+    ],
+  },
+  {
+    groupName: "MEU PROGRESSO",
+    groupIcon: Activity,
+    textColor: "text-sky-400",
+    items: [
+      { label: "Materiais", href: "/aluno/materiais", icon: Library },
+      { label: "Exercícios", href: "/aluno/exercicios", icon: ClipboardCheck },
+      { label: "Plano Diário", href: "/aluno/progresso", icon: Target },
+      { label: "Resultados", href: "/aluno/resultados", icon: Trophy },
+    ],
+  },
+  {
+    groupName: "DANÇA & PALCO",
+    groupIcon: PersonStanding,
+    textColor: "text-fuchsia-400",
+    items: [
+      { label: "Coreografias", href: "/aluno/coreografias", icon: Music },
+      { label: "Eventos", href: "/aluno/eventos", icon: Theater },
+      { label: "Figurinos", href: "/aluno/figurinos", icon: Shirt },
+    ],
+  },
+  {
+    groupName: "RELACIONAMENTO",
+    groupIcon: HeartHandshake,
+    textColor: "text-blue-400",
+    items: [
+      { label: "Avisos", href: "/aluno/avisos", icon: Bell },
+      { label: "Mensagens", href: "/aluno/mensagens", icon: MessageSquare },
+    ],
+  },
+  {
+    groupName: "FINANCEIRO",
+    groupIcon: Wallet,
+    textColor: "text-emerald-400",
+    items: [
+      { label: "Financeiro", href: "/aluno/pagamentos", icon: DollarSign },
+      { label: "Contratos", href: "/aluno/contratos", icon: FileSignature },
+    ],
+  },
+  {
+    groupName: "CONTA",
+    groupIcon: User,
+    textColor: "text-purple-400",
+    items: [
+      { label: "Meu Perfil", href: "/aluno/perfil", icon: User },
+    ],
+  },
+];
 
 interface StudentSidebarProps {
   collapsed: boolean;
@@ -69,16 +123,54 @@ export function StudentSidebar({ collapsed, onToggle, onNavigate }: StudentSideb
   const { data: profile } = trpc.studentPortal.getProfile.useQuery(undefined, {
     enabled: user?.role === 'aluno',
   });
-  
+
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => { window.location.href = "/"; },
   });
 
-  const initials = user?.name
-    ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
-    : "AL";
+  // Estado local com localStorage para controlar categorias recolhidas
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem("dancepro_student_sidebar_groups");
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // Ignore parse errors
+    }
+    // Por padrão: somente PRINCIPAL aberto; demais começam recolhidos
+    return {
+      "MEU PROGRESSO": true,
+      "DANÇA & PALCO": true,
+      "RELACIONAMENTO": true,
+      "FINANCEIRO": true,
+      "CONTA": true,
+    };
+  });
 
-  const filteredNavItems = mainNavItems.filter(item => {
+  const isItemActive = (href: string) =>
+    location === href || (href !== "/aluno" && location.startsWith(href));
+
+  // Auto-expandir o grupo da rota atual
+  useEffect(() => {
+    const currentGroup = navGroups.find((group) => group.items.some((item) => isItemActive(item.href)));
+    if (currentGroup && collapsedGroups[currentGroup.groupName]) {
+      setCollapsedGroups((prev) => ({ ...prev, [currentGroup.groupName]: false }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location]);
+
+  const toggleGroup = (groupName: string) => {
+    setCollapsedGroups((prev) => {
+      const updated = { ...prev, [groupName]: !prev[groupName] };
+      try {
+        localStorage.setItem("dancepro_student_sidebar_groups", JSON.stringify(updated));
+      } catch {
+        // armazenamento indisponível — mantém apenas em memória
+      }
+      return updated;
+    });
+  };
+
+  const canSeeItem = (item: NavItem) => {
     if (!profile?.permissions) return true;
     const perms = profile.permissions as Record<string, boolean>;
     if (item.href === "/aluno/pagamentos" && perms.canSeeFinanceiro === false) return false;
@@ -87,10 +179,12 @@ export function StudentSidebar({ collapsed, onToggle, onNavigate }: StudentSideb
     if (item.href === "/aluno/exercicios" && perms.canSeeProgress === false) return false;
     if (item.href === "/aluno/progresso" && perms.canSeeProgress === false) return false;
     if (item.href === "/aluno/mensagens" && perms.canSeeMessages === false) return false;
-
     return true;
-  });
+  };
 
+  const initials = user?.name
+    ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+    : "AL";
 
   return (
     <aside
@@ -153,61 +247,89 @@ export function StudentSidebar({ collapsed, onToggle, onNavigate }: StudentSideb
         )}
       </div>
 
-      {/* Navigation - Polished Links */}
-      <nav className="flex-1 px-5 py-4 space-y-2 overflow-y-auto no-scrollbar scroll-smooth">
-        {!collapsed && (
-          <div className="flex items-center gap-4 px-3 mb-6 animate-in fade-in duration-700">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-sidebar-foreground/30">Plataforma</p>
-            <div className="h-px flex-1 bg-sidebar-border/20" />
-          </div>
-        )}
-        
-        <div className="space-y-1.5">
-          {filteredNavItems.map((item, idx) => {
-            const Icon = item.icon;
-            const isActive = location === item.href || (item.href !== "/aluno" && location.startsWith(item.href));
-            return (
-              <Link key={item.href} href={item.href}>
-                <div
-                  onClick={onNavigate}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-bold transition-all duration-300 cursor-pointer group relative overflow-hidden",
-                    isActive
-                      ? "bg-indigo-600 text-white shadow-[0_0_20px_rgba(79,70,229,0.4)]"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
-                    collapsed && "justify-center px-0"
-                  )}
-                  title={collapsed ? item.label : undefined}
-                  style={{ animationDelay: `${idx * 50}ms` }}
+      {/* Navegação categorizada com accordion (mesmo padrão do painel admin) */}
+      <nav className="flex-1 px-4 py-3 space-y-4 overflow-y-auto no-scrollbar scroll-smooth">
+        {navGroups.map((group) => {
+          const visibleItems = group.items.filter(canSeeItem);
+          if (visibleItems.length === 0) return null;
+
+          const isGroupCollapsed = !collapsed && !!collapsedGroups[group.groupName];
+          const GroupIcon = group.groupIcon;
+
+          return (
+            <div key={group.groupName} className="space-y-1">
+              {!collapsed && (
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.groupName)}
+                  className="flex items-center justify-between w-full px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer group/header select-none text-left"
+                  title={isGroupCollapsed ? "Expandir categoria" : "Recolher categoria"}
                 >
-                  <Icon
-                    size={16}
+                  <div className="flex items-center gap-2">
+                    <GroupIcon className={cn("w-3.5 h-3.5 shrink-0", group.textColor)} />
+                    <span className={cn("text-[10px] font-black uppercase tracking-widest", group.textColor)}>
+                      {group.groupName}
+                    </span>
+                  </div>
+                  <ChevronDown
+                    size={14}
                     className={cn(
-                      "flex-shrink-0 transition-transform duration-300 relative z-10",
-                      isActive ? "scale-110" : "group-hover:scale-110 group-hover:text-indigo-400"
+                      "text-sidebar-foreground/40 group-hover/header:text-white transition-transform duration-300",
+                      isGroupCollapsed && "-rotate-90 text-sidebar-foreground/30"
                     )}
                   />
-                  {!collapsed && (
-                    <div className="flex-1 flex items-center justify-between min-w-0 z-10 relative">
-                      <span className="truncate tracking-tight">{item.label}</span>
-                      {item.href === "/aluno/mensagens" && messageCount > 0 && (
-                        <span className="ml-2 bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
-                          {messageCount}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  
-                  {isActive && !collapsed && (
-                    <div className="absolute left-[-4px] top-1/4 bottom-1/4 w-1 bg-white rounded-full shadow-[0_0_10px_#fff] z-20" />
-                  )}
+                </button>
+              )}
+
+              {!isGroupCollapsed && (
+                <div className="space-y-1.5">
+                  {visibleItems.map((item, idx) => {
+                    const Icon = item.icon;
+                    const isActive = isItemActive(item.href);
+                    return (
+                      <Link key={item.href} href={item.href}>
+                        <div
+                          onClick={onNavigate}
+                          className={cn(
+                            "flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-bold transition-all duration-300 cursor-pointer group relative overflow-hidden",
+                            isActive
+                              ? "bg-indigo-600 text-white shadow-[0_0_20px_rgba(79,70,229,0.4)]"
+                              : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                            collapsed && "justify-center px-0"
+                          )}
+                          title={collapsed ? item.label : undefined}
+                          style={{ animationDelay: `${idx * 50}ms` }}
+                        >
+                          <Icon
+                            size={16}
+                            className={cn(
+                              "flex-shrink-0 transition-transform duration-300 relative z-10",
+                              isActive ? "scale-110" : "group-hover:scale-110 group-hover:text-indigo-400"
+                            )}
+                          />
+                          {!collapsed && (
+                            <div className="flex-1 flex items-center justify-between min-w-0 z-10 relative">
+                              <span className="truncate tracking-tight">{item.label}</span>
+                              {item.href === "/aluno/mensagens" && messageCount > 0 && (
+                                <span className="ml-2 bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
+                                  {messageCount}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {isActive && !collapsed && (
+                            <div className="absolute left-[-4px] top-1/4 bottom-1/4 w-1 bg-white rounded-full shadow-[0_0_10px_#fff] z-20" />
+                          )}
+                        </div>
+                      </Link>
+                    );
+                  })}
                 </div>
-              </Link>
-            );
-          })}
-        </div>
-
-
+              )}
+            </div>
+          );
+        })}
       </nav>
 
       {/* User Footer */}

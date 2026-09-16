@@ -26,6 +26,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.16.1",
+    date: "2026-09-16",
+    title: "Menu do Portal do Aluno por categorias",
+    summary: "O menu do aluno ficou compacto: agora tem as mesmas repartições com accordion do painel da escola, em vez de uma lista corrida e extensa.",
+    items: [
+      { type: "melhoria", title: "Menu organizado em repartições", description: "PRINCIPAL, MEU PROGRESSO, DANÇA & PALCO, RELACIONAMENTO, FINANCEIRO e CONTA — clique na categoria para abrir ou recolher, e a categoria da página atual abre automaticamente." },
+      { type: "melhoria", title: "Preferência salva", description: "O aluno abre e fecha as categorias e o sistema lembra da próxima vez, igual ao menu da escola." },
+    ],
+  },
+  {
     version: "2026.09.15.3",
     date: "2026-09-15",
     title: "Coreografias, Eventos, Figurinos, Turmas e mais",
