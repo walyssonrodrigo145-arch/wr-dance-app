@@ -823,6 +823,13 @@ export async function runAutoMigrations() {
       { table: 'settings', sql: `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "storeSalesRules" text DEFAULT '' NOT NULL` },
       { table: 'costume_sales', sql: `ALTER TABLE "costume_sales" ADD COLUMN IF NOT EXISTS "discountPercent" decimal(5,2) DEFAULT '0.00' NOT NULL` },
       { table: 'costume_sales', sql: `ALTER TABLE "costume_sales" ADD COLUMN IF NOT EXISTS "madeToOrder" boolean DEFAULT false NOT NULL` },
+
+      // ═══ ÉPICO 3: cobrança da Loja (Asaas / Mercado Pago / InfinitePay / chave PIX) ═══
+      { table: 'costume_sales', sql: `ALTER TABLE "costume_sales" ADD COLUMN IF NOT EXISTS "paymentProvider" varchar(20)` },
+      { table: 'costume_sales', sql: `ALTER TABLE "costume_sales" ADD COLUMN IF NOT EXISTS "externalPaymentId" varchar(80)` },
+      { table: 'costume_sales', sql: `ALTER TABLE "costume_sales" ADD COLUMN IF NOT EXISTS "paymentLink" text` },
+      { table: 'costume_sales', sql: `ALTER TABLE "costume_sales" ADD COLUMN IF NOT EXISTS "pixPayload" text` },
+      { table: 'costume_sales', sql: `CREATE INDEX IF NOT EXISTS "costume_sales_external_idx" ON "costume_sales" ("externalPaymentId")` },
     ];
 
     for (const m of migrations) {

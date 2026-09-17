@@ -26,6 +26,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.16.6",
+    date: "2026-09-16",
+    title: "PIX na hora na Loja e Vendas da Loja no Financeiro",
+    summary: "Gere o PIX copia-e-cola da venda e receba na hora — com Asaas, Mercado Pago ou InfinitePay — e acompanhe tudo na nova aba Vendas da Loja do Financeiro, entrando no saldo líquido.",
+    items: [
+      { type: "novo", title: "Cobrar a venda com PIX na hora", description: "Na aba Vendas da Loja, clique em Cobrar e gere o PIX copia e cola (com QR Code) para o aluno pagar na hora — pelos três gateways: Asaas, Mercado Pago e InfinitePay." },
+      { type: "novo", title: "Chave PIX como alternativa", description: "Sem gateway conectado, a Loja gera o PIX copia e cola direto da chave PIX da escola (baixa manual)." },
+      { type: "novo", title: "Baixa automática do pagamento", description: "Quando o PIX cai, o sistema marca a venda como paga sozinho (Asaas, Mercado Pago e InfinitePay) e avisa a escola." },
+      { type: "novo", title: "Aba Vendas da Loja no Financeiro", description: "Tudo que é vendido entra automaticamente: total vendido, recebido e a receber do mês. As vendas pagas já somam no Saldo Geral Líquido." },
+    ],
+  },
+  {
     version: "2026.09.16.5",
     date: "2026-09-16",
     title: "Venda direta na Loja e regras de venda configuráveis",

@@ -6,7 +6,7 @@ import { formatBRL } from "@/lib/money";
 import { formatDateOnly } from "@/lib/dates";
 import {
   Shirt, Plus, Search, Pencil, Trash2, Loader2, Package, AlertTriangle,
-  ArrowUpRight, ArrowDownLeft, X, CheckCircle2, ShoppingBag,
+  ArrowUpRight, ArrowDownLeft, X, CheckCircle2, ShoppingBag, QrCode, Copy, ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -522,6 +522,133 @@ function SellModal({ open, onClose, preselected }: { open: boolean; onClose: () 
   );
 }
 
+// ─── Modal de cobrança da venda (PIX copia-e-cola / link) ────────────────────
+
+const PROVIDER_LABEL: Record<string, string> = {
+  asaas: "Asaas (PIX)",
+  mercadopago: "Mercado Pago (PIX)",
+  infinitepay: "InfinitePay (link PIX/cartão)",
+  pixkey: "Chave PIX da escola",
+};
+
+function SaleChargeModal({ sale, onClose }: { sale: any | null; onClose: () => void }) {
+  const utils = trpc.useUtils();
+  const [result, setResult] = useState<any>(null);
+
+  const { data: options, isLoading: isLoadingOptions } = trpc.figurinos.salePaymentOptions.useQuery(undefined, {
+    enabled: sale !== null,
+  });
+
+  const charge = trpc.figurinos.saleCharge.useMutation({
+    onSuccess: (data) => {
+      setResult(data);
+      toast.success("Cobrança gerada!");
+      utils.figurinos.sales.invalidate();
+      utils.figurinos.list.invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const availableProviders = [
+    { id: "asaas", enabled: options?.asaas },
+    { id: "mercadopago", enabled: options?.mercadopago },
+    { id: "infinitepay", enabled: options?.infinitepay },
+    { id: "pixkey", enabled: options?.pixKey },
+  ].filter((provider) => provider.enabled);
+
+  return (
+    <Dialog open={sale !== null} onOpenChange={(value) => { if (!value) { setResult(null); onClose(); } }}>
+      <DialogContent className="max-w-lg max-h-[90dvh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-lg font-black">
+            <QrCode className="text-indigo-500" size={20} />
+            Cobrar venda #{sale?.id}
+          </DialogTitle>
+        </DialogHeader>
+
+        {sale && (
+          <div className="space-y-4 mt-2">
+            <div className="rounded-xl border border-border bg-muted/30 px-3 py-2">
+              <p className="text-sm font-black text-foreground">
+                {sale.costumeName} ×{sale.quantity} — {formatBRL(sale.totalPrice)}
+              </p>
+              <p className="text-[11px] font-bold text-muted-foreground mt-0.5">{sale.studentName}</p>
+            </div>
+
+            {isLoadingOptions ? (
+              <div className="flex justify-center py-6"><Loader2 className="animate-spin text-primary" size={22} /></div>
+            ) : availableProviders.length === 0 ? (
+              <p className="text-xs font-bold text-amber-600 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
+                Nenhuma forma de pagamento configurada. Conecte Asaas, Mercado Pago ou InfinitePay em Configurações → Integrações — ou cadastre uma chave PIX.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {availableProviders.map((provider) => (
+                  <Button
+                    key={provider.id}
+                    variant={provider.id === options?.defaultProvider ? "default" : "outline"}
+                    disabled={charge.isPending}
+                    onClick={() => charge.mutate({ id: sale.id, provider: provider.id as any })}
+                  >
+                    {charge.isPending && charge.variables?.provider === provider.id
+                      ? <Loader2 size={14} className="animate-spin mr-1.5" />
+                      : <QrCode size={14} className="mr-1.5" />}
+                    {PROVIDER_LABEL[provider.id]}
+                  </Button>
+                ))}
+              </div>
+            )}
+
+            {result?.pixPayload && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">PIX copia e cola</p>
+                <div className="rounded-xl border border-border bg-card p-3">
+                  <p className="text-[10px] font-mono break-all text-muted-foreground line-clamp-4">{result.pixPayload}</p>
+                </div>
+                <Button
+                  className="w-full"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(result.pixPayload);
+                      toast.success("PIX copiado! Envie para o aluno.");
+                    } catch {
+                      toast.error("Não foi possível copiar — selecione o código manualmente.");
+                    }
+                  }}
+                >
+                  <Copy size={14} className="mr-1.5" /> Copiar PIX copia e cola
+                </Button>
+              </div>
+            )}
+
+            {result?.encodedImage && (
+              <div className="flex justify-center">
+                <img
+                  src={`data:image/png;base64,${result.encodedImage}`}
+                  alt="QR Code PIX"
+                  className="w-52 h-52 rounded-xl border border-border bg-white p-2"
+                />
+              </div>
+            )}
+
+            {result?.paymentLink && (
+              <Button variant="outline" className="w-full" onClick={() => window.open(result.paymentLink, "_blank", "noopener,noreferrer")}>
+                <ExternalLink size={14} className="mr-1.5" /> Abrir link de pagamento
+              </Button>
+            )}
+
+            {result?.provider === "pixkey" && (
+              <p className="text-[10px] font-bold text-amber-600">
+                PIX da chave da escola: a baixa é manual — marque a venda como paga após confirmar o recebimento.
+              </p>
+            )}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Página ───────────────────────────────────────────────────────────────────
 
 export default function Figurinos() {
@@ -534,6 +661,7 @@ export default function Figurinos() {
   const [checkoutItem, setCheckoutItem] = useState<CostumeRow | null>(null);
   const [sellOpen, setSellOpen] = useState(false);
   const [sellItem, setSellItem] = useState<CostumeRow | null>(null);
+  const [chargeSale, setChargeSale] = useState<any | null>(null);
   const [deleting, setDeleting] = useState<CostumeRow | null>(null);
 
   const utils = trpc.useUtils();
@@ -814,6 +942,9 @@ export default function Figurinos() {
                     </Badge>
                     {sale.status === "pendente" && (
                       <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline" onClick={() => setChargeSale(sale)}>
+                          <QrCode size={13} className="mr-1" /> Cobrar
+                        </Button>
                         <Button size="sm" variant="outline" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "pago" })} disabled={updateSaleStatus.isPending}>
                           <CheckCircle2 size={13} className="mr-1" /> Marcar pago
                         </Button>
@@ -849,6 +980,8 @@ export default function Figurinos() {
           preselected={sellItem}
         />
       )}
+
+      <SaleChargeModal sale={chargeSale} onClose={() => setChargeSale(null)} />
 
       <AlertDialog open={deleting !== null} onOpenChange={(value) => { if (!value) setDeleting(null); }}>
         <AlertDialogContent>

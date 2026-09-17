@@ -136,6 +136,8 @@ export async function createAsaasCharge(params: {
   value: number;
   dueDate: string; // "YYYY-MM-DD"
   description?: string;
+  /** Rastreio interno (ex.: "costume_sale:12") — usado na conciliação do webhook. */
+  externalReference?: string;
 }, apiKey?: string): Promise<AsaasCharge> {
   const res = await asaasRequest(
     "POST",
@@ -146,6 +148,7 @@ export async function createAsaasCharge(params: {
       value: params.value,
       dueDate: params.dueDate,
       description: params.description ?? "Mensalidade MusicPro",
+      ...(params.externalReference ? { externalReference: params.externalReference } : {}),
     },
     apiKey
   );

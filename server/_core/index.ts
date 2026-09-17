@@ -24,7 +24,7 @@ import { createRateLimiter, logSecurityEvent, detectAttackCategory } from "./rat
 import { runAutoMigrations } from "./migrate";
 import { runTenantMigrations } from "./migrate_tenants";
 import { getDb } from "../db";
-import { settings, paymentDues, organizations, students, shortLinks } from "../../drizzle/schema";
+import { settings, paymentDues, organizations, students, shortLinks, costumeSales } from "../../drizzle/schema";
 import { ENV } from './env';
 import { eq, and, sql } from "drizzle-orm";
 import { setupEvolutionWebhook, setupAllEvolutionWebhooks } from "../utils/whatsapp";
@@ -210,6 +210,52 @@ async function startServer() {
       const dueId = req.query.dueId as string;
       if (!dueId) return res.status(400).send("Missing dueId");
 
+      // ── Vendas da Loja (PIX do Mercado Pago): dueId = "sale_<id>" ──────────────
+      if (dueId.startsWith("sale_")) {
+        const saleId = parseInt(dueId.replace("sale_", ""), 10);
+        if (!Number.isFinite(saleId)) return res.status(400).send("Invalid sale id");
+        const db = await getDb();
+        if (!db) return res.status(500).send("Database not available");
+        const [sale] = await db.select().from(costumeSales)
+          .where(and(eq(costumeSales.id, saleId), eq(costumeSales.paymentProvider, "mercadopago"))).limit(1);
+        if (!sale) return res.status(404).send("Store sale not found");
+        if (sale.status !== "pendente") return res.status(200).send("Already handled");
+
+        const [mpRow] = await db.select({ token: settings.mpAccessToken }).from(settings)
+          .where(eq(settings.organizationId, sale.organizationId!)).limit(1);
+        if (!mpRow?.token) return res.status(400).send("Mercado Pago not configured");
+        const { decryptSecret } = await import("../utils/integrationCrypto");
+        const token = decryptSecret(String(mpRow.token));
+
+        const body = req.body || {};
+        const paymentId = body?.data?.id;
+        if (!paymentId) return res.status(400).send("Missing payment id");
+        const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+          headers: { "Authorization": `Bearer ${token}` },
+        });
+        if (!response.ok) return res.status(400).send("Could not verify payment");
+        const mpPayment: any = await response.json();
+        if (mpPayment?.status !== "approved") return res.status(200).send("Not approved yet");
+        if (String(mpPayment?.external_reference || "") !== `sale_${sale.id}`) {
+          return res.status(400).send("Reference mismatch");
+        }
+
+        await db.update(costumeSales).set({ status: "pago", paidAt: new Date(), updatedAt: new Date() })
+          .where(and(eq(costumeSales.id, sale.id), eq(costumeSales.organizationId, sale.organizationId!)));
+        debugLog(`[MP Webhook] Venda da Loja marcada como PAGA (${paymentId}) — sale ${sale.id}`);
+
+        const { users: usersTable } = await import("../../drizzle/schema");
+        const [storeAdminMp] = await db.select({ id: usersTable.id }).from(usersTable)
+          .where(and(eq(usersTable.organizationId, sale.organizationId!), eq(usersTable.role, "admin"))).limit(1);
+        if (storeAdminMp?.id) {
+          await notifyUser(storeAdminMp.id, {
+            title: "Venda da Loja paga",
+            content: `PIX confirmado na venda #${sale.id} (${Number(sale.totalPrice).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}).`,
+          }).catch(() => {});
+        }
+        return res.status(200).send("Store sale paid");
+      }
+
       const body = req.body;
       if (body?.type !== "payment" && body?.topic !== "payment") {
         return res.status(200).send("Not a payment event");
@@ -327,6 +373,78 @@ async function startServer() {
       if (req.query.enrollmentCode) {
         debugLog(`[InfinitePay Webhook] Evento de matrícula recebido (ACK): ${req.query.enrollmentCode}`);
         return res.status(200).json({ ok: true });
+      }
+
+      // ── Vendas da Loja (checkout InfinitePay): ?saleId=<id> ──────────────────
+      const saleIdRaw = req.query.saleId as string;
+      if (saleIdRaw && /^\d+$/.test(saleIdRaw)) {
+        const saleDb = await getDb();
+        if (!saleDb) return res.status(500).json({ error: "DB unavailable" });
+        const saleId = parseInt(saleIdRaw, 10);
+        const [sale] = await saleDb.select().from(costumeSales)
+          .where(and(eq(costumeSales.id, saleId), eq(costumeSales.paymentProvider, "infinitepay"))).limit(1);
+        if (!sale) {
+          console.warn(`[InfinitePay Webhook] Venda da Loja não encontrada: ${saleId} — evento ignorado.`);
+          return res.status(200).json({ ok: true });
+        }
+        if (sale.status !== "pendente") return res.status(200).json({ ok: true, already: true });
+
+        const { registerWebhookEventOnce } = await import("../routers/helpers");
+        const saleEventId = transactionNsu || `${invoiceSlug || "noslug"}_${orderNsu || "nonsu"}`;
+        const saleDedup = await registerWebhookEventOnce(saleDb, "infinitepay", saleEventId, "payment.paid", sale.organizationId ?? undefined, {
+          transaction_nsu: transactionNsu,
+          invoice_slug: invoiceSlug,
+          order_nsu: orderNsu,
+          receipt_url: receiptUrl,
+          sale_id: sale.id,
+        });
+        if (saleDedup.isDuplicate) return res.status(200).json({ ok: true });
+
+        const [saleSettings] = await saleDb.select({ handle: settings.infinitepayHandle, apiKey: settings.infinitepayApiKey })
+          .from(settings).where(eq(settings.organizationId, sale.organizationId!)).limit(1);
+        if (!saleSettings?.handle) {
+          console.warn(`[InfinitePay Webhook] Escola sem InfiniteTag (venda ${saleId}).`);
+          return res.status(200).json({ ok: true });
+        }
+
+        const { checkInfinitePayPayment, evaluateInfinitePayPayment, brlToCents, resolveInfinitePayApiKey } = await import("../utils/infinitepay");
+        const saleCheck = await checkInfinitePayPayment({
+          handle: saleSettings.handle,
+          orderNsu: orderNsu || `sale_${sale.id}`,
+          transactionNsu,
+          slug: invoiceSlug || undefined,
+          apiKey: resolveInfinitePayApiKey(saleSettings.apiKey),
+        });
+        const saleDecision = evaluateInfinitePayPayment(brlToCents(sale.totalPrice), saleCheck);
+
+        const { users: usersTableIp } = await import("../../drizzle/schema");
+        const [storeAdminIp] = await saleDb.select({ id: usersTableIp.id }).from(usersTableIp)
+          .where(and(eq(usersTableIp.organizationId, sale.organizationId!), eq(usersTableIp.role, "admin"))).limit(1);
+
+        if (saleDecision === "mismatch") {
+          if (storeAdminIp?.id) {
+            await notifyUser(storeAdminIp.id, {
+              title: "⚠️ Venda da Loja com valor divergente",
+              content: `Pagamento InfinitePay da venda #${sale.id} veio com valor inferior ao esperado. Verifique no Financeiro — a baixa NÃO foi automática.`,
+            }).catch(() => {});
+          }
+          return res.status(200).json({ ok: true, decision: saleDecision });
+        }
+        if (saleDecision !== "paid") {
+          return res.status(400).json({ ok: false, decision: saleDecision });
+        }
+
+        await saleDb.update(costumeSales).set({ status: "pago", paidAt: new Date(), updatedAt: new Date() })
+          .where(and(eq(costumeSales.id, sale.id), eq(costumeSales.organizationId, sale.organizationId!)));
+        debugLog(`[InfinitePay Webhook] Venda da Loja marcada como PAGA (${transactionNsu}) — sale ${sale.id}`);
+
+        if (storeAdminIp?.id) {
+          await notifyUser(storeAdminIp.id, {
+            title: "Venda da Loja paga",
+            content: `Venda #${sale.id} paga via InfinitePay (${Number(sale.totalPrice).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}).`,
+          }).catch(() => {});
+        }
+        return res.status(200).json({ ok: true, decision: saleDecision });
       }
 
       const dueIdRaw = req.query.dueId as string;
@@ -595,6 +713,40 @@ async function startServer() {
           .limit(1);
 
         if (!paymentDetails) {
+          // Não é mensalidade — pode ser uma VENDA DA LOJA (PIX/cartão com externalReference costume_sale:<id>).
+          const [storeSale] = await db
+            .select({
+              id: costumeSales.id,
+              organizationId: costumeSales.organizationId,
+              totalPrice: costumeSales.totalPrice,
+              studentId: costumeSales.studentId,
+              studentName: students.name,
+            })
+            .from(costumeSales)
+            .leftJoin(students, eq(costumeSales.studentId, students.id))
+            .where(and(eq(costumeSales.externalPaymentId, payment.id), eq(costumeSales.status, "pendente")))
+            .limit(1);
+
+          if (storeSale) {
+            await db.update(costumeSales)
+              .set({ status: "pago", paidAt: new Date(), updatedAt: new Date() })
+              .where(and(eq(costumeSales.id, storeSale.id), eq(costumeSales.organizationId, storeSale.organizationId)));
+            debugLog(`[Asaas Webhook] Venda da Loja marcada como PAGA (${payment.id}) — org ${storeSale.organizationId}`);
+
+            const valorLoja = Number(storeSale.totalPrice).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+            const { users: usersTable } = await import("../../drizzle/schema");
+            const [storeAdmin] = await db.select({ id: usersTable.id }).from(usersTable)
+              .where(and(eq(usersTable.organizationId, storeSale.organizationId), eq(usersTable.role, "admin")))
+              .limit(1);
+            if (storeAdmin?.id) {
+              await notifyUser(storeAdmin.id, {
+                title: "Venda da Loja paga",
+                content: `A venda para ${storeSale.studentName || "Aluno"} foi paga (${valorLoja}).`,
+              }).catch(() => {});
+            }
+            return res.status(200).json({ ok: true });
+          }
+
           // asaasId não encontrado no banco — pode ser webhook de outro ambiente ou ID inválido
           console.warn(`[Asaas Webhook] asaasId não encontrado no banco: ${payment.id} — ignorado`);
           return res.status(200).json({ ok: true });

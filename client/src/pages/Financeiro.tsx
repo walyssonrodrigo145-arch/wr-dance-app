@@ -16,6 +16,7 @@ import {
 
 import MensalidadesTab from "./financeiro/MensalidadesTab";
 import { DespesasTab } from "./financeiro/DespesasTab";
+import { VendasLojaTab } from "./financeiro/VendasLojaTab";
 
 const MONTHS_FULL = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 
@@ -27,6 +28,7 @@ export default function Financeiro() {
 
   const { data: payments = [], isLoading: isLoadingPayments } = trpc.paymentDues.list.useQuery({ month: viewMonth, year: viewYear });
   const { data: expenses = [], isLoading: isLoadingExpenses } = trpc.expenses.list.useQuery({ month: viewMonth, year: viewYear });
+  const { data: storeSales = [], isLoading: isLoadingStoreSales } = trpc.figurinos.sales.useQuery({ status: "todos" });
 
   const prevMonth = () => {
     if (viewMonth === 1) { setViewMonth(12); setViewYear(y => y - 1); }
@@ -43,8 +45,16 @@ export default function Financeiro() {
     // O "Recebido" inclui todos os pagamentos confirmados (mesmo de inativos), pois o dinheiro já entrou
     const sumRecebido = payments.filter(p => p.status === "pago").reduce((acc, p) => acc + Number(p.amount), 0);
     const sumGasto = expenses.filter(p => p.status === "pago").reduce((acc, p) => acc + Number(p.amount), 0);
-    return sumRecebido - sumGasto;
-  }, [payments, expenses]);
+    // Vendas da Loja pagas no mês entram no saldo líquido automaticamente
+    const sumVendasLoja = storeSales
+      .filter((sale: any) => {
+        if (sale.status !== "pago") return false;
+        const date = new Date(sale.createdAt);
+        return date.getMonth() + 1 === viewMonth && date.getFullYear() === viewYear;
+      })
+      .reduce((acc: number, sale: any) => acc + Number(sale.totalPrice), 0);
+    return sumRecebido + sumVendasLoja - sumGasto;
+  }, [payments, expenses, storeSales, viewMonth, viewYear]);
 
   // Desconto efetivamente concedido no mês (pagamentos com desconto por antecipação)
   const descontoConcedido = useMemo(() => {
@@ -102,7 +112,7 @@ export default function Financeiro() {
                 <p className="text-xl lg:text-3xl font-black text-foreground mt-0.5">
                    {maskBRL(saldoLiquido)}
                 </p>
-                <p className="text-[10px] font-medium text-muted-foreground mt-0.5">Total recebido menos despesas pagas do mês.</p>
+                <p className="text-[10px] font-medium text-muted-foreground mt-0.5">Total recebido (mensalidades + Loja) menos despesas pagas do mês.</p>
               </div>
             </div>
           </div>
@@ -125,13 +135,18 @@ export default function Financeiro() {
         </div>
 
         <Tabs id="tour-finance-tabs" defaultValue="mensalidades" className="w-full">
-          <TabsList className="w-full lg:w-auto grid grid-cols-2 lg:inline-flex mb-6 rounded-2xl bg-muted/50 p-1">
+          <TabsList className="w-full lg:w-auto grid grid-cols-3 lg:inline-flex mb-6 rounded-2xl bg-muted/50 p-1">
             <TabsTrigger value="mensalidades" className="rounded-xl text-xs font-bold uppercase tracking-widest h-10 data-[state=active]:bg-card data-[state=active]:text-blue-600 data-[state=active]:shadow-sm">Emissões</TabsTrigger>
+            <TabsTrigger value="loja" className="rounded-xl text-xs font-bold uppercase tracking-widest h-10 data-[state=active]:bg-card data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm">Vendas da Loja</TabsTrigger>
             <TabsTrigger value="despesas" className="rounded-xl text-xs font-bold uppercase tracking-widest h-10 data-[state=active]:bg-card data-[state=active]:text-orange-600 data-[state=active]:shadow-sm">Despesas</TabsTrigger>
           </TabsList>
 
           <TabsContent value="mensalidades" className="mt-0">
             <MensalidadesTab viewMonth={viewMonth} viewYear={viewYear} payments={payments} isLoading={isLoadingPayments} />
+          </TabsContent>
+
+          <TabsContent value="loja" className="mt-0">
+            <VendasLojaTab viewMonth={viewMonth} viewYear={viewYear} sales={storeSales} isLoading={isLoadingStoreSales} />
           </TabsContent>
 
           <TabsContent value="despesas" className="mt-0">

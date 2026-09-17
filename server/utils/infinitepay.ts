@@ -203,3 +203,9 @@ export function buildInfinitePayWebhookUrl(dueId: number): string {
   const base = `${ENV.appUrl || "https://wrmusicpro.com.br"}/api/webhooks/infinitepay/student`;
   return `${base}?dueId=${dueId}&token=${encodeURIComponent(ENV.infinitepayWebhookToken)}`;
 }
+
+// ─── URL do webhook de VENDAS DA LOJA (mesmo endpoint, identificador próprio) ──
+export function buildInfinitePaySaleWebhookUrl(saleId: number): string {
+  const base = `${ENV.appUrl || "https://wrmusicpro.com.br"}/api/webhooks/infinitepay/student`;
+  return `${base}?saleId=${saleId}&token=${encodeURIComponent(ENV.infinitepayWebhookToken)}`;
+}

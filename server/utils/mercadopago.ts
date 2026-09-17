@@ -68,6 +68,55 @@ export async function createMPPreference(
   };
 }
 
+// ── PIX direto (copia e cola) via API de Pagamentos ──────────────────────────
+// POST /v1/payments com payment_method_id=pix. Retorna o QR Code (copia-e-cola)
+// para pagamento imediato — usado na Loja. Conciliação pelo webhook /student.
+export async function createMPPixPayment(params: {
+  transactionAmount: number;
+  description: string;
+  payerEmail: string;
+  externalReference: string;
+  notificationUrl: string;
+}, accessToken: string): Promise<{
+  paymentId: string;
+  status: string;
+  qrCode: string | null;
+  qrCodeBase64: string | null;
+  ticketUrl: string | null;
+}> {
+  const response = await fetch("https://api.mercadopago.com/v1/payments", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      "X-Idempotency-Key": `mp-pix-${params.externalReference}`,
+    },
+    body: JSON.stringify({
+      transaction_amount: Number(params.transactionAmount.toFixed(2)),
+      description: params.description,
+      payment_method_id: "pix",
+      external_reference: params.externalReference,
+      notification_url: params.notificationUrl,
+      payer: { email: params.payerEmail },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`[MercadoPago] Erro ao criar PIX: ${response.status} - ${errorBody}`);
+  }
+
+  const data = await response.json();
+  const transactionData = data?.point_of_interaction?.transaction_data ?? {};
+  return {
+    paymentId: String(data.id),
+    status: String(data.status ?? "pending"),
+    qrCode: transactionData.qr_code ?? null,
+    qrCodeBase64: transactionData.qr_code_base64 ?? null,
+    ticketUrl: transactionData.ticket_url ?? null,
+  };
+}
+
 // ── Verifica status real de um pagamento na API do Mercado Pago ───────────────
 // MP redireciona com ?payment_id=XXX&status=YYY na URL de retorno.
 // Esta função consulta a API oficial para garantir que o status é legítimo.

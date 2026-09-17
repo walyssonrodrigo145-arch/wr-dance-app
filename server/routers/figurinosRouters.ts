@@ -6,9 +6,11 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import { protectedProcedure, studentProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { coreografias, costumeLoans, costumeSales, costumes, events, students } from "../../drizzle/schema";
+import { coreografias, costumeLoans, costumeSales, costumes, events, organizations, asaasCustomers, settings, students } from "../../drizzle/schema";
 import { ENV } from "../_core/env";
 import { getStoreSalesRules } from "./helpers";
+import { decryptSecret } from "../utils/integrationCrypto";
+import { buildPixPayload } from "../utils/pix";
 
 const COSTUME_TYPES = ["saia", "collant", "sapatilha", "top", "calca", "acessorio", "uniforme", "outro"] as const;
 const COSTUME_CONDITIONS = ["novo", "bom", "usado", "danificado"] as const;
@@ -29,6 +31,68 @@ async function resolveStudentId(db: any, ctx: { user: { id: number; studentId?: 
     .where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!)))
     .limit(1);
   return found?.id ?? null;
+}
+
+/** API key do Asaas da escola (settings habilitada + chave, decifrada). */
+async function resolveOrgAsaasKey(db: any, orgId: number): Promise<string | null> {
+  const rows = await db.select({ enabled: settings.asaasEnabled, key: settings.asaasApiKey })
+    .from(settings).where(eq(settings.organizationId, orgId));
+  const found = (rows as any[]).find((row) => Number(row.enabled) === 1 && row.key);
+  if (!found?.key) return null;
+  try {
+    return decryptSecret(String(found.key));
+  } catch {
+    return null;
+  }
+}
+
+/** Token do Mercado Pago da escola (decifrado). */
+async function resolveOrgMpToken(db: any, orgId: number): Promise<string | null> {
+  const rows = await db.select({ token: settings.mpAccessToken })
+    .from(settings).where(eq(settings.organizationId, orgId));
+  const found = (rows as any[]).find((row) => row.token && String(row.token).trim() !== "");
+  if (!found?.token) return null;
+  try {
+    return decryptSecret(String(found.token));
+  } catch {
+    return null;
+  }
+}
+
+/** Configuração de cobrança da Loja (gateways disponíveis + PIX estático). */
+async function resolveOrgStorePaymentConfig(db: any, orgId: number) {
+  const rows = await db.select({
+    paymentGateway: settings.paymentGateway,
+    pixKey: settings.pixKey,
+    schoolName: settings.schoolName,
+    schoolCity: settings.schoolCity,
+    infinitepayHandle: settings.infinitepayHandle,
+    infinitepayApiKey: settings.infinitepayApiKey,
+    mpAccessToken: settings.mpAccessToken,
+    asaasEnabled: settings.asaasEnabled,
+    asaasApiKey: settings.asaasApiKey,
+  }).from(settings).where(eq(settings.organizationId, orgId));
+  const [org] = await db.select({ name: organizations.name }).from(organizations)
+    .where(eq(organizations.id, orgId)).limit(1);
+
+  const list = rows as any[];
+  const firstWith = (predicate: (row: any) => boolean) => list.find(predicate);
+  const pixRow = firstWith((row) => row.pixKey && String(row.pixKey).trim() !== "");
+  const infiniteRow = firstWith((row) => row.infinitepayHandle && String(row.infinitepayHandle).trim() !== "");
+  const gatewayRow = firstWith((row) => row.paymentGateway && String(row.paymentGateway).trim() !== "");
+
+  return {
+    hasAsaas: Boolean(firstWith((row) => Number(row.asaasEnabled) === 1 && row.asaasApiKey)),
+    hasMp: Boolean(firstWith((row) => row.mpAccessToken && String(row.mpAccessToken).trim() !== "")),
+    hasInfinitePay: Boolean(infiniteRow),
+    hasPixKey: Boolean(pixRow),
+    defaultProvider: (gatewayRow?.paymentGateway as string | undefined) ?? null,
+    pixKey: pixRow ? String(pixRow.pixKey).trim() : null,
+    merchantName: (pixRow?.schoolName && String(pixRow.schoolName).trim()) || org?.name || "ESCOLA",
+    merchantCity: (pixRow?.schoolCity && String(pixRow.schoolCity).trim()) || "CIDADE",
+    infinitepayHandle: infiniteRow ? String(infiniteRow.infinitepayHandle).trim() : null,
+    infinitepayApiKey: (infiniteRow?.infinitepayApiKey as string | null) ?? null,
+  };
 }
 
 const costumeInput = z.object({
@@ -558,6 +622,172 @@ export const figurinosRouters = {
       return { success: true, unitPrice, totalPrice, quantity: input.quantity, madeToOrder };
     }),
 
+    /** Gateways disponíveis para cobrar uma venda da Loja. */
+    salePaymentOptions: protectedProcedure.query(async ({ ctx }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) return { asaas: false, mercadopago: false, infinitepay: false, pixKey: false, defaultProvider: null as string | null };
+      const config = await resolveOrgStorePaymentConfig(db, ctx.user.organizationId!);
+      return {
+        asaas: config.hasAsaas,
+        mercadopago: config.hasMp,
+        infinitepay: config.hasInfinitePay,
+        pixKey: config.hasPixKey,
+        defaultProvider: config.defaultProvider,
+      };
+    }),
+
+    /**
+     * Gera a cobrança de uma venda da Loja (PIX copia-e-cola ou link de checkout).
+     * - Asaas → PIX com conciliação automática pelo webhook
+     * - Mercado Pago → PIX (payload + QR) com conciliação pelo webhook
+     * - InfinitePay → link de checkout (PIX/cartão) com conciliação pelo webhook
+     * - pixkey → PIX estático da escola (baixa manual)
+     */
+    saleCharge: protectedProcedure.input(z.object({
+      id: z.number(),
+      provider: z.enum(["asaas", "mercadopago", "infinitepay", "pixkey"]),
+    })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+
+      const [sale] = await db.select().from(costumeSales)
+        .where(and(eq(costumeSales.id, input.id), eq(costumeSales.organizationId, orgId))).limit(1);
+      if (!sale) throw new TRPCError({ code: "NOT_FOUND", message: "Venda não encontrada." });
+      if (sale.status === "pago") throw new TRPCError({ code: "BAD_REQUEST", message: "Esta venda já está paga." });
+      if (sale.status === "cancelado") throw new TRPCError({ code: "BAD_REQUEST", message: "Esta venda está cancelada." });
+
+      const [student] = await db.select({ id: students.id, name: students.name, email: students.email, phone: students.phone, cpf: students.cpf })
+        .from(students).where(eq(students.id, sale.studentId)).limit(1);
+      if (!student) throw new TRPCError({ code: "NOT_FOUND", message: "Aluno não encontrado." });
+
+      const amount = Number(sale.totalPrice) || 0;
+      if (amount <= 0) throw new TRPCError({ code: "BAD_REQUEST", message: "Venda sem valor para cobrar." });
+      const description = `Loja #${sale.id} — ${student.name}`;
+      const appUrl = ENV.appUrl || "https://wrmusicpro.com.br";
+
+      // ── Asaas: PIX com conciliação automática ──
+      if (input.provider === "asaas") {
+        const apiKey = await resolveOrgAsaasKey(db, orgId);
+        if (!apiKey) throw new TRPCError({ code: "BAD_REQUEST", message: "Asaas não está configurado nesta escola (Configurações → Integrações)." });
+        const { createAsaasCustomer, createAsaasCharge, getAsaasPixQrCode } = await import("../utils/asaas");
+
+        let paymentId = sale.paymentProvider === "asaas" ? (sale.externalPaymentId as string | null) : null;
+        let invoiceUrl = sale.paymentProvider === "asaas" ? (sale.paymentLink as string | null) : null;
+
+        if (!paymentId) {
+          let asaasCustomerId: string;
+          const [existingCustomer] = await db.select().from(asaasCustomers)
+            .where(and(eq(asaasCustomers.studentId, student.id), eq(asaasCustomers.organizationId, orgId))).limit(1);
+          if (existingCustomer) {
+            asaasCustomerId = existingCustomer.asaasCustomerId;
+          } else {
+            asaasCustomerId = await createAsaasCustomer({
+              name: student.name,
+              email: student.email ?? undefined,
+              phone: student.phone ?? undefined,
+              cpfCnpj: student.cpf ?? undefined,
+            }, apiKey);
+            await db.insert(asaasCustomers).values({ organizationId: orgId, studentId: student.id, asaasCustomerId });
+          }
+
+          const charge = await createAsaasCharge({
+            asaasCustomerId,
+            billingType: "PIX",
+            value: amount,
+            dueDate: new Date().toISOString().slice(0, 10),
+            description,
+            externalReference: `costume_sale:${sale.id}`,
+          }, apiKey);
+          paymentId = charge.id;
+          invoiceUrl = charge.invoiceUrl ?? null;
+          await db.update(costumeSales).set({
+            paymentProvider: "asaas",
+            externalPaymentId: paymentId,
+            paymentLink: invoiceUrl,
+            pixPayload: null,
+            updatedAt: new Date(),
+          }).where(eq(costumeSales.id, sale.id));
+        }
+
+        const qr = await getAsaasPixQrCode(paymentId!, apiKey);
+        await db.update(costumeSales).set({ pixPayload: qr.payload, updatedAt: new Date() }).where(eq(costumeSales.id, sale.id));
+        return { provider: "asaas" as const, pixPayload: qr.payload, encodedImage: qr.encodedImage, paymentLink: invoiceUrl };
+      }
+
+      // ── Mercado Pago: PIX (copia-e-cola) com conciliação automática ──
+      if (input.provider === "mercadopago") {
+        const token = await resolveOrgMpToken(db, orgId);
+        if (!token) throw new TRPCError({ code: "BAD_REQUEST", message: "Mercado Pago não está configurado nesta escola (Configurações → Integrações)." });
+        const { createMPPixPayment } = await import("../utils/mercadopago");
+        const payerEmail = student.email && student.email.includes("@") ? student.email : "pagador@mercadopago.com";
+        const mp = await createMPPixPayment({
+          transactionAmount: amount,
+          description,
+          payerEmail,
+          externalReference: `sale_${sale.id}`,
+          notificationUrl: `${appUrl}/api/webhooks/mercadopago/student?dueId=sale_${sale.id}`,
+        }, token);
+        await db.update(costumeSales).set({
+          paymentProvider: "mercadopago",
+          externalPaymentId: mp.paymentId,
+          paymentLink: mp.ticketUrl,
+          pixPayload: mp.qrCode,
+          updatedAt: new Date(),
+        }).where(eq(costumeSales.id, sale.id));
+        return { provider: "mercadopago" as const, pixPayload: mp.qrCode, encodedImage: mp.qrCodeBase64, paymentLink: mp.ticketUrl };
+      }
+
+      // ── InfinitePay: link de checkout (PIX/cartão) com conciliação automática ──
+      if (input.provider === "infinitepay") {
+        const config = await resolveOrgStorePaymentConfig(db, orgId);
+        if (!config.infinitepayHandle) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "InfinitePay não está configurada nesta escola (InfiniteTag em Configurações → Integrações)." });
+        }
+        const { createInfinitePayLink, buildInfinitePaySaleWebhookUrl, brlToCents, resolveInfinitePayApiKey } = await import("../utils/infinitepay");
+        const link = await createInfinitePayLink({
+          handle: config.infinitepayHandle,
+          orderNsu: `sale_${sale.id}`,
+          items: [{ description, quantity: 1, price: brlToCents(amount.toFixed(2)) }],
+          redirectUrl: `${appUrl}/alunos`,
+          webhookUrl: buildInfinitePaySaleWebhookUrl(sale.id),
+          apiKey: resolveInfinitePayApiKey(config.infinitepayApiKey),
+        });
+        await db.update(costumeSales).set({
+          paymentProvider: "infinitepay",
+          externalPaymentId: link.slug,
+          paymentLink: link.url,
+          pixPayload: null,
+          updatedAt: new Date(),
+        }).where(eq(costumeSales.id, sale.id));
+        return { provider: "infinitepay" as const, pixPayload: null, encodedImage: null, paymentLink: link.url };
+      }
+
+      // ── Chave PIX da escola (estático, baixa manual) ──
+      const config = await resolveOrgStorePaymentConfig(db, orgId);
+      if (!config.pixKey) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Nenhuma forma de pagamento configurada: conecte Asaas/Mercado Pago/InfinitePay ou cadastre uma chave PIX." });
+      }
+      const payload = buildPixPayload({
+        pixKey: config.pixKey,
+        amount,
+        merchantName: config.merchantName,
+        merchantCity: config.merchantCity,
+        txid: `VENDA${sale.id}${Date.now().toString().slice(-4)}`,
+      });
+      if (!payload) throw new TRPCError({ code: "BAD_REQUEST", message: "Não foi possível gerar o PIX desta venda (valor inválido)." });
+      await db.update(costumeSales).set({
+        paymentProvider: "pixkey",
+        externalPaymentId: null,
+        paymentLink: null,
+        pixPayload: payload,
+        updatedAt: new Date(),
+      }).where(eq(costumeSales.id, sale.id));
+      return { provider: "pixkey" as const, pixPayload: payload, encodedImage: null, paymentLink: null };
+    }),
+
     /** Vendas registradas (filtro por evento e status). */
     sales: protectedProcedure.input(z.object({
       eventId: z.number().optional(),
@@ -582,6 +812,8 @@ export const figurinosRouters = {
         paymentMode: costumeSales.paymentMode,
         discountPercent: costumeSales.discountPercent,
         madeToOrder: costumeSales.madeToOrder,
+        paymentProvider: costumeSales.paymentProvider,
+        paymentLink: costumeSales.paymentLink,
         status: costumeSales.status,
         notes: costumeSales.notes,
         paidAt: costumeSales.paidAt,

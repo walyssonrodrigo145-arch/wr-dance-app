@@ -2750,6 +2750,12 @@ export const costumeSales = pgTable("costume_sales", {
   status: varchar("status", { length: 20 }).default("pendente").notNull(),
   notes: text("notes"),
   createdByUserId: integer("createdByUserId").notNull(),
+  // Cobrança gerada na Loja (asaas | mercadopago | infinitepay | pixkey) — conciliação automática
+  paymentProvider: varchar("paymentProvider", { length: 20 }),
+  externalPaymentId: varchar("externalPaymentId", { length: 80 }),
+  paymentLink: text("paymentLink"),
+  // PIX copia-e-cola gerado (para reexibir/reenviar sem nova chamada)
+  pixPayload: text("pixPayload"),
   paidAt: timestamp("paidAt"),
   canceledAt: timestamp("canceledAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
