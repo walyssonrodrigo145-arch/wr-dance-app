@@ -33,7 +33,7 @@ const AVAILABLE_PERMISSIONS = [
   { id: "/aulas", label: "Aulas", icon: "📅" },
   { id: "/coreografias", label: "Coreografias", icon: "🩰" },
   { id: "/eventos", label: "Eventos & Espetáculos", icon: "🎭" },
-  { id: "/figurinos", label: "Figurinos", icon: "👗" },
+  { id: "/figurinos", label: "Loja", icon: "👗" },
   { id: "/turmas", label: "Turmas & Vagas", icon: "🧑‍🤝‍🧑" },
   { id: "/nps", label: "Satisfação (NPS)", icon: "📊" },
   { id: "/instrumentos", label: "Instrumentos", icon: "🎸" },

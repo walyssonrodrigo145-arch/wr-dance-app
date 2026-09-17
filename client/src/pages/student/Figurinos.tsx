@@ -83,10 +83,10 @@ export default function StudentFigurinos() {
       <div>
         <h1 className="text-3xl font-black tracking-tight text-foreground flex items-center gap-2">
           <Shirt className="text-indigo-500" size={28} />
-          Meus Figurinos
+          Minha Loja
         </h1>
         <p className="text-muted-foreground font-medium mt-1">
-          Peças de figurino em sua posse e histórico de devoluções.
+          Peças em sua posse e histórico de devoluções.
         </p>
       </div>
 

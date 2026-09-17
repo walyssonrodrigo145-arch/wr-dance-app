@@ -240,6 +240,7 @@ function Router() {
           <Route path="/coreografias" component={Coreografias} />
           <Route path="/eventos" component={Eventos} />
           <Route path="/figurinos" component={Figurinos} />
+          <Route path="/loja" component={Figurinos} />
           <Route path="/turmas" component={Turmas} />
           <Route path="/nps" component={Nps} />
           <Route path="/reposicoes" component={Reposicoes} />

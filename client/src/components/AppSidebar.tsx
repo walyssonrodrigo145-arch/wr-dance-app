@@ -142,7 +142,7 @@ export function AppSidebar({ collapsed, onToggle, onNavigate }: AppSidebarProps)
         { label: "Turmas & Vagas", href: "/turmas", icon: Users },
         { label: "Coreografias", href: "/coreografias", icon: Music },
         { label: "Eventos & Espetáculos", href: "/eventos", icon: Theater },
-        { label: "Figurinos", href: "/figurinos", icon: Shirt },
+        { label: "Loja", href: "/figurinos", icon: Shirt },
         { label: "Reposições", href: "/reposicoes", icon: Repeat, badge: repositionCount > 0 ? repositionCount : undefined },
         { label: "Modalidades / Ritmos", href: "/instrumentos", icon: Activity },
         { label: "Salas de Ensaio", href: "/salas", icon: DoorOpen },

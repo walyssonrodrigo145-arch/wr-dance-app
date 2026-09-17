@@ -6,7 +6,7 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, eq, ilike, sql } from "drizzle-orm";
 import { protectedProcedure, studentProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { instruments, students, studioRooms, turmaAlunos, turmas, users } from "../../drizzle/schema";
+import { instruments, studentEnrollments, students, studioRooms, turmaAlunos, turmas, users } from "../../drizzle/schema";
 import { ENV } from "../_core/env";
 
 const TURMA_STATUS = ["ativa", "pausada", "encerrada"] as const;
@@ -31,26 +31,117 @@ async function resolveStudentId(db: any, ctx: { user: { id: number; studentId?: 
   return found?.id ?? null;
 }
 
-/** Promove o primeiro da lista de espera quando uma vaga é aberta (ordem da fila). */
-async function promoteNextFromWaitlist(db: any, turmaId: number) {
-  const [next] = await db.select({ id: turmaAlunos.id, studentId: turmaAlunos.studentId })
+/** Promove o primeiro da lista de espera quando uma vaga é aberta (ordem da fila).
+ *  Pula (sem remover) quem tiver conflito de horário com outra matrícula/turma. */
+async function promoteNextFromWaitlist(db: any, turmaId: number, orgId: number) {
+  const [turma] = await db.select({
+    weekdays: turmas.weekdays,
+    timeStr: turmas.timeStr,
+    durationMinutes: turmas.durationMinutes,
+  }).from(turmas).where(eq(turmas.id, turmaId)).limit(1);
+
+  const queue = await db.select({ id: turmaAlunos.id, studentId: turmaAlunos.studentId })
     .from(turmaAlunos)
     .where(and(eq(turmaAlunos.turmaId, turmaId), eq(turmaAlunos.status, "espera")))
     .orderBy(asc(turmaAlunos.position), asc(turmaAlunos.id))
-    .limit(1);
-  if (!next) return null;
-  await db.update(turmaAlunos).set({ status: "ativa", position: 0, updatedAt: new Date() })
-    .where(eq(turmaAlunos.id, next.id));
-  return next;
+    .limit(50);
+
+  for (const next of queue as Array<{ id: number; studentId: number }>) {
+    if (turma) {
+      const conflict = await findStudentScheduleConflict(
+        db, orgId, next.studentId, (turma.weekdays as number[] | null) ?? [], turma.timeStr, turma.durationMinutes,
+        { excludeEnrollmentId: next.id },
+      );
+      if (conflict) continue; // aluno com choque de horário: mantém na fila e tenta o próximo
+    }
+    await db.update(turmaAlunos).set({ status: "ativa", position: 0, updatedAt: new Date() })
+      .where(eq(turmaAlunos.id, next.id));
+    return next;
+  }
+  return null;
 }
 
 /** Cancela a matrícula (soft) e promove o próximo da fila se a vaga foi aberta. */
-async function releaseEnrollmentSlot(db: any, enrollment: { id: number; turmaId: number; status: string }) {
+async function releaseEnrollmentSlot(db: any, enrollment: { id: number; turmaId: number; status: string }, orgId: number) {
   await db.update(turmaAlunos).set({ status: "cancelada", position: 0, updatedAt: new Date() })
     .where(eq(turmaAlunos.id, enrollment.id));
   if (enrollment.status === "ativa") {
-    return promoteNextFromWaitlist(db, enrollment.turmaId);
+    return promoteNextFromWaitlist(db, enrollment.turmaId, orgId);
   }
+  return null;
+}
+
+/** Converte "HH:MM" em minutos desde 00:00 (null se inválido/ausente). */
+function timeToMinutes(time: string | null | undefined): number | null {
+  if (!time) return null;
+  const match = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+/**
+ * D3 — Conflito de horário do ALUNO: bloqueia matrícula (ou promoção) quando o
+ * aluno já tem outra turma ativa ou matrícula adicional no mesmo dia/horário.
+ * Retorna a mensagem de conflito (null = sem conflito).
+ */
+async function findStudentScheduleConflict(
+  db: any,
+  orgId: number,
+  studentId: number,
+  weekdays: number[],
+  timeStr: string | null,
+  durationMinutes: number,
+  opts?: { excludeEnrollmentId?: number },
+): Promise<string | null> {
+  const start = timeToMinutes(timeStr);
+  if (start == null || !weekdays || weekdays.length === 0) return null;
+  const end = start + (Number(durationMinutes) || 60);
+
+  const rows = await db.select({
+    enrollmentId: turmaAlunos.id,
+    turmaName: turmas.name,
+    weekdays: turmas.weekdays,
+    timeStr: turmas.timeStr,
+    durationMinutes: turmas.durationMinutes,
+  }).from(turmaAlunos)
+    .innerJoin(turmas, eq(turmas.id, turmaAlunos.turmaId))
+    .where(and(
+      eq(turmaAlunos.studentId, studentId),
+      eq(turmaAlunos.organizationId, orgId),
+      eq(turmaAlunos.status, "ativa"),
+      eq(turmas.status, "ativa"),
+    ));
+
+  for (const row of rows as any[]) {
+    if (opts?.excludeEnrollmentId && row.enrollmentId === opts.excludeEnrollmentId) continue;
+    const otherStart = timeToMinutes(row.timeStr);
+    if (otherStart == null) continue;
+    const otherEnd = otherStart + (Number(row.durationMinutes) || 60);
+    const sameDay = ((row.weekdays as number[] | null) ?? []).some((day: number) => weekdays.includes(day));
+    if (sameDay && start < otherEnd && otherStart < end) {
+      return `Conflito de horário: o aluno já está na turma "${row.turmaName}" nesse mesmo dia/horário.`;
+    }
+  }
+
+  const enrollments = await db.select({
+    id: studentEnrollments.id,
+    weekday: studentEnrollments.weekday,
+    timeStr: studentEnrollments.timeStr,
+  }).from(studentEnrollments)
+    .where(and(
+      eq(studentEnrollments.studentId, studentId),
+      eq(studentEnrollments.organizationId, orgId),
+      eq(studentEnrollments.status, "ativo"),
+    ));
+
+  for (const enrollment of enrollments as any[]) {
+    const otherStart = timeToMinutes(enrollment.timeStr);
+    if (otherStart == null) continue;
+    if (weekdays.includes(Number(enrollment.weekday)) && start < otherStart + 60 && otherStart < end) {
+      return "Conflito de horário: o aluno já tem uma matrícula adicional nesse mesmo dia/horário.";
+    }
+  }
+
   return null;
 }
 
@@ -63,6 +154,9 @@ const turmaInput = z.object({
   timeStr: z.string().regex(/^\d{2}:\d{2}$/, "Horário inválido (use HH:MM)").nullable().optional(),
   durationMinutes: z.number().int().min(15).max(600).default(60),
   capacity: z.number().int().min(1).max(500).default(20),
+  ageMin: z.number().int().min(0).max(120).nullable().optional(),
+  ageMax: z.number().int().min(0).max(120).nullable().optional(),
+  shift: z.string().max(40).nullable().optional(),
   level: z.enum(LEVELS).default("todas"),
   status: z.enum(TURMA_STATUS).default("ativa"),
   notes: z.string().max(2000).nullable().optional(),
@@ -95,6 +189,9 @@ export const turmasRouters = {
         timeStr: turmas.timeStr,
         durationMinutes: turmas.durationMinutes,
         capacity: turmas.capacity,
+        ageMin: turmas.ageMin,
+        ageMax: turmas.ageMax,
+        shift: turmas.shift,
         level: turmas.level,
         status: turmas.status,
         notes: turmas.notes,
@@ -201,6 +298,9 @@ export const turmasRouters = {
         timeStr: input.timeStr ?? null,
         durationMinutes: input.durationMinutes,
         capacity: input.capacity,
+        ageMin: input.ageMin ?? null,
+        ageMax: input.ageMax ?? null,
+        shift: input.shift?.trim() || null,
         level: input.level,
         status: input.status,
         notes: input.notes?.trim() || null,
@@ -238,6 +338,9 @@ export const turmasRouters = {
         timeStr: input.timeStr ?? null,
         durationMinutes: input.durationMinutes,
         capacity: input.capacity,
+        ageMin: input.ageMin ?? null,
+        ageMax: input.ageMax ?? null,
+        shift: input.shift?.trim() || null,
         level: input.level,
         status: input.status,
         notes: input.notes?.trim() || null,
@@ -272,7 +375,15 @@ export const turmasRouters = {
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
       const orgId = ctx.user.organizationId!;
 
-      const [turma] = await db.select({ id: turmas.id, capacity: turmas.capacity, status: turmas.status, name: turmas.name })
+      const [turma] = await db.select({
+        id: turmas.id,
+        capacity: turmas.capacity,
+        status: turmas.status,
+        name: turmas.name,
+        weekdays: turmas.weekdays,
+        timeStr: turmas.timeStr,
+        durationMinutes: turmas.durationMinutes,
+      })
         .from(turmas)
         .where(and(eq(turmas.id, input.turmaId), eq(turmas.organizationId, orgId))).limit(1);
       if (!turma) throw new TRPCError({ code: "NOT_FOUND", message: "Turma não encontrada." });
@@ -294,6 +405,12 @@ export const turmasRouters = {
             : "Este aluno já está matriculado nesta turma.",
         });
       }
+
+      // D3: bloqueio de conflito de horário do aluno (depois de descartar duplicidade)
+      const conflict = await findStudentScheduleConflict(
+        db, orgId, input.studentId, (turma.weekdays as number[] | null) ?? [], turma.timeStr, turma.durationMinutes,
+      );
+      if (conflict) throw new TRPCError({ code: "BAD_REQUEST", message: conflict });
 
       const [ocupadas] = await db.select({ count: sql<number>`CAST(COUNT(*) AS INT)` })
         .from(turmaAlunos)
@@ -337,18 +454,31 @@ export const turmasRouters = {
         id: turmaAlunos.id,
         turmaId: turmaAlunos.turmaId,
         status: turmaAlunos.status,
+        studentId: turmaAlunos.studentId,
       }).from(turmaAlunos)
         .where(and(eq(turmaAlunos.id, input.id), eq(turmaAlunos.organizationId, orgId))).limit(1);
       if (!enrollment) throw new TRPCError({ code: "NOT_FOUND", message: "Matrícula não encontrada." });
 
       if (input.status === "ativa" && enrollment.status !== "ativa") {
-        const [turma] = await db.select({ capacity: turmas.capacity }).from(turmas).where(eq(turmas.id, enrollment.turmaId)).limit(1);
+        const [turma] = await db.select({
+          capacity: turmas.capacity,
+          name: turmas.name,
+          weekdays: turmas.weekdays,
+          timeStr: turmas.timeStr,
+          durationMinutes: turmas.durationMinutes,
+        }).from(turmas).where(eq(turmas.id, enrollment.turmaId)).limit(1);
         const [ocupadas] = await db.select({ count: sql<number>`CAST(COUNT(*) AS INT)` })
           .from(turmaAlunos)
           .where(and(eq(turmaAlunos.turmaId, enrollment.turmaId), eq(turmaAlunos.status, "ativa")));
         if ((Number(ocupadas?.count) || 0) >= (turma?.capacity ?? 0)) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "A turma está lotada — não há vaga para ativar esta matrícula." });
         }
+
+        const conflict = await findStudentScheduleConflict(
+          db, orgId, enrollment.studentId, (turma?.weekdays as number[] | null) ?? [], turma?.timeStr ?? null, turma?.durationMinutes ?? 60,
+          { excludeEnrollmentId: enrollment.id },
+        );
+        if (conflict) throw new TRPCError({ code: "BAD_REQUEST", message: conflict });
       }
 
       await db.update(turmaAlunos).set({
@@ -381,26 +511,14 @@ export const turmasRouters = {
 
       if (input.hardDelete) {
         await db.delete(turmaAlunos).where(eq(turmaAlunos.id, input.id));
-      } else {
-        await db.update(turmaAlunos).set({ status: "cancelada", position: 0, updatedAt: new Date() })
-          .where(eq(turmaAlunos.id, input.id));
+        const promoted = enrollment.status === "ativa"
+          ? await promoteNextFromWaitlist(db, enrollment.turmaId, orgId)
+          : null;
+        return { success: true, promoted };
       }
 
-      // Promoção automática da lista de espera quando uma vaga é aberta
-      let promoted: { id: number; studentId: number } | null = null;
-      if (enrollment.status === "ativa") {
-        const [next] = await db.select({ id: turmaAlunos.id, studentId: turmaAlunos.studentId })
-          .from(turmaAlunos)
-          .where(and(eq(turmaAlunos.turmaId, enrollment.turmaId), eq(turmaAlunos.status, "espera")))
-          .orderBy(asc(turmaAlunos.position), asc(turmaAlunos.id))
-          .limit(1);
-        if (next) {
-          await db.update(turmaAlunos).set({ status: "ativa", position: 0, updatedAt: new Date() })
-            .where(eq(turmaAlunos.id, next.id));
-          promoted = next;
-        }
-      }
-
+      // Cancela + promove o próximo da fila (pulando conflitos de horário)
+      const promoted = await releaseEnrollmentSlot(db, enrollment, orgId);
       return { success: true, promoted };
     }),
 
@@ -415,6 +533,7 @@ export const turmasRouters = {
         id: turmaAlunos.id,
         turmaId: turmaAlunos.turmaId,
         status: turmaAlunos.status,
+        studentId: turmaAlunos.studentId,
       }).from(turmaAlunos)
         .where(and(eq(turmaAlunos.id, input.id), eq(turmaAlunos.organizationId, orgId))).limit(1);
       if (!enrollment) throw new TRPCError({ code: "NOT_FOUND", message: "Matrícula não encontrada." });
@@ -422,13 +541,25 @@ export const turmasRouters = {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Somente alunos na lista de espera podem ser promovidos." });
       }
 
-      const [turma] = await db.select({ capacity: turmas.capacity }).from(turmas).where(eq(turmas.id, enrollment.turmaId)).limit(1);
+      const [turma] = await db.select({
+        capacity: turmas.capacity,
+        name: turmas.name,
+        weekdays: turmas.weekdays,
+        timeStr: turmas.timeStr,
+        durationMinutes: turmas.durationMinutes,
+      }).from(turmas).where(eq(turmas.id, enrollment.turmaId)).limit(1);
       const [ocupadas] = await db.select({ count: sql<number>`CAST(COUNT(*) AS INT)` })
         .from(turmaAlunos)
         .where(and(eq(turmaAlunos.turmaId, enrollment.turmaId), eq(turmaAlunos.status, "ativa")));
       if ((Number(ocupadas?.count) || 0) >= (turma?.capacity ?? 0)) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "A turma está lotada — não há vaga no momento." });
       }
+
+      const conflict = await findStudentScheduleConflict(
+        db, orgId, enrollment.studentId, (turma?.weekdays as number[] | null) ?? [], turma?.timeStr ?? null, turma?.durationMinutes ?? 60,
+        { excludeEnrollmentId: enrollment.id },
+      );
+      if (conflict) throw new TRPCError({ code: "BAD_REQUEST", message: conflict });
 
       await db.update(turmaAlunos).set({ status: "ativa", position: 0, updatedAt: new Date() })
         .where(eq(turmaAlunos.id, input.id));
@@ -502,7 +633,7 @@ export const turmasRouters = {
       // Remover turma
       if (input.turmaId == null) {
         if (!current) return { success: true, removed: false, waitlisted: false, turmaName: null };
-        const promoted = await releaseEnrollmentSlot(db, current);
+        const promoted = await releaseEnrollmentSlot(db, current, orgId);
         return { success: true, removed: true, waitlisted: false, turmaName: null, promoted };
       }
 
@@ -512,6 +643,9 @@ export const turmasRouters = {
         capacity: turmas.capacity,
         status: turmas.status,
         modalidadeId: turmas.modalidadeId,
+        weekdays: turmas.weekdays,
+        timeStr: turmas.timeStr,
+        durationMinutes: turmas.durationMinutes,
       }).from(turmas)
         .where(and(eq(turmas.id, input.turmaId), eq(turmas.organizationId, orgId))).limit(1);
       if (!turma) throw new TRPCError({ code: "NOT_FOUND", message: "Turma não encontrada nesta escola." });
@@ -526,8 +660,14 @@ export const turmasRouters = {
 
       // Transfere: libera a vaga antiga (e promove a fila dela)
       if (current) {
-        await releaseEnrollmentSlot(db, current);
+        await releaseEnrollmentSlot(db, current, orgId);
       }
+
+      // D3: bloqueio de conflito de horário do aluno (após liberar a turma antiga)
+      const conflict = await findStudentScheduleConflict(
+        db, orgId, input.studentId, (turma.weekdays as number[] | null) ?? [], turma.timeStr, turma.durationMinutes,
+      );
+      if (conflict) throw new TRPCError({ code: "BAD_REQUEST", message: conflict });
 
       // Capacidade da turma de destino
       const [ocupadas] = await db.select({ count: sql<number>`CAST(COUNT(*) AS INT)` })

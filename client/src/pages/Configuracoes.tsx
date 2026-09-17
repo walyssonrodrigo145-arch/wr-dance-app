@@ -38,6 +38,7 @@ import { DueDaysSelector } from "@/components/financeiro/DueDaysSelector";
 import { AssinafyIntegrationCard } from "@/components/integrations/AssinafyIntegrationCard";
 import { ModelosContratoTab } from "@/components/integrations/ModelosContratoTab";
 import { ConfigFiscalTab } from "@/components/fiscal/ConfigFiscalTab";
+import { ShiftsSettings } from "@/components/settings/ShiftsSettings";
 import { PlanosBolsas } from "@/components/settings/PlanosBolsas";
 import { MyTicketsList } from "@/components/support/MyTicketsList";
 
@@ -670,8 +671,11 @@ export default function Configuracoes() {
             )}
 
             {/* ── ABA: ESCOLA ── */}
-            {activeTab === "escola" && (
+             {activeTab === "escola" && (
               <div className="space-y-8">
+                <div className="rounded-2xl border border-border bg-card p-5">
+                  <ShiftsSettings />
+                </div>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
                     <h3 className="text-base lg:text-lg font-black text-foreground uppercase tracking-widest">Dados da Escola</h3>

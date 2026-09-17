@@ -268,6 +268,8 @@ export const settings = pgTable("settings", {
   hiddenDashboardWidgets: text("hiddenDashboardWidgets").default("").notNull(),
   // 1 = mascarar valores financeiros no Dashboard e no Financeiro (por usuário)
   hideFinancialValues: integer("hideFinancialValues").default(0).notNull(),
+  // Turnos personalizáveis da escola (JSON: [{name, start, end}]) — usados nas turmas
+  shifts: text("shifts").default("").notNull(),
   // ⭐ Avaliações de Professores: frequência dos ciclos + janela aberta (dias)
   professorEvalFrequency: varchar("professorEvalFrequency", { length: 20 }), // mensal | bimestral | trimestral | semestral
   professorEvalWindowDays: integer("professorEvalWindowDays"),
@@ -1697,6 +1699,10 @@ export const studentEnrollments = pgTable("student_enrollments", {
   timeStr: varchar("timeStr", { length: 5 }), // HH:mm
   monthlyFee: decimal("monthlyFee", { precision: 10, scale: 2 }).default("0.00").notNull(),
   enrollmentFee: decimal("enrollmentFee", { precision: 10, scale: 2 }).default("0.00").notNull(),
+  // turma | individual | online (permite individual + turma simultâneos)
+  lessonType: varchar("lessonType", { length: 20 }).default("turma").notNull(),
+  // Turno personalizável (opcional, vem das configurações da escola)
+  shift: varchar("shift", { length: 40 }),
   startDate: date("startDate"),
   endDate: date("endDate"),
   status: varchar("status", { length: 20 }).default("ativo").notNull(), // ativo | encerrado
@@ -2735,6 +2741,11 @@ export const turmas = pgTable("turmas", {
   timeStr: varchar("timeStr", { length: 5 }),
   durationMinutes: integer("durationMinutes").default(60).notNull(),
   capacity: integer("capacity").default(20).notNull(),
+  // Faixa etária recomendada (ex.: 6–9 anos) — alerta, não bloqueia
+  ageMin: integer("ageMin"),
+  ageMax: integer("ageMax"),
+  // Turno personalizável definido pela escola (Configurações → Escola → Turnos)
+  shift: varchar("shift", { length: 40 }),
   // iniciante | intermediario | avancado | todas
   level: varchar("level", { length: 30 }).default("todas").notNull(),
   // ativa | pausada | encerrada

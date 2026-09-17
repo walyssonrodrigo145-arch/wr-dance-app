@@ -783,6 +783,15 @@ export async function runAutoMigrations() {
         "custom_tags" jsonb DEFAULT '[]'::jsonb,
         "updated_at" timestamp DEFAULT now() NOT NULL
       );` },
+
+      // ═══ ÉPICO 1/2 (DancePro): faixa etária/turno nas turmas, turnos da escola,
+      // e múltiplas matrículas (tipo de aula + turno) ═══
+      { table: 'turmas', sql: `ALTER TABLE "turmas" ADD COLUMN IF NOT EXISTS "ageMin" integer` },
+      { table: 'turmas', sql: `ALTER TABLE "turmas" ADD COLUMN IF NOT EXISTS "ageMax" integer` },
+      { table: 'turmas', sql: `ALTER TABLE "turmas" ADD COLUMN IF NOT EXISTS "shift" varchar(40)` },
+      { table: 'student_enrollments', sql: `ALTER TABLE "student_enrollments" ADD COLUMN IF NOT EXISTS "lessonType" varchar(20) DEFAULT 'turma' NOT NULL` },
+      { table: 'student_enrollments', sql: `ALTER TABLE "student_enrollments" ADD COLUMN IF NOT EXISTS "shift" varchar(40)` },
+      { table: 'settings', sql: `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "shifts" text DEFAULT '' NOT NULL` },
     ];
 
     for (const m of migrations) {

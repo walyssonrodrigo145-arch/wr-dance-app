@@ -3,7 +3,7 @@ import { generateOccurrences, RECURRENCE_INTERVALS, RECURRENCE_DURATIONS, MAX_OC
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { validateCPF } from "@/lib/cpf";
-import { parseBRL } from "@/lib/money";
+import { parseBRL, formatBRL } from "@/lib/money";
 import { maskCPF, maskPhone } from "@/lib/masks";
 import { parseDueDaysOptions } from "@/lib/settings";
 import { 
@@ -30,7 +30,10 @@ import {
   Clock,
   Timer,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Plus,
+  Trash2,
+  Layers
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -60,6 +63,35 @@ function formatTurmaGrade(weekdays: number[] | null | undefined, timeStr: string
   const days = (weekdays ?? []).slice().sort((a, b) => a - b).map((day) => WEEKDAY_LABELS[day] ?? day).join(", ");
   if (!days && !timeStr) return "Grade a definir";
   return `${days || "Dia a definir"}${timeStr ? ` · ${timeStr}` : ""}`;
+}
+
+/** Linha de matrícula adicional (Epic 2): modalidade + plano + horário + valor. */
+type MatriculaForm = {
+  key: string;
+  id?: number;
+  instrumentId: string;
+  planId: string;
+  teacherUserId: string;
+  lessonType: string;
+  weekday: string;
+  timeStr: string;
+  monthlyFee: string;
+  lessonsPerWeek: string;
+  shift: string;
+};
+
+const newMatriculaRow = (): MatriculaForm => ({
+  key: `m-${Math.random().toString(36).slice(2, 10)}`,
+  instrumentId: "", planId: "", teacherUserId: "", lessonType: "turma",
+  weekday: "1", timeStr: "", monthlyFee: "", lessonsPerWeek: "1", shift: "",
+});
+
+/** Faixa etária da turma × idade do aluno (apenas alerta — D2). */
+function isOutsideAgeRange(age: number | null, ageMin?: number | null, ageMax?: number | null): boolean {
+  if (age == null) return false;
+  if (ageMin != null && age < ageMin) return true;
+  if (ageMax != null && age > ageMax) return true;
+  return false;
 }
 
 export default function NovoAluno() {
@@ -213,6 +245,7 @@ export default function NovoAluno() {
     monthsCount: 3,
     schoolPlanId: null as number | null,
     turmaId: "",
+    matriculas: [] as MatriculaForm[],
   });
 
   // Pre-populate form when editing
@@ -250,6 +283,7 @@ export default function NovoAluno() {
         monthsCount: 3,
         schoolPlanId: (studentData as any).schoolPlanId ?? null,
         turmaId: "",
+        matriculas: [],
       });
 
       const bd = (studentData as any).birthDate;
@@ -391,6 +425,96 @@ export default function NovoAluno() {
     }
   };
 
+  // ─── MATRÍCULAS ADICIONAIS (Epic 2): mais de um plano simultâneo ────────────
+  const { data: matriculasData } = trpc.matriculas.listByStudent.useQuery(
+    { studentId: studentId! },
+    { enabled: isEditMode && !!studentId }
+  );
+  const { data: turnos = [] } = trpc.settings.getShifts.useQuery();
+
+  const matriculasPopulatedRef = useRef(false);
+  useEffect(() => {
+    if (!isEditMode || !matriculasData || matriculasPopulatedRef.current) return;
+    matriculasPopulatedRef.current = true;
+    const ativos = (matriculasData as any[]).filter((matricula) => matricula.status === "ativo");
+    const additional = ativos.reduce((sum, matricula) => sum + (Number(matricula.monthlyFee) || 0), 0);
+    const total = Number((studentData as any)?.monthlyFee || 0);
+    // O campo "mensalidade base" recebe o total menos os adicionais (evita dobrar na edição)
+    const base = Math.max(0, total - additional);
+    setForm((prev) => ({
+      ...prev,
+      monthlyFee: total > 0 ? String(Number(base.toFixed(2))) : prev.monthlyFee,
+      matriculas: ativos.map((matricula) => ({
+        key: `m-${matricula.id}`,
+        id: matricula.id,
+        instrumentId: matricula.instrumentId ? String(matricula.instrumentId) : "",
+        planId: matricula.planId ? String(matricula.planId) : "",
+        teacherUserId: matricula.teacherUserId ? String(matricula.teacherUserId) : "",
+        lessonType: matricula.lessonType || "turma",
+        weekday: String(matricula.weekday ?? 1),
+        timeStr: matricula.timeStr || "",
+        monthlyFee: String(Number(matricula.monthlyFee) || 0),
+        lessonsPerWeek: String(matricula.lessonsPerWeek ?? 1),
+        shift: matricula.shift || "",
+      })),
+    }));
+  }, [isEditMode, matriculasData, studentData]);
+
+  const additionalMonthlyTotal = useMemo(
+    () => (form.matriculas ?? []).reduce((sum, matricula) => sum + parseBRL(matricula.monthlyFee || ""), 0),
+    [form.matriculas]
+  );
+  /** Mensalidade total cobrada = base (plano principal) + matrículas adicionais. */
+  const totalMonthlyFee = parseBRL(form.monthlyFee) + additionalMonthlyTotal;
+
+  const setEnrollmentsMutation = trpc.matriculas.setStudentEnrollments.useMutation();
+
+  /** Sincroniza as matrículas adicionais do formulário com o servidor. */
+  const syncStudentEnrollments = async (id: number) => {
+    const payload = (form.matriculas ?? []).map((matricula) => ({
+      id: matricula.id,
+      instrumentId: matricula.instrumentId ? Number(matricula.instrumentId) : null,
+      planId: matricula.planId ? Number(matricula.planId) : null,
+      teacherUserId: matricula.teacherUserId ? Number(matricula.teacherUserId) : null,
+      studioRoomId: null,
+      lessonType: (matricula.lessonType || "turma") as "turma" | "individual" | "online",
+      shift: matricula.shift || null,
+      durationMonths: 12,
+      lessonsPerWeek: Math.max(1, parseInt(matricula.lessonsPerWeek, 10) || 1),
+      weekday: Number(matricula.weekday ?? 1),
+      timeStr: matricula.timeStr || null,
+      monthlyFee: parseBRL(matricula.monthlyFee || ""),
+      enrollmentFee: 0,
+      startDate: form.startDate || null,
+    }));
+    if (payload.length === 0 && !isEditMode) return;
+    try {
+      await setEnrollmentsMutation.mutateAsync({ studentId: id, enrollments: payload });
+      utils.matriculas.listByStudent.invalidate({ studentId: id });
+    } catch (error: any) {
+      toast.error("Aluno salvo, mas houve erro nas matrículas adicionais: " + (error?.message || "tente novamente."));
+    }
+  };
+
+  const updateMatricula = (key: string, patch: Partial<MatriculaForm>) => {
+    setForm((prev) => ({
+      ...prev,
+      matriculas: (prev.matriculas ?? []).map((matricula) => (matricula.key === key ? { ...matricula, ...patch } : matricula)),
+    }));
+  };
+
+  /** Idade do aluno (para o alerta de faixa etária — D2: apenas alerta). */
+  const studentAge = useMemo(() => {
+    if (!form.birthDate) return null;
+    const birth = new Date(`${form.birthDate}T12:00:00`);
+    if (isNaN(birth.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) age--;
+    return age;
+  }, [form.birthDate]);
+
   const generateMonthlyMutation = trpc.paymentDues.generateMonthly.useMutation({
     onSuccess: (data) => {
       utils.paymentDues.list.invalidate();
@@ -411,7 +535,7 @@ export default function NovoAluno() {
         const now = new Date();
         generateMonthlyMutation.mutate({
           studentId: data.studentId,
-          amount: parseBRL(form.monthlyFee),
+          amount: totalMonthlyFee,
           dueDay: Number(form.dueDay) || 10,
           startMonth: now.getMonth() + 1,
           startYear: now.getFullYear(),
@@ -423,7 +547,10 @@ export default function NovoAluno() {
           } : {}),
         });
       }
-      if (data.studentId) await syncStudentTurma(data.studentId);
+      if (data.studentId) {
+        await syncStudentTurma(data.studentId);
+        await syncStudentEnrollments(data.studentId);
+      }
       setLocation("/alunos");
     },
     onError: (e) => {
@@ -454,6 +581,7 @@ export default function NovoAluno() {
       utils.students.list.invalidate();
       utils.students.getForEdit.invalidate({ id: studentId! });
       await syncStudentTurma(studentId!);
+      await syncStudentEnrollments(studentId!);
       setLocation("/alunos");
     },
     onError: (e) => {
@@ -601,7 +729,7 @@ export default function NovoAluno() {
           studioRoomId: form.studioRoomId ? Number(form.studioRoomId) : undefined,
           level: form.level as any,
           startDate: form.startDate,
-          monthlyFee: parseBRL(form.monthlyFee),
+          monthlyFee: totalMonthlyFee,
           billingPeriodicity: form.billingPeriodicity as any,
           dueDay: form.dueDay ? Number(form.dueDay) : 10,
           schoolPlanId: form.schoolPlanId ?? undefined,
@@ -832,7 +960,7 @@ export default function NovoAluno() {
       studioRoomId: form.studioRoomId ? Number(form.studioRoomId) : undefined,
       professorId: form.professorId ? Number(form.professorId) : undefined,
       level: form.level as "iniciante" | "intermediario" | "avancado",
-      monthlyFee: parseBRL(form.monthlyFee),
+      monthlyFee: totalMonthlyFee,
       billingPeriodicity: form.billingPeriodicity as any,
       dueDay: Number(form.dueDay) || 10,
       schoolPlanId: form.schoolPlanId ?? undefined,
@@ -1608,7 +1736,7 @@ export default function NovoAluno() {
                 {/* Linha 3: Cobrança - Valor e Periodicidade */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2 w-full">
-                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em] ml-1">Valor / Mensalidade (R$)</label>
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em] ml-1">Valor / Mensalidade base (R$)</label>
                     <div className="relative group/input w-full">
                       <Input 
                         name="student_monthly_fee"
@@ -1626,6 +1754,11 @@ export default function NovoAluno() {
                       />
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/70 font-bold text-sm group-focus-within/input:text-violet-500 transition-colors">R$</span>
                     </div>
+                    {additionalMonthlyTotal > 0 && (
+                      <p className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest ml-1">
+                        + Adicionais {formatBRL(additionalMonthlyTotal)} = Total {formatBRL(totalMonthlyFee)}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2 w-full">
                     <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em] ml-1">Periodicidade de Cobrança</label>
@@ -1751,7 +1884,7 @@ export default function NovoAluno() {
                     </div>
                     {selectedPlan && Number(selectedPlan.taxaInscricao) > 0 && form.generateMonthly && (
                       <p className="text-[11px] font-bold text-amber-600 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
-                        1ª fatura: R$ {parseBRL(form.monthlyFee).toFixed(2).replace(".", ",")} + R$ {Number(selectedPlan.taxaInscricao).toFixed(2).replace(".", ",")} (taxa de inscrição) = R$ {(parseBRL(form.monthlyFee) + Number(selectedPlan.taxaInscricao)).toFixed(2).replace(".", ",")}
+                        1ª fatura: R$ {formatBRL(totalMonthlyFee)} + R$ {Number(selectedPlan.taxaInscricao).toFixed(2).replace(".", ",")} (taxa de inscrição) = R$ {(totalMonthlyFee + Number(selectedPlan.taxaInscricao)).toFixed(2).replace(".", ",")}
                       </p>
                     )}
                   </div>
@@ -1803,6 +1936,7 @@ export default function NovoAluno() {
                       </button>
                       {turmasDaModalidade.map((turma: any) => {
                         const lotada = (turma.vagas ?? 0) === 0;
+                        const foraFaixa = isOutsideAgeRange(studentAge, turma.ageMin, turma.ageMax);
                         return (
                           <button
                             key={turma.id}
@@ -1831,12 +1965,181 @@ export default function NovoAluno() {
                             <p className="text-[10px] font-bold text-muted-foreground mt-0.5 truncate">
                               {formatTurmaGrade(turma.weekdays, turma.timeStr)}
                             </p>
+                            {(turma.shift || turma.ageMin != null || turma.ageMax != null) && (
+                              <p className="text-[9px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 mt-0.5 truncate">
+                                {turma.shift ? turma.shift : ""}
+                                {turma.shift && (turma.ageMin != null || turma.ageMax != null) ? " · " : ""}
+                                {turma.ageMin != null || turma.ageMax != null
+                                  ? `${turma.ageMin ?? ""}${turma.ageMin != null && turma.ageMax != null ? "–" : ""}${turma.ageMax ?? ""} anos`
+                                  : ""}
+                              </p>
+                            )}
+                            {foraFaixa && (
+                              <p className="text-[9px] font-black text-amber-600 dark:text-amber-400 mt-0.5">
+                                ⚠ Fora da faixa etária ({studentAge} anos)
+                              </p>
+                            )}
                             {turma.professorName && (
                               <p className="text-[10px] font-medium text-muted-foreground truncate">{turma.professorName}</p>
                             )}
                           </button>
                         );
                       })}
+                    </div>
+                  )}
+                </div>
+
+                {/* MATRÍCULAS ADICIONAIS (Epic 2): mais de um plano ao mesmo tempo */}
+                <div className="mt-6 p-4 bg-indigo-500/5 backdrop-blur-sm rounded-xl border border-indigo-500/20 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                        <Layers size={15} className="text-indigo-600 dark:text-indigo-400" /> Matrículas adicionais
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Permita mais de um plano ao mesmo tempo (ex.: Ballet 2x + Jazz 1x + Aula Particular). O valor de cada matrícula é somado à mensalidade do aluno.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0"
+                      onClick={() => setForm(prev => ({ ...prev, matriculas: [...(prev.matriculas ?? []), newMatriculaRow()] }))}
+                    >
+                      <Plus size={14} className="mr-1.5" /> Adicionar
+                    </Button>
+                  </div>
+
+                  {(form.matriculas ?? []).length === 0 ? (
+                    <p className="text-xs font-bold text-muted-foreground bg-muted/40 border border-border rounded-xl px-3 py-2">
+                      Nenhuma matrícula adicional — o aluno segue apenas com o plano principal.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {(form.matriculas ?? []).map((matricula, index) => (
+                        <div key={matricula.key} className="rounded-2xl border border-border bg-card p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Matrícula {index + 1}</p>
+                            <button
+                              type="button"
+                              onClick={() => setForm(prev => ({ ...prev, matriculas: (prev.matriculas ?? []).filter(item => item.key !== matricula.key) }))}
+                              className="text-muted-foreground hover:text-rose-500 transition-colors"
+                              title="Remover matrícula"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                            <select
+                              value={matricula.instrumentId}
+                              onChange={(event) => updateMatricula(matricula.key, { instrumentId: event.target.value })}
+                              className="h-11 rounded-xl border border-border bg-background px-3 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20"
+                            >
+                              <option value="">Modalidade…</option>
+                              {(instruments as any[]).map((instrument) => (
+                                <option key={instrument.id} value={String(instrument.id)}>{instrument.name}</option>
+                              ))}
+                            </select>
+
+                            <select
+                              value={matricula.planId}
+                              onChange={(event) => {
+                                const plan = (schoolPlans as any[]).find((item) => String(item.id) === event.target.value);
+                                updateMatricula(matricula.key, {
+                                  planId: event.target.value,
+                                  ...(plan ? {
+                                    monthlyFee: String(Number(plan.valorMensal)),
+                                    lessonsPerWeek: String(plan.aulasPorSemana || 1),
+                                  } : {}),
+                                });
+                              }}
+                              className="h-11 rounded-xl border border-border bg-background px-3 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20"
+                            >
+                              <option value="">Plano…</option>
+                              {(schoolPlans as any[]).map((plan) => (
+                                <option key={plan.id} value={String(plan.id)}>{plan.nome} — {formatBRL(Number(plan.valorMensal))}</option>
+                              ))}
+                            </select>
+
+                            <select
+                              value={matricula.lessonType}
+                              onChange={(event) => updateMatricula(matricula.key, { lessonType: event.target.value })}
+                              className="h-11 rounded-xl border border-border bg-background px-3 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20"
+                            >
+                              <option value="turma">Aula em turma</option>
+                              <option value="individual">Aula individual</option>
+                              <option value="online">Aula online</option>
+                            </select>
+
+                            <select
+                              value={matricula.teacherUserId}
+                              onChange={(event) => updateMatricula(matricula.key, { teacherUserId: event.target.value })}
+                              className="h-11 rounded-xl border border-border bg-background px-3 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20"
+                            >
+                              <option value="">Professor(a)…</option>
+                              {(professores as any[]).map((professor) => (
+                                <option key={professor.userId} value={String(professor.userId)}>{professor.name}</option>
+                              ))}
+                            </select>
+
+                            <select
+                              value={matricula.weekday}
+                              onChange={(event) => updateMatricula(matricula.key, { weekday: event.target.value })}
+                              className="h-11 rounded-xl border border-border bg-background px-3 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20"
+                            >
+                              {WEEKDAY_LABELS.map((label, day) => (
+                                <option key={day} value={String(day)}>{label}</option>
+                              ))}
+                            </select>
+
+                            <input
+                              type="time"
+                              value={matricula.timeStr}
+                              onChange={(event) => updateMatricula(matricula.key, { timeStr: event.target.value })}
+                              className="h-11 rounded-xl border border-border bg-background px-3 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20"
+                              title="Horário da aula"
+                            />
+
+                            <select
+                              value={matricula.shift}
+                              onChange={(event) => updateMatricula(matricula.key, { shift: event.target.value })}
+                              className="h-11 rounded-xl border border-border bg-background px-3 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20"
+                            >
+                              <option value="">Turno…</option>
+                              {(turnos as any[]).map((turno, turnoIndex) => (
+                                <option key={`${turno.name}-${turnoIndex}`} value={turno.name}>{turno.name}</option>
+                              ))}
+                            </select>
+
+                            <div className="flex items-center gap-2">
+                              <input
+                                value={matricula.monthlyFee}
+                                onChange={(event) => updateMatricula(matricula.key, { monthlyFee: event.target.value.replace(/[^\d,\.]/g, "") })}
+                                placeholder="Valor mensal"
+                                inputMode="decimal"
+                                className="h-11 flex-1 rounded-xl border border-border bg-background px-3 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-right"
+                                title="Valor mensal adicional"
+                              />
+                              <input
+                                value={matricula.lessonsPerWeek}
+                                onChange={(event) => updateMatricula(matricula.key, { lessonsPerWeek: event.target.value.replace(/\D/g, "") })}
+                                inputMode="numeric"
+                                className="h-11 w-16 rounded-xl border border-border bg-background px-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-center"
+                                title="Aulas por semana"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+
+                      <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/10 px-3 py-2 text-right">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                          Base {formatBRL(parseBRL(form.monthlyFee))} + adicionais {formatBRL(additionalMonthlyTotal)}
+                        </p>
+                        <p className="text-sm font-black text-foreground">Mensalidade total: {formatBRL(totalMonthlyFee)}</p>
+                      </div>
                     </div>
                   )}
                 </div>

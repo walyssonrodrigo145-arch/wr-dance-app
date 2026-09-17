@@ -26,6 +26,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.16.3",
+    date: "2026-09-16",
+    title: "Turmas por faixa etária e turno, múltiplos planos e Loja",
+    summary: "Turmas com idade recomendada e turnos personalizáveis, bloqueio de choque de horário do aluno, mais de um plano por aluno (individual + turma) e a aba Figurinos virou Loja.",
+    items: [
+      { type: "novo", title: "Turma por faixa etária", description: "Defina idade mínima e máxima na turma (ex.: 6 a 9 anos) e o sistema alerta no cadastro quando o aluno está fora da faixa." },
+      { type: "novo", title: "Turnos personalizáveis", description: "Em Configurações → Escola, monte os turnos da sua escola (Manhã, Tarde, Noite…) e use-os nas turmas e matrículas." },
+      { type: "novo", title: "Sem choque de horário do aluno", description: "O sistema bloqueia matricular o mesmo aluno em duas turmas/matrículas no mesmo dia e horário." },
+      { type: "novo", title: "Mais de um plano ao mesmo tempo", description: "No cadastro do aluno, adicione matrículas extras (ex.: Ballet 2x + Jazz 1x + Aula Particular), com valor mensal somado automaticamente à mensalidade." },
+      { type: "melhoria", title: "Aula individual + aula em turma", description: "Cada matrícula adicional pode ser em turma, individual ou online — permitindo as duas modalidades juntas." },
+      { type: "melhoria", title: "Trazer alunos para o evento por filtro", description: "No evento, adicione participantes por turma, modalidade ou coreografia, com seleção em massa e aviso de quem já está no evento." },
+      { type: "melhoria", title: "Aba Figurinos agora é Loja", description: "Menu da escola e do aluno renomeados para Loja — a base para venda de produtos e figurinos." },
+    ],
+  },
+  {
     version: "2026.09.16.2",
     date: "2026-09-16",
     title: "Turma no cadastro do aluno e Rankings com linguagem de dança",

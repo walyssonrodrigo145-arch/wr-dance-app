@@ -416,6 +416,48 @@ export const plataformaRouters = {
       return { success: true };
     }),
 
+    // ── Turnos personalizáveis da escola (D3) — usados nas turmas e matrículas ──
+    /** Leitura org-wide dos turnos (qualquer staff), com fallback para o padrão. */
+    getShifts: protectedProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      const DEFAULT_SHIFTS = [
+        { name: "Manhã", start: "08:00", end: "12:00" },
+        { name: "Tarde", start: "12:00", end: "18:00" },
+        { name: "Noite", start: "18:00", end: "22:00" },
+      ];
+      if (!db) return DEFAULT_SHIFTS;
+      const rows = await db.select({ shifts: settings.shifts }).from(settings)
+        .where(eq(settings.organizationId, ctx.user.organizationId!));
+      const found = (rows as any[]).find((row) => row.shifts && String(row.shifts).trim() !== "");
+      if (!found) return DEFAULT_SHIFTS;
+      try {
+        const parsed = JSON.parse(String(found.shifts));
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed
+            .filter((shift: any) => shift && typeof shift.name === "string" && shift.name.trim() !== "")
+            .map((shift: any) => ({ name: shift.name, start: shift.start ?? null, end: shift.end ?? null }));
+        }
+      } catch {
+        // JSON corrompido: usa o padrão
+      }
+      return DEFAULT_SHIFTS;
+    }),
+
+    /** Atualiza os turnos personalizáveis (somente admin). */
+    updateShifts: protectedProcedure.input(z.object({
+      shifts: z.array(z.object({
+        name: z.string().min(1, "Informe o nome do turno").max(40),
+        start: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+        end: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+      })).max(12),
+    })).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Somente o administrador pode alterar os turnos da escola." });
+      }
+      await upsertSettings(ctx.user.organizationId!, ctx.user.id, { shifts: JSON.stringify(input.shifts) } as any);
+      return { success: true };
+    }),
+
     // Olhinho: mascarar valores financeiros (Dashboard + Financeiro), por usuário.
     setHideFinancialValues: protectedProcedure.input(z.object({
       hidden: z.boolean(),

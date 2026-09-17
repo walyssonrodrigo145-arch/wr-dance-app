@@ -79,7 +79,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: "Coreografias", href: "/aluno/coreografias", icon: Music },
       { label: "Eventos", href: "/aluno/eventos", icon: Theater },
-      { label: "Figurinos", href: "/aluno/figurinos", icon: Shirt },
+      { label: "Loja", href: "/aluno/figurinos", icon: Shirt },
     ],
   },
   {

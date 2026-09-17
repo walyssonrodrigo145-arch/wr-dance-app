@@ -52,6 +52,14 @@ function formatGrade(weekdays: number[] | null | undefined, timeStr: string | nu
   return `${days || "Dia a definir"}${timeStr ? ` · ${timeStr}` : ""}${durationMinutes ? ` (${durationMinutes}min)` : ""}`;
 }
 
+/** "6 a 9 anos" | "A partir de 6 anos" | "Até 9 anos" | null */
+function formatFaixaEtaria(ageMin: number | null | undefined, ageMax: number | null | undefined): string | null {
+  if (ageMin != null && ageMax != null) return `${ageMin} a ${ageMax} anos`;
+  if (ageMin != null) return `A partir de ${ageMin} anos`;
+  if (ageMax != null) return `Até ${ageMax} anos`;
+  return null;
+}
+
 type TurmaRow = {
   id: number;
   name: string;
@@ -65,6 +73,9 @@ type TurmaRow = {
   timeStr: string | null;
   durationMinutes: number;
   capacity: number;
+  ageMin: number | null;
+  ageMax: number | null;
+  shift: string | null;
   matriculados: number;
   espera: number;
   vagas: number;
@@ -80,6 +91,7 @@ function TurmaModal({ open, onClose, editing }: { open: boolean; onClose: () => 
   const { data: modalidades = [] } = trpc.instruments.list.useQuery();
   const { data: professores = [] } = trpc.professores.list.useQuery();
   const { data: salas = [] } = trpc.studioRooms.list.useQuery();
+  const { data: turnos = [] } = trpc.settings.getShifts.useQuery();
 
   const [form, setForm] = useState(() => editing ? {
     name: editing.name,
@@ -90,12 +102,16 @@ function TurmaModal({ open, onClose, editing }: { open: boolean; onClose: () => 
     timeStr: editing.timeStr ?? "",
     durationMinutes: String(editing.durationMinutes),
     capacity: String(editing.capacity),
+    ageMin: editing.ageMin != null ? String(editing.ageMin) : "",
+    ageMax: editing.ageMax != null ? String(editing.ageMax) : "",
+    shift: editing.shift ?? "none",
     level: editing.level,
     status: editing.status,
     notes: editing.notes ?? "",
   } : {
     name: "", modalidadeId: "none", professorId: "none", studioRoomId: "none",
     weekdays: [] as number[], timeStr: "", durationMinutes: "60", capacity: "20",
+    ageMin: "", ageMax: "", shift: "none",
     level: "todas", status: "ativa", notes: "",
   });
 
@@ -116,6 +132,9 @@ function TurmaModal({ open, onClose, editing }: { open: boolean; onClose: () => 
     timeStr: form.timeStr || null,
     durationMinutes: Math.max(15, parseInt(form.durationMinutes, 10) || 60),
     capacity: Math.max(1, parseInt(form.capacity, 10) || 20),
+    ageMin: form.ageMin ? Math.max(0, parseInt(form.ageMin, 10) || 0) : null,
+    ageMax: form.ageMax ? Math.max(0, parseInt(form.ageMax, 10) || 0) : null,
+    shift: form.shift === "none" ? null : form.shift,
     level: form.level as any,
     status: form.status as any,
     notes: form.notes.trim() || null,
@@ -200,6 +219,29 @@ function TurmaModal({ open, onClose, editing }: { open: boolean; onClose: () => 
               <SelectContent>
                 {Object.entries(LEVEL_LABEL).map(([value, label]) => (
                   <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Idade mínima (anos)</Label>
+            <Input type="number" min={0} max={120} value={form.ageMin} onChange={(event) => set("ageMin", event.target.value)} placeholder="Ex.: 6" />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Idade máxima (anos)</Label>
+            <Input type="number" min={0} max={120} value={form.ageMax} onChange={(event) => set("ageMax", event.target.value)} placeholder="Ex.: 9" />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Turno</Label>
+            <Select value={form.shift} onValueChange={(value) => set("shift", value)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Não definir</SelectItem>
+                {(turnos as any[]).map((turno, index) => (
+                  <SelectItem key={`${turno.name}-${index}`} value={turno.name}>{turno.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -566,6 +608,16 @@ export default function Turmas() {
 
                 <div className="text-xs font-medium text-muted-foreground space-y-1">
                   <p className="flex items-center gap-1.5"><Clock size={12} className="shrink-0 text-indigo-500" /> {formatGrade(turma.weekdays, turma.timeStr, turma.durationMinutes)}</p>
+                  {(turma.shift || formatFaixaEtaria(turma.ageMin, turma.ageMax)) && (
+                    <p className="flex flex-wrap items-center gap-1.5">
+                      {turma.shift && (
+                        <span className="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[9px] font-black uppercase tracking-widest">{turma.shift}</span>
+                      )}
+                      {formatFaixaEtaria(turma.ageMin, turma.ageMax) && (
+                        <span className="px-1.5 py-0.5 rounded bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 text-[9px] font-black uppercase tracking-widest">{formatFaixaEtaria(turma.ageMin, turma.ageMax)}</span>
+                      )}
+                    </p>
+                  )}
                   {turma.professorName && <p>Professor(a): {turma.professorName}</p>}
                   {turma.roomName && <p className="flex items-center gap-1.5"><DoorOpen size={12} className="shrink-0 text-indigo-500" /> {turma.roomName}</p>}
                 </div>

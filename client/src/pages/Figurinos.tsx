@@ -374,10 +374,10 @@ export default function Figurinos() {
         <div>
           <h1 className="text-2xl lg:text-3xl font-black tracking-tight text-foreground flex items-center gap-2">
             <Shirt className="text-indigo-500" size={28} />
-            Figurinos & Estoque
+            Loja
           </h1>
           <p className="text-muted-foreground font-medium text-sm mt-1">
-            Acervo de vestuário com controle de empréstimo, devolução e disponibilidade.
+            Acervo de figurinos e produtos: empréstimo, devolução e disponibilidade.
           </p>
         </div>
         <div className="flex gap-2">

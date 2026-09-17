@@ -6,7 +6,7 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq, gte, ilike, inArray, or, sql } from "drizzle-orm";
 import { protectedProcedure, studentProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { coreografias, eventChoreographies, eventParticipants, events, students } from "../../drizzle/schema";
+import { coreografias, eventChoreographies, eventParticipants, events, instruments, students } from "../../drizzle/schema";
 import { ENV } from "../_core/env";
 
 const EVENT_TYPES = ["recital", "festival", "competicao", "workshop", "audicao", "ensaio_geral", "outro"] as const;
@@ -414,6 +414,59 @@ export const eventosRouters = {
         sql`(LOWER(${students.name}) LIKE ${term} OR LOWER(COALESCE(${students.email}, '')) LIKE ${term})`,
         jaParticipam ? sql`${students.id} NOT IN (${jaParticipam})` : undefined,
       )).limit(10);
+    }),
+
+    /**
+     * Candidatos do evento com filtros (turma / modalidade / coreografia / busca).
+     * Retorna a flag `alreadyIn` para a seleção em massa não duplicar ninguém.
+     */
+    candidatesForEvent: protectedProcedure.input(z.object({
+      eventId: z.number(),
+      turmaId: z.number().optional(),
+      modalidadeId: z.number().optional(),
+      coreografiaId: z.number().optional(),
+      search: z.string().max(120).optional(),
+    })).query(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) return [];
+      const orgId = ctx.user.organizationId!;
+
+      const [event] = await db.select({ id: events.id }).from(events)
+        .where(and(eq(events.id, input.eventId), eq(events.organizationId, orgId))).limit(1);
+      if (!event) throw new TRPCError({ code: "NOT_FOUND", message: "Evento não encontrado." });
+
+      const conditions: any[] = [
+        eq(students.organizationId, orgId),
+        eq(students.status, "ativo"),
+      ];
+      if (input.modalidadeId) conditions.push(eq(students.instrumentId, input.modalidadeId));
+      if (input.search) {
+        const term = `%${input.search.trim().toLowerCase()}%`;
+        conditions.push(sql`(LOWER(${students.name}) LIKE ${term} OR LOWER(COALESCE(${students.email}, '')) LIKE ${term})`);
+      }
+      if (input.turmaId) {
+        conditions.push(sql`${students.id} IN (SELECT ta."studentId" FROM "turma_alunos" ta WHERE ta."turmaId" = ${input.turmaId} AND ta."status" = 'ativa')`);
+      }
+      if (input.coreografiaId) {
+        conditions.push(sql`${students.id} IN (SELECT ca."studentId" FROM "coreografia_alunos" ca WHERE ca."coreografiaId" = ${input.coreografiaId})`);
+      }
+
+      const rows = await db.select({
+        id: students.id,
+        name: students.name,
+        level: students.level,
+        birthDate: students.birthDate,
+        instrumentName: instruments.name,
+        alreadyIn: sql<boolean>`EXISTS (SELECT 1 FROM "event_participants" ep WHERE ep."eventId" = ${input.eventId} AND ep."studentId" = ${students.id})`,
+      })
+        .from(students)
+        .leftJoin(instruments, eq(instruments.id, students.instrumentId))
+        .where(and(...conditions))
+        .orderBy(asc(students.name))
+        .limit(300);
+
+      return rows.map((row) => ({ ...row, alreadyIn: Boolean(row.alreadyIn) }));
     }),
 
     /** Coreografias disponíveis para vincular (não arquivadas). */

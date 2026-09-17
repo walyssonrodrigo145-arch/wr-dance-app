@@ -275,6 +275,30 @@ function EventoModal({ open, onClose, editing }: {
 function EventoDetalhes({ eventId, onClose }: { eventId: number | null; onClose: () => void }) {
   const utils = trpc.useUtils();
   const [studentSearch, setStudentSearch] = useState("");
+  // Adição por filtro (turma / modalidade / coreografia) + seleção em massa
+  const [filterModalidade, setFilterModalidade] = useState("none");
+  const [filterTurma, setFilterTurma] = useState("none");
+  const [filterCoreografia, setFilterCoreografia] = useState("none");
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState<number[]>([]);
+
+  const { data: modalidades = [] } = trpc.instruments.list.useQuery();
+  const { data: turmasAtivas = [] } = trpc.turmas.list.useQuery({ status: "ativa" });
+  const { data: coreografiasTodas = [] } = trpc.coreografias.list.useQuery({});
+
+  const { data: candidates = [], isLoading: isLoadingCandidates } = trpc.eventos.candidatesForEvent.useQuery(
+    {
+      eventId: eventId ?? 0,
+      modalidadeId: filterModalidade === "none" ? undefined : Number(filterModalidade),
+      turmaId: filterTurma === "none" ? undefined : Number(filterTurma),
+      coreografiaId: filterCoreografia === "none" ? undefined : Number(filterCoreografia),
+    },
+    { enabled: eventId !== null }
+  );
+
+  const turmasFiltradas = (turmasAtivas as any[]).filter((turma) =>
+    filterModalidade === "none" ? true : String(turma.modalidadeId) === filterModalidade
+  );
+  const availableCandidates = (candidates as any[]).filter((candidate) => !candidate.alreadyIn);
 
   const { data, isLoading } = trpc.eventos.getById.useQuery(
     { id: eventId! },
@@ -407,6 +431,117 @@ function EventoDetalhes({ eventId, onClose }: { eventId: number | null; onClose:
               <p className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                 <Users size={14} /> Participantes ({participantes.length})
               </p>
+
+              {/* Adicionar por filtro (turma / modalidade / coreografia) + seleção em massa */}
+              <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-4 space-y-3">
+                <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                  Adicionar por filtro (turma, modalidade ou coreografia)
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <Select
+                    value={filterModalidade}
+                    onValueChange={(value) => { setFilterModalidade(value); setFilterTurma("none"); setSelectedCandidateIds([]); }}
+                  >
+                    <SelectTrigger className="h-11 text-xs"><SelectValue placeholder="Modalidade" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Todas as modalidades</SelectItem>
+                      {(modalidades as any[]).map((modalidade) => (
+                        <SelectItem key={modalidade.id} value={String(modalidade.id)}>{modalidade.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select
+                    value={filterTurma}
+                    onValueChange={(value) => { setFilterTurma(value); setSelectedCandidateIds([]); }}
+                  >
+                    <SelectTrigger className="h-11 text-xs"><SelectValue placeholder="Turma" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Todas as turmas</SelectItem>
+                      {turmasFiltradas.map((turma: any) => (
+                        <SelectItem key={turma.id} value={String(turma.id)}>{turma.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select
+                    value={filterCoreografia}
+                    onValueChange={(value) => { setFilterCoreografia(value); setSelectedCandidateIds([]); }}
+                  >
+                    <SelectTrigger className="h-11 text-xs"><SelectValue placeholder="Coreografia" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Todas as coreografias</SelectItem>
+                      {(coreografiasTodas as any[]).map((coreografia) => (
+                        <SelectItem key={coreografia.id} value={String(coreografia.id)}>{coreografia.title}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="rounded-xl border border-border bg-card max-h-56 overflow-y-auto">
+                  {isLoadingCandidates ? (
+                    <div className="flex justify-center py-6"><Loader2 className="animate-spin text-primary" size={20} /></div>
+                  ) : (candidates as any[]).length === 0 ? (
+                    <p className="text-xs font-bold text-muted-foreground text-center py-6">
+                      Nenhum aluno ativo encontrado com esses filtros.
+                    </p>
+                  ) : (
+                    (candidates as any[]).map((candidate) => (
+                      <label
+                        key={candidate.id}
+                        className={cn(
+                          "flex items-center gap-3 px-3 py-2.5 border-b border-border/50 last:border-0 cursor-pointer hover:bg-muted/40 transition-colors",
+                          candidate.alreadyIn && "opacity-50 cursor-not-allowed"
+                        )}
+                      >
+                        <Checkbox
+                          disabled={candidate.alreadyIn}
+                          checked={selectedCandidateIds.includes(candidate.id)}
+                          onCheckedChange={(checked) => {
+                            setSelectedCandidateIds((prev) =>
+                              checked ? [...prev, candidate.id] : prev.filter((id) => id !== candidate.id)
+                            );
+                          }}
+                        />
+                        <span className="text-sm font-bold text-foreground flex-1 truncate">{candidate.name}</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground truncate">
+                          {candidate.instrumentName || "—"}
+                        </span>
+                        {candidate.alreadyIn && (
+                          <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600">No evento</span>
+                        )}
+                      </label>
+                    ))
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allSelected = availableCandidates.length > 0 && selectedCandidateIds.length === availableCandidates.length;
+                      setSelectedCandidateIds(allSelected ? [] : availableCandidates.map((candidate: any) => candidate.id));
+                    }}
+                    className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 hover:underline"
+                  >
+                    {availableCandidates.length > 0 && selectedCandidateIds.length === availableCandidates.length
+                      ? "Limpar seleção"
+                      : `Selecionar todos disponíveis (${availableCandidates.length})`}
+                  </button>
+                  <Button
+                    size="sm"
+                    disabled={selectedCandidateIds.length === 0 || addParticipant.isPending}
+                    onClick={() => {
+                      if (!eventId) return;
+                      addParticipant.mutate({ eventId, studentIds: selectedCandidateIds });
+                      setSelectedCandidateIds([]);
+                    }}
+                  >
+                    {addParticipant.isPending ? <Loader2 size={14} className="animate-spin mr-1.5" /> : <Plus size={14} className="mr-1.5" />}
+                    Adicionar selecionados ({selectedCandidateIds.length})
+                  </Button>
+                </div>
+              </div>
 
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />

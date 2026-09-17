@@ -39,6 +39,7 @@ import { eventosRouters } from "./eventosRouters";
 import { figurinosRouters } from "./figurinosRouters";
 import { turmasRouters } from "./turmasRouters";
 import { saudeRouters } from "./saudeRouters";
+import { matriculasRouters } from "./matriculasRouters";
 import { supportRouter } from "../supportRouter";
 import { releasesRouter } from "../releasesRouter";
 
@@ -91,6 +92,8 @@ export const appRouter = router({
   ...turmasRouters,
   // ── 🩺 Saúde física + 📊 NPS (novas chaves no fim — não reordenar as existentes) ──
   ...saudeRouters,
+  // ── 📚 Matrículas adicionais / múltiplos planos (novas chaves no fim) ──
+  ...matriculasRouters,
 });
 
 export type AppRouter = typeof appRouter;
