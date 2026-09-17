@@ -8,8 +8,7 @@ import { protectedProcedure, studentProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { coreografias, costumeLoans, costumeSales, costumes, events, organizations, asaasCustomers, settings, students } from "../../drizzle/schema";
 import { ENV } from "../_core/env";
-import { getStoreSalesRules } from "./helpers";
-import { decryptSecret } from "../utils/integrationCrypto";
+import { getStoreSalesRules, resolveOrgAsaasApiKey, resolveOrgMpAccessToken } from "./helpers";
 import { buildPixPayload } from "../utils/pix";
 
 const COSTUME_TYPES = ["saia", "collant", "sapatilha", "top", "calca", "acessorio", "uniforme", "outro"] as const;
@@ -31,32 +30,6 @@ async function resolveStudentId(db: any, ctx: { user: { id: number; studentId?: 
     .where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!)))
     .limit(1);
   return found?.id ?? null;
-}
-
-/** API key do Asaas da escola (settings habilitada + chave, decifrada). */
-async function resolveOrgAsaasKey(db: any, orgId: number): Promise<string | null> {
-  const rows = await db.select({ enabled: settings.asaasEnabled, key: settings.asaasApiKey })
-    .from(settings).where(eq(settings.organizationId, orgId));
-  const found = (rows as any[]).find((row) => Number(row.enabled) === 1 && row.key);
-  if (!found?.key) return null;
-  try {
-    return decryptSecret(String(found.key));
-  } catch {
-    return null;
-  }
-}
-
-/** Token do Mercado Pago da escola (decifrado). */
-async function resolveOrgMpToken(db: any, orgId: number): Promise<string | null> {
-  const rows = await db.select({ token: settings.mpAccessToken })
-    .from(settings).where(eq(settings.organizationId, orgId));
-  const found = (rows as any[]).find((row) => row.token && String(row.token).trim() !== "");
-  if (!found?.token) return null;
-  try {
-    return decryptSecret(String(found.token));
-  } catch {
-    return null;
-  }
 }
 
 /** Configuração de cobrança da Loja (gateways disponíveis + PIX estático). */
@@ -670,7 +643,7 @@ export const figurinosRouters = {
 
       // ── Asaas: PIX com conciliação automática ──
       if (input.provider === "asaas") {
-        const apiKey = await resolveOrgAsaasKey(db, orgId);
+        const apiKey = await resolveOrgAsaasApiKey(db, orgId);
         if (!apiKey) throw new TRPCError({ code: "BAD_REQUEST", message: "Asaas não está configurado nesta escola (Configurações → Integrações)." });
         const { createAsaasCustomer, createAsaasCharge, getAsaasPixQrCode } = await import("../utils/asaas");
 
@@ -719,7 +692,7 @@ export const figurinosRouters = {
 
       // ── Mercado Pago: PIX (copia-e-cola) com conciliação automática ──
       if (input.provider === "mercadopago") {
-        const token = await resolveOrgMpToken(db, orgId);
+        const token = await resolveOrgMpAccessToken(db, orgId);
         if (!token) throw new TRPCError({ code: "BAD_REQUEST", message: "Mercado Pago não está configurado nesta escola (Configurações → Integrações)." });
         const { createMPPixPayment } = await import("../utils/mercadopago");
         const payerEmail = student.email && student.email.includes("@") ? student.email : "pagador@mercadopago.com";

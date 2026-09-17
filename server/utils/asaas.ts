@@ -162,6 +162,25 @@ export async function createAsaasCharge(params: {
 }
 
 /**
+ * Saldo disponível da conta Asaas (finance/balance) — usado no Financeiro para
+ * mostrar quanto há na conta onde o checkout recebe. Nunca lança: devolve erro
+ * tratado para a UI exibir "indisponível".
+ */
+export async function getAsaasBalance(apiKey?: string): Promise<{ balance: number | null; error?: string }> {
+  try {
+    const res = await asaasRequest("GET", `${ENV.asaasBaseUrl}/finance/balance`, undefined, apiKey);
+    if (!res.ok) {
+      const body = await res.text();
+      return { balance: null, error: `HTTP ${res.status}${body ? ` — ${body.slice(0, 120)}` : ""}` };
+    }
+    const data = await res.json() as { balance?: number };
+    return { balance: typeof data?.balance === "number" ? data.balance : null };
+  } catch (error: any) {
+    return { balance: null, error: error?.message ?? "Falha ao consultar saldo" };
+  }
+}
+
+/**
  * Retrieves PIX QR Code details for an existing charge.
  */
 export async function getAsaasPixQrCode(asaasPaymentId: string, apiKey?: string): Promise<{

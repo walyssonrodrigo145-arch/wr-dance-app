@@ -26,6 +26,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.16.7",
+    date: "2026-09-16",
+    title: "Saldo das contas de pagamento no Financeiro",
+    summary: "Veja na hora quanto há na conta onde o checkout recebe — Asaas e Mercado Pago — direto no topo do Financeiro.",
+    items: [
+      { type: "novo", title: "Card Saldo nos gateways", description: "O Financeiro mostra o saldo disponível da conta Asaas (finance/balance) e do Mercado Pago, com botão de atualizar e horário da última consulta." },
+      { type: "melhoria", title: "Transparência por gateway", description: "Quando um gateway não está conectado ou a consulta falha, o card explica (não configurado / indisponível). A InfinitePay não possui API pública de saldo — o card indica que ela oferece apenas conciliação." },
+    ],
+  },
+  {
     version: "2026.09.16.6",
     date: "2026-09-16",
     title: "PIX na hora na Loja e Vendas da Loja no Financeiro",

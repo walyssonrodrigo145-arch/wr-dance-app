@@ -117,6 +117,38 @@ export async function createMPPixPayment(params: {
   };
 }
 
+// ── Saldo da conta Mercado Pago ───────────────────────────────────────────────
+// GET /users/me/mercadopago_account/balance — disponível para a conta que recebe.
+// Nunca lança: devolve erro tratado para a UI exibir "indisponível".
+export async function getMPBalance(accessToken: string): Promise<{
+  balance: number | null;
+  unavailable: number | null;
+  error?: string;
+}> {
+  const pickAmount = (value: any): number | null => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value?.amount === "number" && Number.isFinite(value.amount)) return value.amount;
+    return null;
+  };
+
+  try {
+    const response = await fetch("https://api.mercadopago.com/users/me/mercadopago_account/balance", {
+      headers: { "Authorization": `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) {
+      return { balance: null, unavailable: null, error: `HTTP ${response.status}` };
+    }
+    const data: any = await response.json();
+    return {
+      balance: pickAmount(data?.available_balance) ?? pickAmount(data?.total_amount),
+      unavailable: pickAmount(data?.unavailable_balance),
+    };
+  } catch (error: any) {
+    return { balance: null, unavailable: null, error: error?.message ?? "Falha ao consultar saldo" };
+  }
+}
+
 // ── Verifica status real de um pagamento na API do Mercado Pago ───────────────
 // MP redireciona com ?payment_id=XXX&status=YYY na URL de retorno.
 // Esta função consulta a API oficial para garantir que o status é legítimo.

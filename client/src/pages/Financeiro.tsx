@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
-import { ChevronLeft, ChevronRight, Wallet, BadgePercent } from "lucide-react";
+import { ChevronLeft, ChevronRight, Wallet, BadgePercent, RefreshCw, Landmark } from "lucide-react";
 import { useDashboardPrefs } from "@/hooks/useDashboardPrefs";
 import { EyeToggleButton } from "@/components/dashboard/EyeToggleButton";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,11 @@ export default function Financeiro() {
   const { data: payments = [], isLoading: isLoadingPayments } = trpc.paymentDues.list.useQuery({ month: viewMonth, year: viewYear });
   const { data: expenses = [], isLoading: isLoadingExpenses } = trpc.expenses.list.useQuery({ month: viewMonth, year: viewYear });
   const { data: storeSales = [], isLoading: isLoadingStoreSales } = trpc.figurinos.sales.useQuery({ status: "todos" });
+  const { data: gatewayBalances, isFetching: isFetchingBalances } = trpc.gatewayBalances.get.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
+  });
+  const utils = trpc.useUtils();
 
   const prevMonth = () => {
     if (viewMonth === 1) { setViewMonth(12); setViewYear(y => y - 1); }
@@ -93,8 +98,8 @@ export default function Financeiro() {
           <EyeToggleButton className="h-12 w-12 shrink-0" />
         </div>
 
-        {/* Saldo Geral Líquido + Desconto Concedido */}
-        <div id="tour-finance-cards" className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
+        {/* Saldo Geral Líquido + Desconto Concedido + Saldo nos gateways */}
+        <div id="tour-finance-cards" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
           {/* Saldo Geral Líquido */}
           <div className={cn(
             "relative p-4 lg:p-8 rounded-2xl lg:rounded-[2rem] border shadow-sm overflow-hidden",
@@ -129,6 +134,63 @@ export default function Financeiro() {
                    {maskBRL(descontoConcedido)}
                 </p>
                 <p className="text-[10px] font-medium text-muted-foreground mt-0.5">Descontos por pagamento antecipado no mês.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Saldo nas contas de pagamento (checkout) */}
+          <div className="relative p-4 lg:p-8 rounded-2xl lg:rounded-[2rem] border shadow-sm overflow-hidden bg-gradient-to-br from-sky-500/20 to-background border-sky-500/30">
+            <div className="flex items-start gap-3 relative z-10">
+              <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-2xl flex items-center justify-center shadow-sm shrink-0 bg-sky-500/20 text-sky-600">
+                <Landmark size={20} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-sky-700">Saldo nos gateways (checkout)</p>
+                  <button
+                    type="button"
+                    onClick={() => utils.gatewayBalances.get.invalidate()}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-sky-600 hover:bg-sky-500/10 transition-colors"
+                    title="Atualizar saldos"
+                  >
+                    <RefreshCw size={14} className={isFetchingBalances ? "animate-spin" : ""} />
+                  </button>
+                </div>
+
+                <div className="mt-2 space-y-1.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[11px] font-bold text-muted-foreground">Asaas</span>
+                    <span className="text-sm font-black text-foreground">
+                      {!gatewayBalances?.asaas?.configured
+                        ? <span className="text-[10px] font-bold text-muted-foreground">não configurado</span>
+                        : gatewayBalances.asaas.balance != null
+                          ? maskBRL(gatewayBalances.asaas.balance)
+                          : <span className="text-[10px] font-bold text-amber-600">indisponível</span>}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[11px] font-bold text-muted-foreground">Mercado Pago</span>
+                    <span className="text-sm font-black text-foreground">
+                      {!gatewayBalances?.mercadopago?.configured
+                        ? <span className="text-[10px] font-bold text-muted-foreground">não configurado</span>
+                        : gatewayBalances.mercadopago.balance != null
+                          ? maskBRL(gatewayBalances.mercadopago.balance)
+                          : <span className="text-[10px] font-bold text-amber-600">indisponível</span>}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[11px] font-bold text-muted-foreground">InfinitePay</span>
+                    <span className="text-[10px] font-bold text-muted-foreground text-right">
+                      {gatewayBalances?.infinitepay?.configured ? "sem API de saldo (só conciliação)" : "não configurado"}
+                    </span>
+                  </div>
+                </div>
+
+                <p className="text-[10px] font-medium text-muted-foreground mt-2">
+                  {gatewayBalances?.checkedAt
+                    ? `Atualizado às ${new Date(gatewayBalances.checkedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}. Saldo da conta que recebe os pagamentos.`
+                    : "Consultando saldos..."}
+                </p>
               </div>
             </div>
           </div>

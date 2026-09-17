@@ -59,6 +59,34 @@ export async function getStoreSalesRules(db: any, organizationId: number): Promi
   return parseStoreSalesRules(found?.rules);
 }
 
+/** API key do Asaas da escola (settings habilitada + chave, já decifrada). */
+export async function resolveOrgAsaasApiKey(db: any, organizationId: number): Promise<string | null> {
+  const rows = await db.select({ enabled: settings.asaasEnabled, key: settings.asaasApiKey })
+    .from(settings).where(eq(settings.organizationId, organizationId));
+  const found = (rows as any[]).find((row) => Number(row.enabled) === 1 && row.key);
+  if (!found?.key) return null;
+  try {
+    const { decryptSecret } = await import("../utils/integrationCrypto");
+    return decryptSecret(String(found.key));
+  } catch {
+    return null;
+  }
+}
+
+/** Access token do Mercado Pago da escola (já decifrado). */
+export async function resolveOrgMpAccessToken(db: any, organizationId: number): Promise<string | null> {
+  const rows = await db.select({ token: settings.mpAccessToken })
+    .from(settings).where(eq(settings.organizationId, organizationId));
+  const found = (rows as any[]).find((row) => row.token && String(row.token).trim() !== "");
+  if (!found?.token) return null;
+  try {
+    const { decryptSecret } = await import("../utils/integrationCrypto");
+    return decryptSecret(String(found.token));
+  } catch {
+    return null;
+  }
+}
+
 // ─── Datas e status "atrasado" (fonte única — AUDIT F5) ─────────────────────
 // Data de hoje no fuso do Brasil no formato ISO (yyyy-mm-dd).
 export function getTodayBR(): string {

@@ -28,7 +28,9 @@ import { TRPCError } from "@trpc/server";
 
 import crypto from "crypto";
 import { decryptSecret } from "../utils/integrationCrypto";
-import { createAsaasCustomer, createAsaasCharge, deleteAsaasCharge, getAsaasPixQrCode } from "../utils/asaas";
+import { createAsaasCustomer, createAsaasCharge, deleteAsaasCharge, getAsaasPixQrCode, getAsaasBalance } from "../utils/asaas";
+import { getMPBalance } from "../utils/mercadopago";
+import { resolveOrgAsaasApiKey, resolveOrgMpAccessToken } from "./helpers";
 import { buildUserContext } from "../utils/aiContext";
 import { getSystemPrompt } from "../utils/aiPrompts";
 import { callGemini, genAI } from "../utils/gemini";
@@ -1854,6 +1856,39 @@ export const financeiroRouters = {
           return handleDbError(error, "atualizar ajustes do pagamento");
         }
       }),
+  }),
+
+  // ─── Saldo nas contas de pagamento (checkout) — Asaas + Mercado Pago ────────
+  // Mostra quanto há na conta onde o checkout recebe. A InfinitePay não expõe
+  // API pública de saldo (apenas conciliação de pagamentos).
+  gatewayBalances: router({
+    get: protectedProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      const orgId = ctx.user.organizationId!;
+      const checkedAt = new Date().toISOString();
+      if (!db) {
+        return { checkedAt, asaas: { configured: false, balance: null }, mercadopago: { configured: false, balance: null, unavailable: null }, infinitepay: { configured: false, supported: false } };
+      }
+
+      const [asaasKey, mpToken, infiniteRow] = await Promise.all([
+        resolveOrgAsaasApiKey(db, orgId),
+        resolveOrgMpAccessToken(db, orgId),
+        db.select({ handle: settings.infinitepayHandle }).from(settings)
+          .where(eq(settings.organizationId, orgId)).then((rows: any[]) => rows.find((row) => row.handle && String(row.handle).trim() !== "")),
+      ]);
+
+      const [asaasResult, mpResult] = await Promise.all([
+        asaasKey ? getAsaasBalance(asaasKey) : Promise.resolve({ balance: null as number | null, error: undefined as string | undefined }),
+        mpToken ? getMPBalance(mpToken) : Promise.resolve({ balance: null as number | null, unavailable: null as number | null, error: undefined as string | undefined }),
+      ]);
+
+      return {
+        checkedAt,
+        asaas: { configured: Boolean(asaasKey), balance: asaasResult.balance, error: asaasResult.error },
+        mercadopago: { configured: Boolean(mpToken), balance: mpResult.balance, unavailable: mpResult.unavailable, error: mpResult.error },
+        infinitepay: { configured: Boolean(infiniteRow), supported: false },
+      };
+    }),
   }),
 
 };
