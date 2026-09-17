@@ -14,6 +14,11 @@ import { buildPixPayload } from "../utils/pix";
 const COSTUME_TYPES = ["saia", "collant", "sapatilha", "top", "calca", "acessorio", "uniforme", "outro"] as const;
 const COSTUME_CONDITIONS = ["novo", "bom", "usado", "danificado"] as const;
 
+// Anti-duplicação de cobrança: cliques concorrentes em "Cobrar" não podem gerar
+// duas cobranças no mesmo gateway. Lock em memória por venda+provider (o deploy é
+// um único container; multi-instância exigiria Redis — mesma limitação do login).
+const saleChargeLocks = new Set<string>();
+
 function assertStaff(ctx: { user: { role: string; openId: string } | null }) {
   if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "Não autenticado" });
   const role = ctx.user.role;
@@ -440,7 +445,7 @@ export const figurinosRouters = {
     }),
 
     /** Catálogo de venda (Loja / Loja do evento): produtos vendáveis com estoque. */
-    storeCatalog: protectedProcedure.input(z.object({ eventId: z.number().optional() })).query(async ({ ctx, input }) => {
+    storeCatalog: protectedProcedure.input(z.object({ eventId: z.number().optional() }).optional()).query(async ({ ctx, input }) => {
       assertStaff(ctx);
       const db = await getDb();
       if (!db) return [];
@@ -641,6 +646,15 @@ export const figurinosRouters = {
       const description = `Loja #${sale.id} — ${student.name}`;
       const appUrl = ENV.appUrl || "https://wrmusicpro.com.br";
 
+      // Lock anti-cobrança-duplicada (cliques simultâneos)
+      const chargeLockKey = `${sale.id}:${input.provider}`;
+      if (saleChargeLocks.has(chargeLockKey)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Esta cobrança já está sendo gerada. Aguarde alguns segundos e tente novamente." });
+      }
+      saleChargeLocks.add(chargeLockKey);
+
+      try {
+
       // ── Asaas: PIX com conciliação automática ──
       if (input.provider === "asaas") {
         const apiKey = await resolveOrgAsaasApiKey(db, orgId);
@@ -759,6 +773,9 @@ export const figurinosRouters = {
         updatedAt: new Date(),
       }).where(eq(costumeSales.id, sale.id));
       return { provider: "pixkey" as const, pixPayload: payload, encodedImage: null, paymentLink: null };
+      } finally {
+        saleChargeLocks.delete(chargeLockKey);
+      }
     }),
 
     /** Vendas registradas (filtro por evento e status). */
