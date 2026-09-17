@@ -792,6 +792,37 @@ export async function runAutoMigrations() {
       { table: 'student_enrollments', sql: `ALTER TABLE "student_enrollments" ADD COLUMN IF NOT EXISTS "lessonType" varchar(20) DEFAULT 'turma' NOT NULL` },
       { table: 'student_enrollments', sql: `ALTER TABLE "student_enrollments" ADD COLUMN IF NOT EXISTS "shift" varchar(40)` },
       { table: 'settings', sql: `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "shifts" text DEFAULT '' NOT NULL` },
+
+      // ═══ ÉPICO 3: Loja do figurino (preço de venda + vendas por evento) ═══
+      { table: 'costumes', sql: `ALTER TABLE "costumes" ADD COLUMN IF NOT EXISTS "salePrice" decimal(10,2) DEFAULT '0.00' NOT NULL` },
+      { table: 'costumes', sql: `ALTER TABLE "costumes" ADD COLUMN IF NOT EXISTS "sellable" boolean DEFAULT true NOT NULL` },
+      { table: 'costume_sales', sql: `CREATE TABLE IF NOT EXISTS "costume_sales" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "organizationId" integer NOT NULL,
+        "costumeId" integer NOT NULL,
+        "studentId" integer NOT NULL,
+        "eventId" integer,
+        "quantity" integer DEFAULT 1 NOT NULL,
+        "unitPrice" decimal(10,2) DEFAULT '0.00' NOT NULL,
+        "totalPrice" decimal(10,2) DEFAULT '0.00' NOT NULL,
+        "paymentMode" varchar(20) DEFAULT 'mensalidade' NOT NULL,
+        "status" varchar(20) DEFAULT 'pendente' NOT NULL,
+        "notes" text,
+        "createdByUserId" integer NOT NULL,
+        "paidAt" timestamp,
+        "canceledAt" timestamp,
+        "createdAt" timestamp DEFAULT now() NOT NULL,
+        "updatedAt" timestamp DEFAULT now() NOT NULL
+      );` },
+      { table: 'costume_sales', sql: `CREATE INDEX IF NOT EXISTS "costume_sales_org_idx" ON "costume_sales" ("organizationId", "status")` },
+      { table: 'costume_sales', sql: `CREATE INDEX IF NOT EXISTS "costume_sales_event_idx" ON "costume_sales" ("eventId")` },
+      { table: 'costume_sales', sql: `CREATE INDEX IF NOT EXISTS "costume_sales_student_idx" ON "costume_sales" ("studentId")` },
+      { table: 'costume_sales', sql: `CREATE INDEX IF NOT EXISTS "costume_sales_costume_idx" ON "costume_sales" ("costumeId")` },
+
+      // ═══ ÉPICO 3: Regras de venda da Loja (Configurações → Loja) ═══
+      { table: 'settings', sql: `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "storeSalesRules" text DEFAULT '' NOT NULL` },
+      { table: 'costume_sales', sql: `ALTER TABLE "costume_sales" ADD COLUMN IF NOT EXISTS "discountPercent" decimal(5,2) DEFAULT '0.00' NOT NULL` },
+      { table: 'costume_sales', sql: `ALTER TABLE "costume_sales" ADD COLUMN IF NOT EXISTS "madeToOrder" boolean DEFAULT false NOT NULL` },
     ];
 
     for (const m of migrations) {

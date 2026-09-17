@@ -270,6 +270,8 @@ export const settings = pgTable("settings", {
   hideFinancialValues: integer("hideFinancialValues").default(0).notNull(),
   // Turnos personalizáveis da escola (JSON: [{name, start, end}]) — usados nas turmas
   shifts: text("shifts").default("").notNull(),
+  // Regras de venda da Loja (JSON) — Configurações → Loja
+  storeSalesRules: text("storeSalesRules").default("").notNull(),
   // ⭐ Avaliações de Professores: frequência dos ciclos + janela aberta (dias)
   professorEvalFrequency: varchar("professorEvalFrequency", { length: 20 }), // mensal | bimestral | trimestral | semestral
   professorEvalWindowDays: integer("professorEvalWindowDays"),
@@ -2678,6 +2680,10 @@ export const costumes = pgTable("costumes", {
   // novo | bom | usado | danificado
   condition: varchar("condition", { length: 30 }).default("bom").notNull(),
   cost: decimal("cost", { precision: 10, scale: 2 }).default("0.00").notNull(),
+  // Preço de venda na Loja (0 = não à venda)
+  salePrice: decimal("salePrice", { precision: 10, scale: 2 }).default("0.00").notNull(),
+  // Disponível para venda (Loja / Loja do evento)
+  sellable: boolean("sellable").default(true).notNull(),
   photoUrl: text("photoUrl"),
   notes: text("notes"),
   active: boolean("active").default(true).notNull(),
@@ -2718,6 +2724,45 @@ export const costumeLoans = pgTable("costume_loans", {
 
 export type CostumeLoan = typeof costumeLoans.$inferSelect;
 export type InsertCostumeLoan = typeof costumeLoans.$inferInsert;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VENDAS DE FIGURINO / LOJA (Epic 3) — venda avulsa ou dentro do evento
+// Estoque disponível = quantity − empréstimos ativos − vendas não canceladas.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const costumeSales = pgTable("costume_sales", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").notNull(),
+  costumeId: integer("costumeId").notNull(),
+  studentId: integer("studentId").notNull(),
+  // Vínculo opcional com evento (Loja do evento)
+  eventId: integer("eventId"),
+  quantity: integer("quantity").default(1).notNull(),
+  unitPrice: decimal("unitPrice", { precision: 10, scale: 2 }).default("0.00").notNull(),
+  totalPrice: decimal("totalPrice", { precision: 10, scale: 2 }).default("0.00").notNull(),
+  // mensalidade | avulso
+  paymentMode: varchar("paymentMode", { length: 20 }).default("mensalidade").notNull(),
+  // Desconto aplicado na venda (%)
+  discountPercent: decimal("discountPercent", { precision: 5, scale: 2 }).default("0.00").notNull(),
+  // Venda sob encomenda (sem estoque disponível, permitida pelas regras)
+  madeToOrder: boolean("madeToOrder").default(false).notNull(),
+  // pendente | pago | cancelado
+  status: varchar("status", { length: 20 }).default("pendente").notNull(),
+  notes: text("notes"),
+  createdByUserId: integer("createdByUserId").notNull(),
+  paidAt: timestamp("paidAt"),
+  canceledAt: timestamp("canceledAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdateFn(() => new Date()).notNull(),
+}, (table) => [
+  index("costume_sales_org_idx").on(table.organizationId, table.status),
+  index("costume_sales_event_idx").on(table.eventId),
+  index("costume_sales_student_idx").on(table.studentId),
+  index("costume_sales_costume_idx").on(table.costumeId),
+]);
+
+export type CostumeSale = typeof costumeSales.$inferSelect;
+export type InsertCostumeSale = typeof costumeSales.$inferInsert;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TURMAS (DancePro) — turmas fixas com vagas e lista de espera

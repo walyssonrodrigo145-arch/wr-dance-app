@@ -3,10 +3,12 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { formatBRL } from "@/lib/money";
 import { format } from "date-fns";
 import {
   Theater, Plus, Search, Pencil, Trash2, Users, Loader2, MapPin,
   CalendarDays, Music, X, UserPlus, ShieldCheck, CheckCircle2, Clock,
+  Shirt, ShoppingCart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +64,12 @@ const PARTICIPANT_STATUS_META: Record<string, { label: string; className: string
   convidado: { label: "Convidado", className: "bg-slate-500/10 text-slate-500 border-slate-500/30" },
   confirmado: { label: "Confirmado", className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
   recusado: { label: "Recusado", className: "bg-rose-500/10 text-rose-600 border-rose-500/30" },
+};
+
+const SALE_STATUS_META: Record<string, { label: string; className: string }> = {
+  pendente: { label: "Venda pendente", className: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
+  pago: { label: "Venda paga", className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
+  cancelado: { label: "Venda cancelada", className: "bg-rose-500/10 text-rose-600 border-rose-500/30" },
 };
 
 /** datetime-local exige "YYYY-MM-DDTHH:mm" no fuso local. */
@@ -299,6 +307,43 @@ function EventoDetalhes({ eventId, onClose }: { eventId: number | null; onClose:
     filterModalidade === "none" ? true : String(turma.modalidadeId) === filterModalidade
   );
   const availableCandidates = (candidates as any[]).filter((candidate) => !candidate.alreadyIn);
+
+  // ─── Loja do evento (venda de figurinos) ────────────────────────────────────
+  const [sellOpen, setSellOpen] = useState(false);
+  const [sellCostumeId, setSellCostumeId] = useState("");
+  const [sellStudentId, setSellStudentId] = useState("");
+  const [sellQuantity, setSellQuantity] = useState("1");
+  const [sellPaymentMode, setSellPaymentMode] = useState("mensalidade");
+  const [sellNotes, setSellNotes] = useState("");
+
+  const { data: storeCatalog = [] } = trpc.figurinos.storeCatalog.useQuery(
+    { eventId: eventId ?? undefined },
+    { enabled: eventId !== null }
+  );
+  const { data: sales = [] } = trpc.figurinos.sales.useQuery(
+    { eventId: eventId ?? undefined, status: "todos" },
+    { enabled: eventId !== null }
+  );
+
+  const sell = trpc.figurinos.sell.useMutation({
+    onSuccess: (result) => {
+      toast.success(`Venda registrada! Total ${formatBRL(result.totalPrice)}`);
+      setSellOpen(false);
+      utils.figurinos.storeCatalog.invalidate();
+      utils.figurinos.sales.invalidate();
+      invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const updateSaleStatus = trpc.figurinos.updateSaleStatus.useMutation({
+    onSuccess: () => {
+      toast.success("Venda atualizada!");
+      utils.figurinos.storeCatalog.invalidate();
+      utils.figurinos.sales.invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
 
   const { data, isLoading } = trpc.eventos.getById.useQuery(
     { id: eventId! },
@@ -646,6 +691,103 @@ function EventoDetalhes({ eventId, onClose }: { eventId: number | null; onClose:
                           </Button>
                         </div>
                       </div>
+                     );
+                   })}
+                </div>
+              )}
+            </div>
+
+            {/* Loja do evento: venda de figurinos para os participantes (qtd > 1) */}
+            <div className="space-y-3">
+              <p className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <Shirt size={14} /> Loja do evento
+              </p>
+
+              {storeCatalog.length === 0 ? (
+                <p className="text-sm font-medium text-muted-foreground text-center py-6 rounded-2xl border-2 border-dashed border-border">
+                  Nenhum produto disponível para venda. Cadastre o preço de venda na Loja (aba Acervo) para vender no evento.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+                  {(storeCatalog as any[]).map((product) => {
+                    const esgotado = product.disponivelVenda === 0;
+                    return (
+                      <div key={product.id} className="rounded-2xl border border-border bg-card p-3 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-black text-foreground truncate">{product.name}</p>
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest truncate">
+                              {product.size ? `Tam. ${product.size}` : ""}{product.color ? ` · ${product.color}` : ""}
+                            </p>
+                          </div>
+                          <span className={cn(
+                            "shrink-0 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest",
+                            esgotado ? "bg-rose-500/10 text-rose-600" : "bg-emerald-500/10 text-emerald-600"
+                          )}>
+                            {esgotado ? "Esgotado" : `${product.disponivelVenda} disp.`}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-black text-indigo-600 dark:text-indigo-400">
+                            {formatBRL(product.salePrice)}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={esgotado}
+                            onClick={() => {
+                              setSellCostumeId(String(product.id));
+                              setSellStudentId("");
+                              setSellQuantity("1");
+                              setSellPaymentMode("mensalidade");
+                              setSellNotes("");
+                              setSellOpen(true);
+                            }}
+                          >
+                            <ShoppingCart size={13} className="mr-1.5" /> Vender
+                          </Button>
+                        </div>
+                        {product.vendidosEvento > 0 && (
+                          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                            {product.vendidosEvento} vendido(s) neste evento
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Vendas do evento */}
+              {sales.length > 0 && (
+                <div className="space-y-2">
+                  {(sales as any[]).map((sale) => {
+                    const statusMeta = SALE_STATUS_META[sale.status] ?? SALE_STATUS_META.pendente;
+                    return (
+                      <div key={sale.id} className="rounded-2xl border border-border bg-card p-3 flex flex-col lg:flex-row lg:items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-black text-foreground truncate">
+                            {sale.costumeName} <span className="text-muted-foreground font-bold">×{sale.quantity}</span>
+                            <span className="text-indigo-600 dark:text-indigo-400 ml-2">{formatBRL(sale.totalPrice)}</span>
+                          </p>
+                          <p className="text-[11px] font-bold text-muted-foreground mt-0.5 truncate">
+                            {sale.studentName} · {sale.paymentMode === "mensalidade" ? "junto com a mensalidade" : "cobrança avulsa"}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className={cn("w-fit text-[10px] font-black", statusMeta.className)}>
+                          {statusMeta.label}
+                        </Badge>
+                        {sale.status === "pendente" && (
+                          <div className="flex items-center gap-2">
+                            <Button size="sm" variant="outline" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "pago" })} disabled={updateSaleStatus.isPending}>
+                              <CheckCircle2 size={13} className="mr-1" /> Marcar pago
+                            </Button>
+                            <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-rose-500" title="Cancelar venda" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "cancelado" })} disabled={updateSaleStatus.isPending}>
+                              <X size={15} />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -654,6 +796,107 @@ function EventoDetalhes({ eventId, onClose }: { eventId: number | null; onClose:
           </div>
         )}
       </DialogContent>
+
+      {/* Dialog: vender figurino do evento */}
+      <Dialog open={sellOpen} onOpenChange={setSellOpen}>
+        <DialogContent className="max-w-lg max-h-[90dvh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg font-black">
+              <ShoppingCart className="text-indigo-500" size={20} />
+              Vender figurino do evento
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-2">
+            <div className="space-y-1.5">
+              <Label>Produto *</Label>
+              <Select value={sellCostumeId} onValueChange={setSellCostumeId}>
+                <SelectTrigger><SelectValue placeholder="Selecione o produto" /></SelectTrigger>
+                <SelectContent>
+                  {(storeCatalog as any[]).map((product) => (
+                    <SelectItem key={product.id} value={String(product.id)} disabled={product.disponivelVenda === 0}>
+                      {product.name} — {formatBRL(product.salePrice)} ({product.disponivelVenda} disp.)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Participante *</Label>
+              <Select value={sellStudentId} onValueChange={setSellStudentId}>
+                <SelectTrigger><SelectValue placeholder="Selecione o participante" /></SelectTrigger>
+                <SelectContent>
+                  {(participantes as any[]).map((participante) => (
+                    <SelectItem key={participante.studentId} value={String(participante.studentId)}>
+                      {participante.studentName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Quantidade</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={sellQuantity}
+                  onChange={(event) => setSellQuantity(event.target.value.replace(/\D/g, "") || "1")}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Pagamento</Label>
+                <Select value={sellPaymentMode} onValueChange={setSellPaymentMode}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mensalidade">Junto com a mensalidade</SelectItem>
+                    <SelectItem value="avulso">Cobrança avulsa</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Observações</Label>
+              <Textarea value={sellNotes} onChange={(event) => setSellNotes(event.target.value)} rows={2} maxLength={2000} />
+            </div>
+
+            {(() => {
+              const product = (storeCatalog as any[]).find((item) => String(item.id) === sellCostumeId);
+              const quantity = Math.max(1, parseInt(sellQuantity, 10) || 1);
+              if (!product) return null;
+              return (
+                <p className="text-sm font-bold text-foreground text-right">
+                  Total: <span className="text-indigo-600 dark:text-indigo-400 font-black">{formatBRL(product.salePrice * quantity)}</span>
+                </p>
+              );
+            })()}
+          </div>
+
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setSellOpen(false)} disabled={sell.isPending}>Cancelar</Button>
+            <Button
+              disabled={!sellCostumeId || !sellStudentId || sell.isPending}
+              onClick={() => {
+                if (!eventId) return;
+                sell.mutate({
+                  eventId,
+                  costumeId: Number(sellCostumeId),
+                  studentId: Number(sellStudentId),
+                  quantity: Math.max(1, parseInt(sellQuantity, 10) || 1),
+                  paymentMode: sellPaymentMode as "mensalidade" | "avulso",
+                  notes: sellNotes.trim() || null,
+                });
+              }}
+            >
+              {sell.isPending && <Loader2 size={15} className="animate-spin mr-1.5" />}
+              Registrar venda
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

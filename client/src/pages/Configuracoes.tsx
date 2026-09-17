@@ -19,7 +19,7 @@ import {
   User, Building2, Bell, Palette, Shield, Save,
   Sun, Moon, Phone, Mail,
   CheckCircle2, Loader2, Smartphone, Wallet, Sparkles, HelpCircle,
-  FileText, DollarSign, Percent, Receipt, Calculator, Calendar, Clock, Upload, Trash2, Image,
+  FileText, DollarSign, Percent, Receipt, Calculator, Calendar, Clock, Upload, Trash2, Image, ShoppingBag,
   FileSignature, AlertTriangle, FlaskConical, GraduationCap, Repeat, FileCode2, MessageCircle
 } from "lucide-react";
 import { SUPPORT_WHATSAPP_URL, SUPPORT_WHATSAPP_DISPLAY } from "@/lib/support";
@@ -39,17 +39,19 @@ import { AssinafyIntegrationCard } from "@/components/integrations/AssinafyInteg
 import { ModelosContratoTab } from "@/components/integrations/ModelosContratoTab";
 import { ConfigFiscalTab } from "@/components/fiscal/ConfigFiscalTab";
 import { ShiftsSettings } from "@/components/settings/ShiftsSettings";
+import { StoreRulesSettings } from "@/components/settings/StoreRulesSettings";
 import { PlanosBolsas } from "@/components/settings/PlanosBolsas";
 import { MyTicketsList } from "@/components/support/MyTicketsList";
 
 // ─── Tab types ───────────────────────────────────────────────────────────────
-type Tab = "perfil" | "escola" | "fiscal" | "salas" | "financeiro" | "planos" | "modelos_contrato" | "notificacoes" | "aparencia" | "whatsapp" | "integracoes" | "ia" | "prompts" | "reposicoes" | "seguranca" | "ajuda";
+type Tab = "perfil" | "escola" | "fiscal" | "salas" | "financeiro" | "loja" | "planos" | "modelos_contrato" | "notificacoes" | "aparencia" | "whatsapp" | "integracoes" | "ia" | "prompts" | "reposicoes" | "seguranca" | "ajuda";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType; href?: string }[] = [
   { id: "perfil", label: "Perfil", icon: User },
   { id: "escola", label: "Escola", icon: Building2 },
   { id: "salas", label: "Salas & Tablados", icon: Building2 },
   { id: "financeiro", label: "Financeiro", icon: DollarSign },
+  { id: "loja", label: "Loja", icon: ShoppingBag },
   { id: "fiscal", label: "Notas Fiscais", icon: Receipt },
   { id: "planos", label: "Planos & Bolsas", icon: GraduationCap },
   { id: "modelos_contrato", label: "Modelos de Contrato", icon: FileSignature },
@@ -1108,6 +1110,13 @@ export default function Configuracoes() {
             {/* ── ABA: FISCAL (NFS-e FOCUS) ── */}
             {activeTab === "fiscal" && (
               <ConfigFiscalTab />
+            )}
+
+            {/* ── ABA: LOJA (REGRAS DE VENDA) ── */}
+            {activeTab === "loja" && (
+              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <StoreRulesSettings />
+              </div>
             )}
 
             {/* ── ABA: FINANCEIRO (JUROS E MULTAS) ── */}

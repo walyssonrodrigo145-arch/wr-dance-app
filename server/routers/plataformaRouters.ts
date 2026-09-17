@@ -23,7 +23,7 @@ import { organizations, users, students, lessons, instruments, reminders, remind
 import { eq, desc, sql, and, gte, lt, lte, asc, ne, or, inArray, aliasedTable, ilike, isNull } from "drizzle-orm";
 import { notifyOwner, notifyUser } from "../_core/notification";
 import { handleDbError } from "../utils/error_handler";
-import { isValidCNPJ } from "./helpers";
+import { isValidCNPJ, getStoreSalesRules, parseStoreSalesRules, DEFAULT_STORE_SALES_RULES } from "./helpers";
 import { TRPCError } from "@trpc/server";
 
 import crypto from "crypto";
@@ -456,6 +456,33 @@ export const plataformaRouters = {
       }
       await upsertSettings(ctx.user.organizationId!, ctx.user.id, { shifts: JSON.stringify(input.shifts) } as any);
       return { success: true };
+    }),
+
+    // ── Regras de venda da Loja (Configurações → Loja) ──
+    getStoreRules: protectedProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return DEFAULT_STORE_SALES_RULES;
+      return getStoreSalesRules(db, ctx.user.organizationId!);
+    }),
+
+    updateStoreRules: protectedProcedure.input(z.object({
+      rules: z.object({
+        enableStoreSales: z.boolean(),
+        enableEventSales: z.boolean(),
+        allowMonthlyPayment: z.boolean(),
+        allowStandalonePayment: z.boolean(),
+        allowMadeToOrder: z.boolean(),
+        requireActiveStudent: z.boolean(),
+        allowDiscount: z.boolean(),
+        maxDiscountPercent: z.number().min(0).max(100),
+      }),
+    })).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Somente o administrador pode alterar as regras da Loja." });
+      }
+      const sanitized = parseStoreSalesRules(JSON.stringify(input.rules));
+      await upsertSettings(ctx.user.organizationId!, ctx.user.id, { storeSalesRules: JSON.stringify(sanitized) } as any);
+      return { success: true, rules: sanitized };
     }),
 
     // Olhinho: mascarar valores financeiros (Dashboard + Financeiro), por usuário.

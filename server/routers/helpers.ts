@@ -3,8 +3,61 @@ import { debugLog } from "../_core/logger";
 import crypto from "crypto";
 import { TRPCError } from "@trpc/server";
 import { eq, and, sql, isNotNull } from "drizzle-orm";
-import { organizations, students, contracts, schoolIntegrations } from "../../drizzle/schema";
+import { organizations, students, contracts, schoolIntegrations, settings } from "../../drizzle/schema";
 import { ENV } from "../_core/env";
+
+// ─── Regras de venda da Loja (Configurações → Loja) ──────────────────────────
+// Configurações org-wide, aplicadas no backend em TODA venda (nunca só na UI).
+export interface StoreSalesRules {
+  enableStoreSales: boolean;
+  enableEventSales: boolean;
+  allowMonthlyPayment: boolean;
+  allowStandalonePayment: boolean;
+  allowMadeToOrder: boolean;
+  requireActiveStudent: boolean;
+  allowDiscount: boolean;
+  maxDiscountPercent: number;
+}
+
+export const DEFAULT_STORE_SALES_RULES: StoreSalesRules = {
+  enableStoreSales: true,
+  enableEventSales: true,
+  allowMonthlyPayment: true,
+  allowStandalonePayment: true,
+  allowMadeToOrder: true,
+  requireActiveStudent: true,
+  allowDiscount: false,
+  maxDiscountPercent: 10,
+};
+
+/** Parse seguro do JSON salvo em settings.storeSalesRules (fallback = padrão). */
+export function parseStoreSalesRules(raw: string | null | undefined): StoreSalesRules {
+  if (!raw || !String(raw).trim()) return { ...DEFAULT_STORE_SALES_RULES };
+  try {
+    const parsed = JSON.parse(String(raw));
+    const merged = { ...DEFAULT_STORE_SALES_RULES, ...(parsed ?? {}) };
+    return {
+      enableStoreSales: Boolean(merged.enableStoreSales),
+      enableEventSales: Boolean(merged.enableEventSales),
+      allowMonthlyPayment: Boolean(merged.allowMonthlyPayment),
+      allowStandalonePayment: Boolean(merged.allowStandalonePayment),
+      allowMadeToOrder: Boolean(merged.allowMadeToOrder),
+      requireActiveStudent: Boolean(merged.requireActiveStudent),
+      allowDiscount: Boolean(merged.allowDiscount),
+      maxDiscountPercent: Math.max(0, Math.min(100, Number(merged.maxDiscountPercent) || 0)),
+    };
+  } catch {
+    return { ...DEFAULT_STORE_SALES_RULES };
+  }
+}
+
+/** Lê as regras org-wide (primeira linha de settings com valor definido). */
+export async function getStoreSalesRules(db: any, organizationId: number): Promise<StoreSalesRules> {
+  const rows = await db.select({ rules: settings.storeSalesRules }).from(settings)
+    .where(eq(settings.organizationId, organizationId));
+  const found = (rows as any[]).find((row) => row.rules && String(row.rules).trim() !== "");
+  return parseStoreSalesRules(found?.rules);
+}
 
 // ─── Datas e status "atrasado" (fonte única — AUDIT F5) ─────────────────────
 // Data de hoje no fuso do Brasil no formato ISO (yyyy-mm-dd).

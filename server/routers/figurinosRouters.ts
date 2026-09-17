@@ -6,8 +6,9 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import { protectedProcedure, studentProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { coreografias, costumeLoans, costumes, students } from "../../drizzle/schema";
+import { coreografias, costumeLoans, costumeSales, costumes, events, students } from "../../drizzle/schema";
 import { ENV } from "../_core/env";
+import { getStoreSalesRules } from "./helpers";
 
 const COSTUME_TYPES = ["saia", "collant", "sapatilha", "top", "calca", "acessorio", "uniforme", "outro"] as const;
 const COSTUME_CONDITIONS = ["novo", "bom", "usado", "danificado"] as const;
@@ -39,6 +40,8 @@ const costumeInput = z.object({
   quantity: z.number().int().min(1).max(10000).default(1),
   condition: z.enum(COSTUME_CONDITIONS).default("bom"),
   cost: z.number().min(0).max(1000000).default(0),
+  salePrice: z.number().min(0).max(1000000).default(0),
+  sellable: z.boolean().default(true),
   photoUrl: z.string().max(1000).nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
 });
@@ -58,6 +61,7 @@ export const figurinosRouters = {
       const orgId = ctx.user.organizationId!;
 
       const emUso = sql<number>`(SELECT COALESCE(SUM(cl."quantity"), 0) FROM "costume_loans" cl WHERE cl."costumeId" = ${costumes.id} AND cl."returnedAt" IS NULL)`.as("emUso");
+      const vendidos = sql<number>`(SELECT COALESCE(SUM(cs."quantity"), 0) FROM "costume_sales" cs WHERE cs."costumeId" = ${costumes.id} AND cs."status" <> 'cancelado')`.as("vendidos");
 
       const rows = await db.select({
         id: costumes.id,
@@ -69,11 +73,14 @@ export const figurinosRouters = {
         quantity: costumes.quantity,
         condition: costumes.condition,
         cost: costumes.cost,
+        salePrice: costumes.salePrice,
+        sellable: costumes.sellable,
         photoUrl: costumes.photoUrl,
         notes: costumes.notes,
         active: costumes.active,
         createdAt: costumes.createdAt,
         emUso,
+        vendidos,
       })
         .from(costumes)
         .where(and(
@@ -88,11 +95,15 @@ export const figurinosRouters = {
       return rows
         .map((row) => {
           const emUsoNum = Number(row.emUso) || 0;
+          const vendidosNum = Number(row.vendidos) || 0;
           return {
             ...row,
             emUso: emUsoNum,
+            vendidos: vendidosNum,
             disponivel: Math.max(0, row.quantity - emUsoNum),
+            disponivelVenda: Math.max(0, row.quantity - vendidosNum),
             cost: Number(row.cost) || 0,
+            salePrice: Number(row.salePrice) || 0,
           };
         })
         .filter((row) => !input?.onlyAvailable || row.disponivel > 0);
@@ -148,6 +159,8 @@ export const figurinosRouters = {
         quantity: input.quantity,
         condition: input.condition,
         cost: input.cost.toFixed(2),
+        salePrice: input.salePrice.toFixed(2),
+        sellable: input.sellable,
         photoUrl: input.photoUrl?.trim() || null,
         notes: input.notes?.trim() || null,
       }).returning({ id: costumes.id });
@@ -184,6 +197,8 @@ export const figurinosRouters = {
         quantity: input.quantity,
         condition: input.condition,
         cost: input.cost.toFixed(2),
+        salePrice: input.salePrice.toFixed(2),
+        sellable: input.sellable,
         photoUrl: input.photoUrl?.trim() || null,
         notes: input.notes?.trim() || null,
         updatedAt: new Date(),
@@ -385,6 +400,269 @@ export const figurinosRouters = {
           sql`${coreografias.status} <> 'arquivada'`,
         ))
         .orderBy(asc(coreografias.title));
+    }),
+
+    /** Catálogo de venda (Loja / Loja do evento): produtos vendáveis com estoque. */
+    storeCatalog: protectedProcedure.input(z.object({ eventId: z.number().optional() })).query(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) return [];
+      const orgId = ctx.user.organizationId!;
+
+      if (input?.eventId) {
+        const [event] = await db.select({ id: events.id }).from(events)
+          .where(and(eq(events.id, input.eventId), eq(events.organizationId, orgId))).limit(1);
+        if (!event) throw new TRPCError({ code: "NOT_FOUND", message: "Evento não encontrado." });
+      }
+
+      const vendidos = sql<number>`(SELECT COALESCE(SUM(cs."quantity"), 0) FROM "costume_sales" cs WHERE cs."costumeId" = ${costumes.id} AND cs."status" <> 'cancelado')`.as("vendidos");
+      const vendidosEvento = input?.eventId
+        ? sql<number>`(SELECT COALESCE(SUM(cs2."quantity"), 0) FROM "costume_sales" cs2 WHERE cs2."costumeId" = ${costumes.id} AND cs2."eventId" = ${input.eventId} AND cs2."status" <> 'cancelado')`.as("vendidosEvento")
+        : sql<number>`0`.as("vendidosEvento");
+
+      const rows = await db.select({
+        id: costumes.id,
+        name: costumes.name,
+        type: costumes.type,
+        size: costumes.size,
+        color: costumes.color,
+        photoUrl: costumes.photoUrl,
+        quantity: costumes.quantity,
+        salePrice: costumes.salePrice,
+        vendidos,
+        vendidosEvento,
+      })
+        .from(costumes)
+        .where(and(
+          eq(costumes.organizationId, orgId),
+          eq(costumes.active, true),
+          eq(costumes.sellable, true),
+        ))
+        .orderBy(asc(costumes.name));
+
+      return rows.map((row) => {
+        const vendidosNum = Number(row.vendidos) || 0;
+        return {
+          ...row,
+          salePrice: Number(row.salePrice) || 0,
+          vendidos: vendidosNum,
+          vendidosEvento: Number(row.vendidosEvento) || 0,
+          disponivelVenda: Math.max(0, row.quantity - vendidosNum),
+        };
+      });
+    }),
+
+    /** Registra a venda de figurino (Loja do evento ou avulsa). Preço SEMPRE do servidor. */
+    sell: protectedProcedure.input(z.object({
+      costumeId: z.number(),
+      studentId: z.number(),
+      eventId: z.number().nullable().optional(),
+      quantity: z.number().int().min(1).max(1000).default(1),
+      paymentMode: z.enum(["mensalidade", "avulso"]).default("mensalidade"),
+      discountPercent: z.number().min(0).max(100).default(0),
+      notes: z.string().max(2000).nullable().optional(),
+    })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+
+      // Regras de venda da escola (Configurações → Loja) — validadas no servidor
+      const rules = await getStoreSalesRules(db, orgId);
+      const isEventSale = input.eventId != null;
+      if (isEventSale && !rules.enableEventSales) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "As vendas dentro de eventos estão desativadas nas regras da Loja." });
+      }
+      if (!isEventSale && !rules.enableStoreSales) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "As vendas da Loja estão desativadas nas regras da escola." });
+      }
+      if (input.paymentMode === "mensalidade" && !rules.allowMonthlyPayment) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Pagamento junto com a mensalidade está desativado nas regras da Loja." });
+      }
+      if (input.paymentMode === "avulso" && !rules.allowStandalonePayment) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Cobrança avulsa está desativada nas regras da Loja." });
+      }
+
+      const [costume] = await db.select({
+        id: costumes.id,
+        name: costumes.name,
+        quantity: costumes.quantity,
+        salePrice: costumes.salePrice,
+        sellable: costumes.sellable,
+      }).from(costumes)
+        .where(and(eq(costumes.id, input.costumeId), eq(costumes.organizationId, orgId), eq(costumes.active, true))).limit(1);
+      if (!costume) throw new TRPCError({ code: "NOT_FOUND", message: "Produto não encontrado na Loja." });
+      if (!costume.sellable) throw new TRPCError({ code: "BAD_REQUEST", message: "Este produto não está disponível para venda." });
+
+      const [student] = await db.select({ id: students.id, status: students.status }).from(students)
+        .where(and(eq(students.id, input.studentId), eq(students.organizationId, orgId))).limit(1);
+      if (!student) throw new TRPCError({ code: "NOT_FOUND", message: "Aluno não encontrado nesta escola." });
+      if (rules.requireActiveStudent && student.status !== "ativo") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Aluno não está ativo — venda bloqueada pelas regras da Loja." });
+      }
+
+      if (input.eventId != null) {
+        const [event] = await db.select({ id: events.id }).from(events)
+          .where(and(eq(events.id, input.eventId), eq(events.organizationId, orgId))).limit(1);
+        if (!event) throw new TRPCError({ code: "NOT_FOUND", message: "Evento não encontrado." });
+      }
+
+      const [vendidos] = await db.select({ count: sql<number>`CAST(COALESCE(SUM(${costumeSales.quantity}), 0) AS INT)` })
+        .from(costumeSales)
+        .where(and(eq(costumeSales.costumeId, input.costumeId), sql`${costumeSales.status} <> 'cancelado'`));
+      const disponivel = costume.quantity - (Number(vendidos?.count) || 0);
+
+      // Desconto (regra da Loja)
+      const discountPercent = Math.max(0, Math.min(100, Number(input.discountPercent) || 0));
+      if (discountPercent > 0 && !rules.allowDiscount) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Desconto não permitido nas regras da Loja." });
+      }
+      if (discountPercent > rules.maxDiscountPercent) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Desconto máximo permitido: ${rules.maxDiscountPercent}%.` });
+      }
+
+      // Estoque: sem disponibilidade só vende com "sob encomenda" habilitado
+      let madeToOrder = false;
+      if (input.quantity > disponivel) {
+        if (!rules.allowMadeToOrder) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: disponivel === 0
+              ? `"${costume.name}" está esgotado para venda.`
+              : `Só há ${disponivel} unidade(s) de "${costume.name}" disponível(is) para venda.`,
+          });
+        }
+        madeToOrder = true;
+      }
+
+      const basePrice = Number(costume.salePrice) || 0;
+      const unitPrice = Number((basePrice * (1 - discountPercent / 100)).toFixed(2));
+      const totalPrice = Number((unitPrice * input.quantity).toFixed(2));
+
+      await db.insert(costumeSales).values({
+        organizationId: orgId,
+        costumeId: input.costumeId,
+        studentId: input.studentId,
+        eventId: input.eventId ?? null,
+        quantity: input.quantity,
+        unitPrice: unitPrice.toFixed(2),
+        totalPrice: totalPrice.toFixed(2),
+        paymentMode: input.paymentMode,
+        discountPercent: discountPercent.toFixed(2),
+        madeToOrder,
+        status: "pendente",
+        notes: input.notes?.trim() || null,
+        createdByUserId: ctx.user.id,
+      });
+
+      return { success: true, unitPrice, totalPrice, quantity: input.quantity, madeToOrder };
+    }),
+
+    /** Vendas registradas (filtro por evento e status). */
+    sales: protectedProcedure.input(z.object({
+      eventId: z.number().optional(),
+      status: z.enum(["todos", "pendente", "pago", "cancelado"]).default("todos"),
+    }).optional()).query(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) return [];
+      const orgId = ctx.user.organizationId!;
+
+      const rows = await db.select({
+        id: costumeSales.id,
+        costumeId: costumeSales.costumeId,
+        costumeName: costumes.name,
+        studentId: costumeSales.studentId,
+        studentName: students.name,
+        eventId: costumeSales.eventId,
+        eventName: events.name,
+        quantity: costumeSales.quantity,
+        unitPrice: costumeSales.unitPrice,
+        totalPrice: costumeSales.totalPrice,
+        paymentMode: costumeSales.paymentMode,
+        discountPercent: costumeSales.discountPercent,
+        madeToOrder: costumeSales.madeToOrder,
+        status: costumeSales.status,
+        notes: costumeSales.notes,
+        paidAt: costumeSales.paidAt,
+        createdAt: costumeSales.createdAt,
+      })
+        .from(costumeSales)
+        .innerJoin(costumes, eq(costumes.id, costumeSales.costumeId))
+        .innerJoin(students, eq(students.id, costumeSales.studentId))
+        .leftJoin(events, eq(events.id, costumeSales.eventId))
+        .where(and(
+          eq(costumeSales.organizationId, orgId),
+          input?.eventId ? eq(costumeSales.eventId, input.eventId) : undefined,
+          input?.status && input.status !== "todos" ? eq(costumeSales.status, input.status) : undefined,
+        ))
+        .orderBy(desc(costumeSales.createdAt))
+        .limit(500);
+
+      return rows.map((row) => ({
+        ...row,
+        unitPrice: Number(row.unitPrice) || 0,
+        totalPrice: Number(row.totalPrice) || 0,
+        discountPercent: Number(row.discountPercent) || 0,
+      }));
+    }),
+
+    /** Atualiza o status da venda (somente pendente → pago/cancelado). */
+    updateSaleStatus: protectedProcedure.input(z.object({
+      id: z.number(),
+      status: z.enum(["pago", "cancelado"]),
+    })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+
+      const [sale] = await db.select({ id: costumeSales.id, status: costumeSales.status }).from(costumeSales)
+        .where(and(eq(costumeSales.id, input.id), eq(costumeSales.organizationId, orgId))).limit(1);
+      if (!sale) throw new TRPCError({ code: "NOT_FOUND", message: "Venda não encontrada." });
+      if (sale.status !== "pendente") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Somente vendas pendentes podem ser atualizadas." });
+      }
+
+      await db.update(costumeSales).set({
+        status: input.status,
+        paidAt: input.status === "pago" ? new Date() : null,
+        canceledAt: input.status === "cancelado" ? new Date() : null,
+        updatedAt: new Date(),
+      }).where(eq(costumeSales.id, input.id));
+
+      return { success: true };
+    }),
+
+    /** Portal do aluno: compras na Loja. */
+    myPurchases: studentProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const studentId = await resolveStudentId(db, ctx);
+      if (!studentId) return [];
+
+      const rows = await db.select({
+        id: costumeSales.id,
+        costumeName: costumes.name,
+        costumeType: costumes.type,
+        costumeSize: costumes.size,
+        quantity: costumeSales.quantity,
+        totalPrice: costumeSales.totalPrice,
+        paymentMode: costumeSales.paymentMode,
+        status: costumeSales.status,
+        createdAt: costumeSales.createdAt,
+        eventName: events.name,
+      })
+        .from(costumeSales)
+        .innerJoin(costumes, eq(costumes.id, costumeSales.costumeId))
+        .leftJoin(events, eq(events.id, costumeSales.eventId))
+        .where(and(
+          eq(costumeSales.studentId, studentId),
+          eq(costumeSales.organizationId, ctx.user.organizationId!),
+        ))
+        .orderBy(desc(costumeSales.createdAt));
+
+      return rows.map((row) => ({ ...row, totalPrice: Number(row.totalPrice) || 0 }));
     }),
 
     /** Portal do aluno: figurinos em sua posse + histórico. */

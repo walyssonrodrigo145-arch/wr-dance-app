@@ -26,6 +26,30 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.16.5",
+    date: "2026-09-16",
+    title: "Venda direta na Loja e regras de venda configuráveis",
+    summary: "A Loja agora vende (não só empresta) com estoque, desconto e pagamento, e a escola define as regras de venda em Configurações → Loja.",
+    items: [
+      { type: "novo", title: "Vender direto na Loja", description: "Botão Vender em cada produto e no topo da Loja: escolha o aluno, a quantidade, o desconto (se liberado) e a forma de pagamento. Estoque e total calculados na hora." },
+      { type: "novo", title: "Aba Vendas na Loja", description: "Todas as vendas em um só lugar, com filtro de status, marcação de pago e cancelamento (cancelar devolve a peça ao estoque)." },
+      { type: "novo", title: "Regras de venda (Configurações → Loja)", description: "Ligue/desligue: vender na Loja, vender no evento, pagar junto da mensalidade, cobrança avulsa, venda sob encomenda, vender só para aluno ativo e desconto máximo. O sistema aplica as regras em toda venda." },
+      { type: "melhoria", title: "Venda sob encomenda", description: "Quando o estoque acaba, a venda pode ser registrada como sob encomenda (se a regra permitir) e fica sinalizada na lista." },
+    ],
+  },
+  {
+    version: "2026.09.16.4",
+    date: "2026-09-16",
+    title: "Loja do figurino dentro do evento",
+    summary: "Cada evento agora tem a própria loja: venda figurinos do acervo para os participantes, com quantidade, estoque em tempo real e controle de pagamento.",
+    items: [
+      { type: "novo", title: "Loja do evento", description: "Dentro do evento, ofereça os produtos vendáveis da Loja para os participantes — com quantidade maior que 1 e estoque atualizado automaticamente." },
+      { type: "novo", title: "Preço de venda na Loja", description: "Na Loja, cada produto ganhou preço de venda e a opção 'disponível para venda' (o que é só empréstimo fica fora da loja)." },
+      { type: "melhoria", title: "Controle das vendas", description: "Acompanhe as vendas do evento com status (pendente, paga, cancelada), forma de pagamento (junto da mensalidade ou cobrança avulsa) e total vendido." },
+      { type: "melhoria", title: "Minhas compras no portal", description: "O aluno vê no portal as compras feitas na Loja (inclusive as do evento) com status e valor." },
+    ],
+  },
+  {
     version: "2026.09.16.3",
     date: "2026-09-16",
     title: "Turmas por faixa etária e turno, múltiplos planos e Loja",
