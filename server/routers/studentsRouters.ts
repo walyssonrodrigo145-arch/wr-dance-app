@@ -1037,7 +1037,7 @@ export const studentsRouters = {
      * e modalidade padrão. Respeita o limite do plano da escola.
      */
     importBatch: protectedProcedure.input(z.object({
-      professorId: z.number(),
+      professorId: z.number().optional(),
       instrumentId: z.number().nullable().optional(),
       level: z.enum(["iniciante", "intermediario", "avancado"]).default("iniciante"),
       rows: z.array(z.object({
@@ -1052,8 +1052,10 @@ export const studentsRouters = {
       const orgId = ctx.user.organizationId!;
       await assertCanImportStudents(db, ctx);
 
+      // Sem professor escolhido, o responsável é o próprio usuário (mesma regra do cadastro individual)
+      const professorId = input.professorId ?? ctx.user.id;
       const [professor] = await db.select({ id: users.id }).from(users)
-        .where(and(eq(users.id, input.professorId), eq(users.organizationId, orgId))).limit(1);
+        .where(and(eq(users.id, professorId), eq(users.organizationId, orgId))).limit(1);
       if (!professor) throw new TRPCError({ code: "NOT_FOUND", message: "Professor selecionado não pertence a esta escola." });
 
       if (input.instrumentId != null) {
@@ -1119,7 +1121,7 @@ export const studentsRouters = {
       await db.insert(students).values(toImport.map((row) => ({
         organizationId: orgId,
         userId: ctx.user.id,
-        professorId: input.professorId,
+        professorId,
         instrumentId: input.instrumentId ?? null,
         name: row.name.trim(),
         email: row.email?.trim() || undefined,

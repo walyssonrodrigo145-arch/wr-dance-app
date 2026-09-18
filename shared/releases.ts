@@ -26,6 +26,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.18.3",
+    date: "2026-09-18",
+    title: "Importação de alunos sem travar no professor",
+    summary: "O professor responsável deixou de ser obrigatório na importação: sem escolher ninguém, os alunos entram no seu nome — igual ao cadastro individual.",
+    items: [
+      { type: "correcao", title: "Botão Importar sempre disponível", description: "Antes o botão ficava cinza até escolher um professor. Agora, sem professor selecionado, os alunos são importados com você como responsável (mesma regra do cadastro individual)." },
+    ],
+  },
+  {
     version: "2026.09.18.2",
     date: "2026-09-18",
     title: "Importação de alunos: prévia responsiva no celular",

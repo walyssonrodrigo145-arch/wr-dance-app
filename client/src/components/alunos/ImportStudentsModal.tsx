@@ -373,11 +373,10 @@ export function ImportStudentsModal({ open, onOpenChange }: Props) {
   });
 
   const submit = () => {
-    if (!professorId) { toast.error("Selecione o professor responsável."); return; }
     const payload = buildPayload();
     if (payload.length === 0) { toast.error("Nenhum aluno marcado para importar."); return; }
     importMutation.mutate({
-      professorId: Number(professorId),
+      professorId: professorId ? Number(professorId) : undefined,
       instrumentId: instrumentId === "none" ? null : Number(instrumentId),
       level,
       rows: payload,
@@ -489,10 +488,10 @@ export function ImportStudentsModal({ open, onOpenChange }: Props) {
           <div className="space-y-4 pt-1">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Professor responsável *</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Professor responsável</label>
                 <Select value={professorId} onValueChange={setProfessorId}>
                   <SelectTrigger className="h-10 rounded-xl text-xs font-bold">
-                    <SelectValue placeholder="Selecione..." />
+                    <SelectValue placeholder="Eu mesmo" />
                   </SelectTrigger>
                   <SelectContent>
                     {profs.map((p: any) => (
@@ -717,7 +716,7 @@ export function ImportStudentsModal({ open, onOpenChange }: Props) {
                 <Button
                   type="button"
                   onClick={submit}
-                  disabled={importMutation.isPending || includedRows.length === 0 || !professorId}
+                  disabled={importMutation.isPending || includedRows.length === 0}
                   className="h-10 rounded-xl px-5 text-xs font-bold gap-2"
                 >
                   {importMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <FileUp size={14} />}
