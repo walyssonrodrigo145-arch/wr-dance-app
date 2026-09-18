@@ -26,6 +26,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.17",
+    date: "2026-09-17",
+    title: "100% Dança: IA pedagógica, automações e identidade",
+    summary: "O sistema deixou de 'parecer' de música: a IA agora é especialista em cada modalidade de dança, as mensagens automáticas falam a língua da dança e toda a identidade (e-mails, relatórios, salas) está DancePro.",
+    items: [
+      { type: "novo", title: "IA especialista por modalidade de dança", description: "O Plano Diário agora é gerado por especialistas em Ballet, Jazz, Danças Urbanas, Dança de Salão, Sapateado, Contemporâneo, Kids e Fitness — com terminologia, aquecimento e segurança corretos para cada técnica." },
+      { type: "melhoria", title: "Plano diário com 'Musicalidade' e sem metrônomo", description: "O bloco 'Conceito Musical' virou 'Musicalidade' (tempo, contagem e expressão) e o sistema não pede mais BPM/metrônomo nos treinos de dança." },
+      { type: "melhoria", title: "Mensagens e robô WhatsApp de dança", description: "Lembretes, aniversários, cobranças e o menu do robô agora falam de aulas de dança — e os links usam o endereço correto da plataforma." },
+      { type: "melhoria", title: "CRM voltado para dança", description: "Leads e funil usam 'Modalidade' no lugar de instrumento e textos de captação para aulas de dança." },
+      { type: "melhoria", title: "Identidade DancePro de ponta a ponta", description: "E-mails de verificação/recuperação, cabeçalho de relatórios exportados, salas (Sala de ensaio · Espelhos, Barra, Tablado) e descrição da NFS-e agora são de dança." },
+      { type: "correcao", title: "Botão de metrônomo morto removido", description: "O portal do aluno não mostra mais o botão de metrônomo desativado nos exercícios do plano diário." },
+      { type: "correcao", title: "Landing com estado vazio de planos", description: "Sem planos ativos, a página inicial mostra um convite para falar com a gente em vez de uma seção vazia." },
+    ],
+  },
+  {
     version: "2026.09.16.7",
     date: "2026-09-16",
     title: "Saldo das contas de pagamento no Financeiro",

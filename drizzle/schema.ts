@@ -1631,9 +1631,9 @@ export const studioRooms = pgTable("studio_rooms", {
   organizationId: integer("organizationId").notNull(),
   name: varchar("name", { length: 100 }).notNull(),
   description: text("description"),
-  category: varchar("category", { length: 100 }).default("Estúdio de gravação").notNull(),
+  category: varchar("category", { length: 100 }).default("Sala de ensaio").notNull(),
   capacity: integer("capacity").default(8).notNull(),
-  equipments: text("equipments").default("Bateria, Teclado, Ar Condicionado").notNull(),
+  equipments: text("equipments").default("Espelhos, Barra, Tablado").notNull(),
   status: varchar("status", { length: 20 }).default("ativa").notNull(), // "ativa" | "manutencao" | "inativa"
   imageUrl: text("imageUrl"),
   utilizationRate: integer("utilization_rate").default(75).notNull(),
@@ -1911,7 +1911,7 @@ export const fiscalServices = pgTable("fiscal_services", {
   codigoTributacaoMunicipio: varchar("codigoTributacaoMunicipio", { length: 50 }),
   aliquotaIss: decimal("aliquotaIss", { precision: 5, scale: 2 }).default("0.00").notNull(),
   naturezaOperacao: varchar("naturezaOperacao", { length: 100 }).default("1").notNull(), // 1: Tributação no município, etc.
-  descricaoPadrao: text("descricaoPadrao").default("Mensalidade referente a aulas de musica - Competencia {competencia}").notNull(),
+  descricaoPadrao: text("descricaoPadrao").default("Mensalidade referente a aulas de dança - Competência {competencia}").notNull(),
   itemListaServico: varchar("itemListaServico", { length: 20 }).default("08.01"), // Item LC 116 (ex: 08.01 Ensino/Instrução)
   issRetido: boolean("issRetido").default(false).notNull(),
   ativo: boolean("ativo").default(true).notNull(),

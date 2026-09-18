@@ -14,15 +14,15 @@ import {
 import { PROMPT_VARIABLE_LIST } from "@shared/promptVariables";
 
 const BUILTIN_SPECIALISTS = [
-  { key: "teclado", name: "Teclado / Piano" },
-  { key: "cordas_dedilhadas", name: "Violão / Guitarra" },
-  { key: "baixo", name: "Contrabaixo" },
-  { key: "percussao", name: "Bateria" },
-  { key: "piano", name: "Piano (erudito)" },
-  { key: "voz", name: "Canto" },
-  { key: "sopro", name: "Sopro" },
-  { key: "cordas_arco", name: "Cordas com Arco" },
-  { key: "geral", name: "Geral" },
+  { key: "ballet", name: "Ballet Clássico" },
+  { key: "jazz", name: "Jazz / Lírico" },
+  { key: "urbanas", name: "Danças Urbanas" },
+  { key: "salao", name: "Dança de Salão" },
+  { key: "sapateado", name: "Sapateado (Tap)" },
+  { key: "contemporaneo", name: "Contemporâneo / Moderno" },
+  { key: "kids", name: "Dança Infantil (Kids)" },
+  { key: "fitness", name: "Fitness & Ritmos" },
+  { key: "geral", name: "Geral (Dança)" },
 ];
 
 /**

@@ -7,10 +7,10 @@ const base = {
   durations: { revisao: 3, warm: 5, tecnica: 10, conceito: 4, aplicacao: 6, desafio: 2 },
 };
 
-describe("RF-003 — buildPlanOutputSchema (schema compacto do plano diário)", () => {
+describe("RF-003 — buildPlanOutputSchema (schema compacto do plano diário de dança)", () => {
   it("contém os 6 blocos fixos na ordem correta", () => {
     const s = buildPlanOutputSchema(base);
-    const titles = ["\"Revisão\"", "\"Aquecimento\"", "\"Técnica\"", "\"Conceito Musical\"", "\"Aplicação\"", "\"Desafio\""];
+    const titles = ["\"Revisão\"", "\"Aquecimento\"", "\"Técnica\"", "\"Musicalidade\"", "\"Aplicação\"", "\"Desafio\""];
     let last = -1;
     for (const t of titles) {
       const idx = s.indexOf(t);
@@ -52,22 +52,23 @@ describe("RF-003 — buildPlanOutputSchema (schema compacto do plano diário)", 
     expect(AI_PROMPT_VERSIONS.planoDiario).toBe("2.3.0");
   });
 
-  it("permite o campo opcional bpm para o metrônomo (PRD 03)", () => {
+  it("não permite campos extras de música (sem bpm/metrônomo) e exige segurança articular", () => {
     const s = buildPlanOutputSchema(base);
-    expect(s).toContain('"bpm"');
-    expect(s).toContain("40 a 200");
+    expect(s).toContain("PROIBIDO qualquer campo extra");
+    expect(s).toContain("sem bpm, sem metrônomo");
+    expect(s).toContain("preparação articular");
   });
 });
 
-describe("Regra de linguagem por nível (iniciante sem jargão avançado)", () => {
-  it("iniciante: proíbe voicing/comping e exige meta À RISCA com linguagem simples", () => {
+describe("Regra de linguagem por nível (iniciante sem jargão avançado de dança)", () => {
+  it("iniciante: proíbe jargão de palco e exige meta À RISCA com linguagem simples", () => {
     const rule = buildLevelLanguageRule("iniciante");
     expect(rule).toContain("INEGOCIÁVEL");
-    expect(rule).toContain("shell voicing");
-    expect(rule).toContain("comping");
+    expect(rule).toContain("fouetté");
+    expect(rule).toContain("power move");
     expect(rule).toContain("À RISCA");
-    expect(rule).toContain("as notas do acorde");
-    expect(rule).toContain("Teoria permitida: APENAS o básico");
+    expect(rule).toContain("gire devagar");
+    expect(rule).toContain("Termos permitidos: APENAS o básico");
   });
 
   it("intermediário tem regra leve; avançado não tem regra de linguagem", () => {
@@ -77,45 +78,45 @@ describe("Regra de linguagem por nível (iniciante sem jargão avançado)", () =
 });
 
 describe("validateBeginnerLanguage — bloqueio duro de jargão para iniciante", () => {
-  it("detecta exatamente os termos que vazaram no plano real do Iago", () => {
+  it("detecta jargão avançado de dança em plano de iniciante", () => {
     const plan = JSON.stringify({
       days: [{
         dayName: "Dia 1",
-        focus: { title: "Shell voicing das tríades", description: "Construir shell voicing" },
-        exercises: [{ title: "Técnica", subtitle: "Close voicing das tríades", duration: "6 min", points: ["Comping com rootless voicing"] }],
+        focus: { title: "Pirueta dupla e fouetté", description: "Treinar giro avançado" },
+        exercises: [{ title: "Técnica", subtitle: "Power move e headspin", duration: "6 min", points: ["Windmill sem colchão"] }],
       }],
     });
     const result = validateBeginnerLanguage(plan, "iniciante");
     expect(result.passed).toBe(false);
-    for (const term of ["shell voicing", "close voicing", "rootless", "comping"]) {
+    for (const term of ["fouette", "pirueta dupla", "power move", "headspin"]) {
       expect(result.found).toContain(term);
     }
   });
 
-  it("plano em linguagem simples passa para iniciante", () => {
-    const plan = "Forme o acorde de Dó com 3 notas (Dó, Mi, Sol). Toque junto com a música. Metrônomo a 60 BPM.";
+  it("plano em linguagem simples de dança passa para iniciante", () => {
+    const plan = "Marque o passo contando em voz alta, gire devagar com o pé no chão e alongue com apoio. Repita 3 vezes.";
     expect(validateBeginnerLanguage(plan, "iniciante").passed).toBe(true);
   });
 
-  it("não bloqueia níveis intermediário/avançado (voicing é legítimo)", () => {
-    expect(validateBeginnerLanguage("shell voicing e comping", "avancado").passed).toBe(true);
-    expect(validateBeginnerLanguage("voicing", "intermediario").passed).toBe(true);
+  it("não bloqueia níveis intermediário/avançado (fouetté é legítimo)", () => {
+    expect(validateBeginnerLanguage("fouetté e pirueta dupla", "avancado").passed).toBe(true);
+    expect(validateBeginnerLanguage("fouetté", "intermediario").passed).toBe(true);
   });
 
-  it("normaliza acentos/caixa e usa fronteira de palavra", () => {
-    expect(validateBeginnerLanguage("Técnica de VOICING avançada", "Iniciante").passed).toBe(false);
-    // 'voicinho' não é voicing (fronteira de palavra)
-    expect(validateBeginnerLanguage("som voicinho limpo", "iniciante").passed).toBe(true);
+  it("normaliza acentos/caixa e usa fronteira de palavra em termos curtos", () => {
+    expect(validateBeginnerLanguage("Técnica de PENCHE avançada", "Iniciante").passed).toBe(false);
+    // 'penchezinho' não é 'penche' (fronteira de palavra)
+    expect(validateBeginnerLanguage("movimento penchezinho leve", "iniciante").passed).toBe(true);
     expect(BEGINNER_JARGON_TERMS.length).toBeGreaterThanOrEqual(15);
   });
 });
 
-describe("Escopo estrito segue a meta À RISCA (caso real: tríades Do-Sol-Lá menor-Fá)", () => {
-  it("bloco estrito traz instrução literal com exemplo de tríades", () => {
+describe("Escopo estrito segue a meta À RISCA (caso: transição entre passos)", () => {
+  it("bloco estrito traz instrução literal com exemplo de passos e giro", () => {
     const block = buildGoalScopeBlock("somente_metas");
     expect(block).toContain("À RISCA");
     expect(block).toContain("Interprete as metas LITERALMENTE");
-    expect(block).toContain("Tríades Dó, Sol, Lá menor, Fá");
+    expect(block).toContain("giro");
     expect(block).toContain("NÃO PODE APARECER");
   });
 
@@ -141,7 +142,7 @@ describe("Escopo de conteúdo — 2 opções (Só Metas | Metas +)", () => {
     const rule = buildGoalScopeRule("somente_metas");
     expect(rule).toContain("FOCO 100% FECHADO NAS METAS");
     expect(rule).toContain("ROTEIRO FECHADO");
-    expect(rule).toContain("Proibido inventar repertório");
+    expect(rule).toContain("Proibido inventar coreografia");
     const block = buildGoalScopeBlock("somente_metas");
     expect(block).toContain("EXCLUSIVAMENTE o conteúdo das metas cadastradas");
     expect(block).toContain("sem assuntos extras");

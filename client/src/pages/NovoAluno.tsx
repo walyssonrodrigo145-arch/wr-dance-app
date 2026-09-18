@@ -759,7 +759,7 @@ export default function NovoAluno() {
 
     const instrument = instruments.find((i: any) => i.id.toString() === scheduleForm.instrumentId);
     const defaultTitleName = form.name || "Aluno";
-    const submissionTitle = scheduleForm.title.trim() || (instrument ? `Aula de ${instrument.name} - ${defaultTitleName}` : `Aula de Música - ${defaultTitleName}`);
+    const submissionTitle = scheduleForm.title.trim() || (instrument ? `Aula de ${instrument.name} - ${defaultTitleName}` : `Aula de Dança - ${defaultTitleName}`);
     const scheduledDate = buildScheduledAt();
 
     if (!isScheduleBatch) {
@@ -839,7 +839,7 @@ export default function NovoAluno() {
     }
     const instrument = instruments.find((i: any) => i.id.toString() === scheduleForm.instrumentId);
     const defaultTitleName = form.name || "Aluno";
-    const submissionTitle = scheduleForm.title.trim() || (instrument ? `Aula de ${instrument.name} - ${defaultTitleName}` : `Aula de Música - ${defaultTitleName}`);
+    const submissionTitle = scheduleForm.title.trim() || (instrument ? `Aula de ${instrument.name} - ${defaultTitleName}` : `Aula de Dança - ${defaultTitleName}`);
     createBatchLessonMutation.mutate({
       studentId: targetStudentId,
       title: submissionTitle,
@@ -1321,7 +1321,7 @@ export default function NovoAluno() {
                   <Input
                     value={scheduleForm.title}
                     onChange={e => updateSchedule(p => ({ ...p, title: e.target.value }))}
-                    placeholder={`Aula de ${instruments.find((i: any) => i.id.toString() === scheduleForm.instrumentId)?.name ?? "Música"} - ${form.name || "Aluno"}`}
+                    placeholder={`Aula de ${instruments.find((i: any) => i.id.toString() === scheduleForm.instrumentId)?.name ?? "Dança"} - ${form.name || "Aluno"}`}
                     className={cn("h-12 rounded-xl text-sm font-semibold border-border bg-muted/30", scheduleErrors.title && "border-red-500")}
                   />
                   {scheduleErrors.title && <p className="text-xs text-red-500 ml-1">{scheduleErrors.title}</p>}
@@ -2274,7 +2274,7 @@ export default function NovoAluno() {
 
               <div className="space-y-2">
                 <Textarea 
-                  placeholder="Adicione detalhes sobre o aluno, objetivos ou histórico musical..." 
+                  placeholder="Adicione detalhes sobre o aluno, objetivos ou histórico na dança..." 
                   className="min-h-[160px] rounded-2xl border-border bg-muted/30 focus:bg-background focus:ring-4 focus:ring-slate-800/10 focus:border-slate-800 transition-all text-sm font-semibold p-4 resize-none leading-relaxed shadow-inner"
                   value={form.notes}
                   onChange={(e) => handleInputChange('notes', e.target.value)}

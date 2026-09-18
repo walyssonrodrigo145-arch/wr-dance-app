@@ -243,10 +243,10 @@ export const comunicacaoRouters = {
 
         const dataAula = lessonDate.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", timeZone: "America/Sao_Paulo" });
         const horaAula = lessonDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
-        const bodyTemplate = tpl?.body ?? "Olá {nome}, lembrete: sua aula de {instrumento} será dia {data_aula} às {hora_aula}.";
+        const bodyTemplate = tpl?.body ?? "Olá {nome}, lembrete: sua aula de {modalidade} será dia {data_aula} às {hora_aula}.";
         const message = bodyTemplate
           .replace(/\{nome\}/g, lesson.studentName ?? "Aluno")
-          .replace(/\{instrumento\}/g, lesson.instrumentName ?? "música")
+          .replace(/\{instrumento\}/g, lesson.instrumentName ?? "música").replace(/\{modalidade\}/g, lesson.instrumentName ?? "música")
           .replace(/\{data_aula\}/g, dataAula)
           .replace(/\{hora_aula\}/g, horaAula);
 
@@ -413,7 +413,7 @@ export const comunicacaoRouters = {
           .replace(/\{nome\}/g, due.studentName ?? "Aluno")
           .replace(/\{valor\}/g, valor)
           .replace(/\{vencimento\}/g, vencimento)
-          .replace(/\{instrumento\}/g, due.instrumentName ?? "música")
+          .replace(/\{instrumento\}/g, due.instrumentName ?? "música").replace(/\{modalidade\}/g, due.instrumentName ?? "música")
           .replace(/\{chave_pix\}/g, pixKey ?? "");
 
         // Adiciona link de pagamento do gateway ativo, gerando se não existir
@@ -1486,7 +1486,7 @@ export const comunicacaoRouters = {
           trigger: "lesson_scheduled",
           offsetDays: 0,
           offsetHours: -24,
-          messageTemplate: "Olá {nome_aluno}! 🎸 Lembrando que você tem aula de {curso} amanhã, {data_aula} às {hora_aula}. Te esperamos! Qualquer imprevisto, entre em contato.",
+          messageTemplate: "Olá {nome_aluno}! 🩰 Lembrando que você tem aula de {curso} amanhã, {data_aula} às {hora_aula}. Te esperamos! Qualquer imprevisto, entre em contato.",
           channel: "whatsapp",
         },
         {
@@ -1513,7 +1513,7 @@ export const comunicacaoRouters = {
           trigger: "birthday",
           offsetDays: 0,
           offsetHours: 0,
-          messageTemplate: "🎂 Feliz Aniversário, {nome_aluno}! A equipe da {nome_escola} deseja um dia incrível cheio de muita música e alegria! 🎵🎉",
+          messageTemplate: "🎂 Feliz Aniversário, {nome_aluno}! A equipe da {nome_escola} deseja um dia incrível cheio de muita dança e alegria! 💃🎉",
           channel: "whatsapp",
         },
         {
@@ -1541,7 +1541,7 @@ export const comunicacaoRouters = {
           offsetDays: 0,
           offsetHours: 0,
           conditions: JSON.stringify({ daysOfWeek: [1, 2, 3, 4, 5], sendTime: "08:00" }),
-          messageTemplate: "🎵 Olá {nome_aluno}! Hora de praticar {instrumento}!\nSeu professor {nome_professor} da {nome_escola} está torcendo por você.\nMesmo 15 minutinhos por dia fazem uma grande diferença. Vamos lá! 💪",
+          messageTemplate: "💃 Olá {nome_aluno}! Hora de praticar {modalidade}!\nSeu professor {nome_professor} da {nome_escola} está torcendo por você.\nMesmo 15 minutinhos por dia fazem uma grande diferença. Vamos lá! 💪",
           channel: "whatsapp",
         },
         {

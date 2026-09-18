@@ -449,9 +449,9 @@ async function ensureSchemaConsistency(db: any) {
     await safeExecute(sql`CREATE INDEX IF NOT EXISTS "student_enrollments_org_idx" ON "student_enrollments" ("organizationId")`, "student_enrollments.org_idx");
 
     // studio_rooms schema extension
-    await safeExecute(sql`ALTER TABLE "studio_rooms" ADD COLUMN IF NOT EXISTS "category" varchar(100) DEFAULT 'Estúdio de gravação' NOT NULL`, "studio_rooms.category");
+    await safeExecute(sql`ALTER TABLE "studio_rooms" ADD COLUMN IF NOT EXISTS "category" varchar(100) DEFAULT 'Sala de ensaio' NOT NULL`, "studio_rooms.category");
     await safeExecute(sql`ALTER TABLE "studio_rooms" ADD COLUMN IF NOT EXISTS "capacity" integer DEFAULT 8 NOT NULL`, "studio_rooms.capacity");
-    await safeExecute(sql`ALTER TABLE "studio_rooms" ADD COLUMN IF NOT EXISTS "equipments" text DEFAULT 'Bateria, Teclado, Ar Condicionado' NOT NULL`, "studio_rooms.equipments");
+    await safeExecute(sql`ALTER TABLE "studio_rooms" ADD COLUMN IF NOT EXISTS "equipments" text DEFAULT 'Espelhos, Barra, Tablado' NOT NULL`, "studio_rooms.equipments");
     await safeExecute(sql`ALTER TABLE "studio_rooms" ADD COLUMN IF NOT EXISTS "status" varchar(20) DEFAULT 'ativa' NOT NULL`, "studio_rooms.status");
     await safeExecute(sql`ALTER TABLE "studio_rooms" ADD COLUMN IF NOT EXISTS "imageUrl" text`, "studio_rooms.imageUrl");
     await safeExecute(sql`ALTER TABLE "studio_rooms" ADD COLUMN IF NOT EXISTS "utilization_rate" integer DEFAULT 75 NOT NULL`, "studio_rooms.utilization_rate");
@@ -1213,7 +1213,7 @@ async function ensureSchemaConsistency(db: any) {
         "codigoTributacaoMunicipio" varchar(50),
         "aliquotaIss" numeric(5, 2) DEFAULT 0.00 NOT NULL,
         "naturezaOperacao" varchar(100) DEFAULT '1' NOT NULL,
-        "descricaoPadrao" text DEFAULT 'Mensalidade referente a aulas de musica - Competencia {competencia}' NOT NULL,
+        "descricaoPadrao" text DEFAULT 'Mensalidade referente a aulas de dança - Competência {competencia}' NOT NULL,
         "itemListaServico" varchar(20) DEFAULT '08.01',
         "issRetido" boolean DEFAULT false NOT NULL,
         "ativo" boolean DEFAULT true NOT NULL,

@@ -1,7 +1,7 @@
 export const ReportEngineConfig = {
   defaultSheetName: 'Relatório',
   defaultPeriod: 'Sem período definido',
-  defaultCompany: 'MusicPro',
+  defaultCompany: 'DancePro',
   defaultGenerator: 'Sistema',
   csvSeparator: ',',
 };

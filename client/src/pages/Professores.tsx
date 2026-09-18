@@ -36,7 +36,7 @@ const AVAILABLE_PERMISSIONS = [
   { id: "/figurinos", label: "Loja", icon: "👗" },
   { id: "/turmas", label: "Turmas & Vagas", icon: "🧑‍🤝‍🧑" },
   { id: "/nps", label: "Satisfação (NPS)", icon: "📊" },
-  { id: "/instrumentos", label: "Instrumentos", icon: "🎸" },
+  { id: "/instrumentos", label: "Modalidades / Ritmos", icon: "💃" },
   { id: "/relatorios", label: "Relatórios", icon: "📈" },
   { id: "/lembretes", label: "Lembretes", icon: "🔔" },
   { id: "/comunicados", label: "Comunicados", icon: "📢" },

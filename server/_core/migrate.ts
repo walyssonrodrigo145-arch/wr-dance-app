@@ -241,7 +241,7 @@ export async function runAutoMigrations() {
         "codigoTributacaoMunicipio" varchar(50),
         "aliquotaIss" numeric(5, 2) DEFAULT '0.00' NOT NULL,
         "naturezaOperacao" varchar(100) DEFAULT '1' NOT NULL,
-        "descricaoPadrao" text DEFAULT 'Mensalidade referente a aulas de musica - Competencia {competencia}' NOT NULL,
+        "descricaoPadrao" text DEFAULT 'Mensalidade referente a aulas de dança - Competência {competencia}' NOT NULL,
         "itemListaServico" varchar(20) DEFAULT '08.01',
         "issRetido" boolean DEFAULT false NOT NULL,
         "ativo" boolean DEFAULT true NOT NULL,

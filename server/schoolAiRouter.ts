@@ -19,13 +19,13 @@ export const DEFAULT_SUGGESTED_TOPICS = [
     title: "👶 Idade Mínima & Musicalização Infantil",
     category: "faq_geral",
     content:
-      "Atendemos crianças a partir de 3 a 4 anos com Musicalização Infantil (desenvolvimento rítmico, auditivo e motor de forma lúdica). Para instrumentos como violão, teclado, bateria e canto, a idade recomendada inicial é a partir de 6 a 7 anos, além de turmas completas para jovens e adultos de qualquer idade.",
+      "Atendemos crianças a partir de 3 a 4 anos com Baby Class e dança infantil (coordenação, musicalidade e socialização de forma lúdica). A partir de 6 a 7 anos, temos turmas por modalidade e faixa etária (ballet, jazz, danças urbanas, sapateado) e também turmas para adolescentes e adultos de qualquer idade.",
   },
   {
-    title: "🎸 Cursos Oferecidos & Metodologia",
+    title: "🩰 Cursos Oferecidos & Metodologia",
     category: "cursos_precos",
     content:
-      "Oferecemos aulas de Violão, Guitarra, Teclado/Piano, Bateria, Baixo, Canto/Técnica Vocal, Ukulele e Musicalização Infantil. Nossas aulas são 100% práticas desde o primeiro dia, unindo teoria musical aplicada ao repertório que o aluno mais gosta de ouvir e tocar.",
+      "Oferecemos turmas de Ballet Clássico, Jazz, Danças Urbanas (Hip Hop), Dança de Salão (Forró, Samba, Tango), Sapateado, Contemporâneo, Baby Class/Dança Infantil e aulas fitness de dança. Nossas aulas são 100% práticas desde o primeiro dia, unindo técnica, musicalidade e coreografias que o aluno adora dançar.",
   },
   {
     title: "💰 Valores, Planos & Formas de Pagamento",
@@ -263,7 +263,7 @@ export const schoolAiRouter = router({
         4000
       );
 
-      const enrollmentLink = `${process.env.APP_URL || "https://wrmusicpro.com.br"}/matricula/${schoolName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
+      const enrollmentLink = `${process.env.APP_URL || "https://dancepro.wrmusicpro.com.br"}/matricula/${schoolName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
 
       // RF-004: fonte única da atendente (mesma personalidade/tom do atendimento real)
       const systemPrompt = buildSchoolKnowledgePrompt({

@@ -1863,7 +1863,7 @@ export default function Progresso() {
                 {generateDailyStudyPlanMutation.isPending ? (
                   <div className="flex flex-col items-center justify-center py-16 space-y-4">
                     <Loader2 size={44} className="animate-spin text-orange-500" />
-                    <p className="text-sm font-bold text-muted-foreground animate-pulse text-center">Analisando histórico musical e criando cronograma...</p>
+                    <p className="text-sm font-bold text-muted-foreground animate-pulse text-center">Analisando histórico de dança e criando cronograma...</p>
                   </div>
                 ) : studyPlanContent ? (
                    isEditingStudyPlan ? (

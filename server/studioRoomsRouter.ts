@@ -8,9 +8,9 @@ let schemaEnsured = false;
 async function ensureStudioRoomsSchema(db: any) {
   if (schemaEnsured) return;
   try {
-    await db.execute(sql`ALTER TABLE "studio_rooms" ADD COLUMN IF NOT EXISTS "category" varchar(100) DEFAULT 'Estúdio de gravação' NOT NULL`);
+    await db.execute(sql`ALTER TABLE "studio_rooms" ADD COLUMN IF NOT EXISTS "category" varchar(100) DEFAULT 'Sala de ensaio' NOT NULL`);
     await db.execute(sql`ALTER TABLE "studio_rooms" ADD COLUMN IF NOT EXISTS "capacity" integer DEFAULT 8 NOT NULL`);
-    await db.execute(sql`ALTER TABLE "studio_rooms" ADD COLUMN IF NOT EXISTS "equipments" text DEFAULT 'Bateria, Teclado, Ar Condicionado' NOT NULL`);
+    await db.execute(sql`ALTER TABLE "studio_rooms" ADD COLUMN IF NOT EXISTS "equipments" text DEFAULT 'Espelhos, Barra, Tablado' NOT NULL`);
     await db.execute(sql`ALTER TABLE "studio_rooms" ADD COLUMN IF NOT EXISTS "status" varchar(20) DEFAULT 'ativa' NOT NULL`);
     await db.execute(sql`ALTER TABLE "studio_rooms" ADD COLUMN IF NOT EXISTS "imageUrl" text`);
     await db.execute(sql`ALTER TABLE "studio_rooms" ADD COLUMN IF NOT EXISTS "utilization_rate" integer DEFAULT 75 NOT NULL`);
@@ -254,9 +254,9 @@ export const studioRoomsRouter = router({
           organizationId: orgId,
           name: input.name,
           description: input.description || null,
-          category: input.category || "Estúdio de gravação",
+          category: input.category || "Sala de ensaio",
           capacity: input.capacity || 8,
-          equipments: input.equipments || "Bateria, Teclado, Ar Condicionado",
+          equipments: input.equipments || "Espelhos, Barra, Tablado",
           status: input.status || "ativa",
           imageUrl: input.imageUrl && input.imageUrl.trim() ? input.imageUrl : null,
           utilizationRate: input.utilizationRate || 75,

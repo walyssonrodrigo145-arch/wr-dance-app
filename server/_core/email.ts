@@ -17,12 +17,12 @@ export async function sendVerificationEmail(email: string, token: string) {
       {
         from: ENV.resendFromEmail,
         to: [email],
-        subject: "Verifique sua conta - WR Music App",
+        subject: "Verifique sua conta - DancePro",
         html: `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; background-color: #f9fafb; padding: 40px; border-radius: 16px;">
             <div style="text-align: center; margin-bottom: 30px;">
               <h1 style="color: #4f46e5; margin: 0; font-size: 24px;">Verifique sua conta</h1>
-              <p style="color: #6b7280; margin-top: 10px;">Music App - Dashboard de Gestão</p>
+              <p style="color: #6b7280; margin-top: 10px;">DancePro - Gestão de Dança</p>
             </div>
             
             <p style="color: #374151; font-size: 16px; line-height: 1.5;">Olá! Para ativar sua conta, use o código de verificação abaixo:</p>
@@ -84,7 +84,7 @@ export async function sendPasswordResetEmail(email: string, token: string) {
       {
         from: ENV.resendFromEmail,
         to: [email],
-        subject: "Recuperação de Senha - WR Music App",
+        subject: "Recuperação de Senha - DancePro",
         html: `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
             <h1 style="color: #4f46e5;">Recuperação de Senha</h1>

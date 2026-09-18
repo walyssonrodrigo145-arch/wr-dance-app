@@ -375,7 +375,7 @@ export default function IAAssistente() {
                 <h3 className="text-sm font-bold text-foreground leading-tight">
                   {conversations.find((c: any) => c.id === activeConversationId)?.title || "Nova Conversa"}
                 </h3>
-                <p className="text-[10px] text-muted-foreground">IA Assistente Musical · Dados em tempo real</p>
+                <p className="text-[10px] text-muted-foreground">IA Assistente de Dança · Dados em tempo real</p>
               </div>
               <div className="ml-auto flex items-center gap-1.5">
                 <Zap size={12} className="text-amber-500" />
@@ -427,7 +427,7 @@ export default function IAAssistente() {
               </div>
 
               <h2 className="text-3xl font-black text-foreground text-center mb-3 tracking-tight">
-                Assistente Musical com IA
+                Assistente de Dança com IA
               </h2>
               <p className="text-muted-foreground text-center max-w-md mb-5 leading-relaxed text-sm">
                 Sua IA tem acesso em tempo real aos seus <strong>alunos</strong>, <strong>aulas</strong> e <strong>finanças</strong>. Faça perguntas ou escolha uma sugestão abaixo.
@@ -541,7 +541,7 @@ export default function IAAssistente() {
                 {[
                   "Pergunte em linguagem natural, como se estivesse falando com uma pessoa.",
                   "Use as sugestões da tela inicial para começar rápido.",
-                  "Quanto mais contexto (período, aluno, instrumento), melhor a resposta.",
+                  "Quanto mais contexto (período, aluno, modalidade), melhor a resposta.",
                   "Sempre confira as informações importantes antes de agir.",
                 ].map((t, i) => (
                   <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">

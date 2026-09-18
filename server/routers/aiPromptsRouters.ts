@@ -16,15 +16,15 @@ import { renderPromptVariables, defaultPromptVariables } from "../services/Promp
 import { INSTRUMENT_SPECIALISTS } from "../services/InstrumentSpecialistService";
 
 const BUILTIN_ICONS: Record<string, string> = {
-  cordas_dedilhadas: "🎸",
-  teclado: "🎹",
-  percussao: "🥁",
-  baixo: "🎸",
-  piano: "🎹",
-  voz: "🎤",
-  sopro: "🎷",
-  cordas_arco: "🎻",
-  geral: "🎵",
+  ballet: "🩰",
+  jazz: "✨",
+  urbanas: "👟",
+  salao: "💃",
+  sapateado: "👞",
+  contemporaneo: "🎭",
+  kids: "🧒",
+  fitness: "🔥",
+  geral: "💃",
 };
 
 export const aiSpecialistsRouters = {

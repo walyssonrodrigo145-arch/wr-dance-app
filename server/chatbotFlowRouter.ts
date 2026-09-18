@@ -47,13 +47,13 @@ export function getDefaultFlow(flowType: "aluno" | "lead"): ChatbotFlowData {
       flowType: "aluno",
       name: "Fluxo de Alunos Matriculados",
       welcomeMessage:
-        "Oi, *{nome_aluno}*! Que alegria te ver por aqui! 🎵😊\n\nComo posso te ajudar hoje na *{nome_escola}*?",
+        "Oi, *{nome_aluno}*! Que alegria te ver por aqui! 🩰😊\n\nComo posso te ajudar hoje na *{nome_escola}*?",
       fallbackMessage:
         "Desculpe, não entendi essa opção. Por favor, digite o número de uma das opções do menu ou digite *MENU* para reiniciar. 😊",
       humanMessage:
-        "Claro! Chamei o professor para te atender. Aguarde um instante! 🎸👤\n\n_Quando quiser voltar ao robô automático no futuro, é só digitar *MENU*._",
+        "Claro! Chamei o professor para te atender. Aguarde um instante! 🩰👤\n\n_Quando quiser voltar ao robô automático no futuro, é só digitar *MENU*._",
       exitMessage:
-        "Atendimento encerrado! 😊\n\nFoi um prazer falar com você. Se precisar de algo no futuro, é só mandar uma mensagem ou digitar *MENU*! 🎵👋",
+        "Atendimento encerrado! 😊\n\nFoi um prazer falar com você. Se precisar de algo no futuro, é só mandar uma mensagem ou digitar *MENU*! 🩰👋",
       isActive: 1,
       options: [
         {
@@ -139,13 +139,13 @@ export function getDefaultFlow(flowType: "aluno" | "lead"): ChatbotFlowData {
     flowType: "lead",
     name: "Fluxo de Novos Contatos / Visitantes",
     welcomeMessage:
-      "Olá! Seja muito bem-vindo(a) à *{nome_escola}*! 🎶\n\nFicamos felizes com seu contato! Aqui você encontra as melhores aulas de música. 😊\n\nComo posso te ajudar?",
+      "Olá! Seja muito bem-vindo(a) à *{nome_escola}*! 🎶\n\nFicamos felizes com seu contato! Aqui você encontra as melhores aulas de dança. 💃\n\nComo posso te ajudar?",
     fallbackMessage:
       "Desculpe, não compreendi. Por favor, digite o número de uma das opções ou digite *MENU* para ver as opções! 👇",
     humanMessage:
-      "Encaminhei sua solicitação para nossa equipe! Um atendente/professor entrará em contato em instantes. 🎵👤",
+      "Encaminhei sua solicitação para nossa equipe! Um atendente/professor entrará em contato em instantes. 🩰👤",
     exitMessage:
-      "Atendimento encerrado! 😊\n\nFicamos à disposição para quando quiser iniciar suas aulas de música! Até logo! 🎶",
+      "Atendimento encerrado! 😊\n\nFicamos à disposição para quando quiser iniciar suas aulas de dança! Até logo! 🩰",
     isActive: 1,
     options: [
       {
@@ -157,7 +157,7 @@ export function getDefaultFlow(flowType: "aluno" | "lead"): ChatbotFlowData {
         actionType: "system_action",
         systemAction: "matricula_link",
         customReply:
-          "Que alegria! 🎵 Venha fazer parte da nossa escola!\n\nAcesse nosso link oficial para conferir nossos cursos, planos e fazer sua matrícula online:\n👉 {link_matricula}\n\nOu digite 2 para falar diretamente com nossa equipe!",
+          "Que alegria! 🩰 Venha fazer parte da nossa escola!\n\nAcesse nosso link oficial para conferir nossos cursos, planos e fazer sua matrícula online:\n👉 {link_matricula}\n\nOu digite 2 para falar diretamente com nossa equipe!",
         isActive: true,
       },
       {
@@ -364,13 +364,15 @@ export const chatbotFlowRouter = router({
       const schoolName = "Sua Escola de Música";
       const studentName = "Aluno Teste";
 
+      const appUrl = process.env.APP_URL || "https://dancepro.wrmusicpro.com.br";
+
       const interpolate = (msg: string) => {
         return msg
           .replace(/\{nome_aluno\}/g, studentName)
           .replace(/\{primeiro_nome\}/g, "Aluno")
           .replace(/\{nome_escola\}/g, schoolName)
-          .replace(/\{link_matricula\}/g, "https://wrmusicpro.com.br/matricula/escola-exemplo")
-          .replace(/\{link_portal\}/g, "https://wrmusicpro.com.br/aluno")
+          .replace(/\{link_matricula\}/g, `${appUrl}/matricula/escola-exemplo`)
+          .replace(/\{link_portal\}/g, `${appUrl}/aluno`)
           .replace(/\{telefone\}/g, "(11) 99999-9999");
       };
 
@@ -445,7 +447,7 @@ export const chatbotFlowRouter = router({
           switch (matchedOpt.systemAction) {
             case "minhas_aulas":
               return {
-                reply: `📅 *Suas Próximas Aulas:*\n\n1️⃣ Terça-feira (18/08) às 15:00 - *Violão*\n2️⃣ Quinta-feira (20/08) às 15:00 - *Violão*\n\n_Para reagendar ou ver detalhes, acesse seu Portal do Aluno:_ https://wrmusicpro.com.br/aluno\n\nDigite *MENU* para ver mais opções.`,
+                reply: `📅 *Suas Próximas Aulas:*\n\n1️⃣ Terça-feira (18/08) às 15:00 - *Ballet*\n2️⃣ Quinta-feira (20/08) às 15:00 - *Ballet*\n\n_Para reagendar ou ver detalhes, acesse seu Portal do Aluno:_ ${appUrl}/aluno\n\nDigite *MENU* para ver mais opções.`,
                 nextState: "MENU_ALUNO",
                 actionExecuted: "system_minhas_aulas",
               };
@@ -463,19 +465,19 @@ export const chatbotFlowRouter = router({
               };
             case "reagendar_aula":
               return {
-                reply: `🔄 *Reagendamento de Aula:*\n\nVocê pode solicitar a troca de horário diretamente pelo Portal do Aluno:\n👉 https://wrmusicpro.com.br/aluno/agenda\n\nOu digite *0* para que o professor veja um novo horário com você!`,
+                reply: `🔄 *Reagendamento de Aula:*\n\nVocê pode solicitar a troca de horário diretamente pelo Portal do Aluno:\n👉 ${appUrl}/aluno/agenda\n\nOu digite *0* para que o professor veja um novo horário com você!`,
                 nextState: "MENU_ALUNO",
                 actionExecuted: "system_reagendar",
               };
             case "indicar_amigo":
               return {
-                reply: `🎁 *Indique um Amigo e Ganhe Desconto!*\n\nIndique amigos para a *${schoolName}*. Quando seu amigo se matricular, você ganha 20% de desconto na sua próxima mensalidade!\n\nCompartilhe esse link com ele:\n👉 https://wrmusicpro.com.br/matricula/escola-exemplo?ref=aluno-teste`,
+                reply: `🎁 *Indique um Amigo e Ganhe Desconto!*\n\nIndique amigos para a *${schoolName}*. Quando seu amigo se matricular, você ganha 20% de desconto na sua próxima mensalidade!\n\nCompartilhe esse link com ele:\n👉 ${appUrl}/matricula/escola-exemplo?ref=aluno-teste`,
                 nextState: "MENU_ALUNO",
                 actionExecuted: "system_indicar",
               };
             case "matricula_link":
               return {
-                reply: interpolate(matchedOpt.customReply || "👉 Acesse nosso portal de matrículas: https://wrmusicpro.com.br/matricula/escola-exemplo"),
+                reply: interpolate(matchedOpt.customReply || `👉 Acesse nosso portal de matrículas: ${appUrl}/matricula/escola-exemplo`),
                 nextState: "MENU_NOVO",
                 actionExecuted: "system_matricula",
               };

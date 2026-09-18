@@ -7,7 +7,6 @@ import {
   DollarSign, 
   BarChart3, 
   Bell, 
-  Guitar, 
   Check, 
   ArrowRight, 
   Menu, 
@@ -36,6 +35,7 @@ import { HeroSlider } from '@/components/HeroSlider';
 import ClientsMarquee from '@/components/ClientsMarquee';
 import { DanceProLogo } from '@/components/DanceProLogo';
 import { trpc } from '@/lib/trpc';
+import { SUPPORT_WHATSAPP_URL } from '@/lib/support';
 
 // ─── CONSTANTES ───────────────────────────────────────────────────────────────
 export const TRIAL_DAYS = 7;
@@ -988,7 +988,7 @@ const LandingPage = () => {
               { icon: DollarSign, title: 'Controle Financeiro', desc: 'Mensalidades, comprovantes e relatórios financeiros automáticos.' },
               { icon: Bell, title: 'Lembretes Automáticos', desc: 'Notificações por WhatsApp para alunos sobre aulas e pagamentos pendentes.' },
               { icon: BarChart3, title: 'Relatórios Avançados', desc: 'Dashboards detalhados para tomar decisões baseadas em dados reais.' },
-              { icon: Guitar, title: 'IA para Professores', desc: 'Gere planos de aula, análises de progresso e sugestões com inteligência artificial.' },
+              { icon: Sparkles, title: 'IA para Professores', desc: 'Gere planos de aula, análises de progresso e sugestões com inteligência artificial.' },
             ].map((feature, i) => (
               <motion.div
                 key={feature.title}
@@ -1248,6 +1248,22 @@ const LandingPage = () => {
           {loadingPlans ? (
             <div className="flex justify-center items-center py-20">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+            </div>
+          ) : plans.length === 0 ? (
+            <div className="max-w-xl mx-auto text-center rounded-[2rem] border border-border bg-card p-10 shadow-sm">
+              <Sparkles className="mx-auto text-primary mb-4" size={32} />
+              <h3 className="text-lg font-black text-foreground">Conta sob medida para sua escola</h3>
+              <p className="text-sm text-muted-foreground mt-2">
+                Fale com a gente no WhatsApp para criar a conta da sua escola de dança e conhecer as condições atuais.
+              </p>
+              <a
+                href={SUPPORT_WHATSAPP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 mt-6 px-6 py-3 bg-primary text-primary-foreground rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/30 hover:bg-primary/90 transition-all"
+              >
+                Falar com a gente
+              </a>
             </div>
           ) : (
             <div className="grid md:grid-cols-3 gap-6 items-center">

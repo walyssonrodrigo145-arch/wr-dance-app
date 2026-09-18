@@ -225,7 +225,7 @@ export function BibliotecaMusical({ studentId }: { studentId: number }) {
        {/* HEADER DA BIBLIOTECA */}
        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-             <h3 className="text-xl font-black text-foreground uppercase tracking-tighter">Biblioteca Musical</h3>
+             <h3 className="text-xl font-black text-foreground uppercase tracking-tighter">Biblioteca de Trilhas</h3>
              <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-[0.2em] mt-1">Central de Mídia e Materiais de Apoio</p>
           </div>
           

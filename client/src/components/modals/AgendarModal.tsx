@@ -344,7 +344,7 @@ export default function AgendarModal({ open, onOpenChange, initialDate, editingL
     const student = students?.find((s: any) => s.id.toString() === formData.studentId);
     const studentLabel = formData.isExperimental ? formData.experimentalName : student?.name;
     const instrument = instruments?.find(i => i.id.toString() === formData.instrumentId);
-    const submissionTitle = formData.title || (instrument ? `Aula de ${instrument.name}` : `Aula de Música (${studentLabel})`);
+    const submissionTitle = formData.title || (instrument ? `Aula de ${instrument.name}` : `Aula de Dança (${studentLabel})`);
 
     const [y, M, d] = formData.date.split("-").map(Number);
     const [hours, minutes] = formData.time.split(":").map(Number);
@@ -652,7 +652,7 @@ export default function AgendarModal({ open, onOpenChange, initialDate, editingL
               {/* Instrumento */}
               <div className="space-y-2">
                  <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 px-2">
-                   <Music size={12} className="text-primary/40" /> Instrumento
+                   <Music size={12} className="text-primary/40" /> Modalidade
                  </label>
                  <select
                    value={formData.instrumentId}
@@ -1052,7 +1052,7 @@ export default function AgendarModal({ open, onOpenChange, initialDate, editingL
                    studentId: formData.isExperimental ? null : (formData.studentId ? Number(formData.studentId) : null),
                    isExperimental: formData.isExperimental,
                    experimentalName: formData.experimentalName,
-                   title: formData.title || "Aula de Música",
+                   title: formData.title || "Aula de Dança",
                    duration: formData.duration,
                    notes: formData.notes,
                    instrumentId: formData.instrumentId ? Number(formData.instrumentId) : null,
@@ -1079,7 +1079,7 @@ export default function AgendarModal({ open, onOpenChange, initialDate, editingL
                    studentId: formData.isExperimental ? null : (formData.studentId ? Number(formData.studentId) : null),
                    isExperimental: formData.isExperimental,
                    experimentalName: formData.experimentalName,
-                   title: formData.title || "Aula de Música",
+                   title: formData.title || "Aula de Dança",
                    duration: formData.duration,
                    notes: formData.notes,
                    instrumentId: formData.instrumentId ? Number(formData.instrumentId) : null,

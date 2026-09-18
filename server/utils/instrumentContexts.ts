@@ -1,18 +1,18 @@
 /**
- * INSTRUMENT_CONTEXTS
+ * MODALITY_CONTEXTS — DancePro
  *
- * Mapa estático de contextos pedagógicos por categoria de instrumento.
- * Usado pelo gerador de Plano Diário de Estudos para garantir que
- * o prompt da IA use terminologia correta para cada instrumento.
+ * Mapa estático de contextos pedagógicos por MODALIDADE DE DANÇA.
+ * Usado pelo gerador de Plano Diário/Estudos (IA) para garantir terminologia
+ * correta, aquecimento seguro e evitar contaminação entre técnicas.
  *
  * Categorias suportadas:
- *   cordas_dedilhadas | teclado | percussao | voz | sopro | cordas_arco | geral
+ *   ballet | jazz | urbanas | salao | sapateado | contemporaneo | kids | fitness | geral
  */
 
 export interface InstrumentContext {
-  /** Termos técnicos corretos e esperados para este instrumento */
+  /** Termos técnicos corretos e esperados para esta modalidade */
   terminology: string[];
-  /** Termos de outros instrumentos que NÃO devem aparecer neste plano */
+  /** Termos de outras modalidades que NÃO devem aparecer neste plano */
   forbiddenTerms: string[];
   /** Descrição do tipo de aquecimento adequado */
   warmupDescription: string;
@@ -28,662 +28,381 @@ export interface InstrumentContext {
     intermediario: string;
     avancado: string;
   };
-  /** Instrução extra para a IA sobre este instrumento */
+  /** Instrução extra para a IA sobre esta modalidade */
   extraInstruction: string;
 }
 
 export type InstrumentCategory =
-  | "cordas_dedilhadas"
-  | "teclado"
-  | "percussao"
-  | "baixo"
-  | "piano"
-  | "voz"
-  | "sopro"
-  | "cordas_arco"
+  | "ballet"
+  | "jazz"
+  | "urbanas"
+  | "salao"
+  | "sapateado"
+  | "contemporaneo"
+  | "kids"
+  | "fitness"
   | "geral";
 
 export const INSTRUMENT_CONTEXTS: Record<InstrumentCategory, InstrumentContext> = {
-  // ─── CORDAS DEDILHADAS: Violão, Guitarra, Baixo, Ukulele, Cavaquinho ─────
-  cordas_dedilhadas: {
+  // ─── BALLET CLÁSSICO / PONTAS / REPERTÓRIO ─────────────────────────────
+  ballet: {
     terminology: [
-      "cordas",
-      "trastes",
-      "pestana",
-      "dedilhado",
-      "palhetada",
-      "acorde",
-      "escala",
-      "arpejo",
-      "afinação",
-      "braço do instrumento",
-      "captador",
-      "corpo do instrumento",
-      "ponte",
-      "capotraste",
-      "slides",
-      "bend",
-      "vibrato",
-      "ligado ascendente (hammer-on)",
-      "ligado descendente (pull-off)",
+      "postura", "alinhamento", "en dehors", "plié", "tendu", "dégagé",
+      "rond de jambe", "battement", "piqué", "port de bras", "barra", "centro",
+      "primeira posição", "quinta posição", "arabesque", "attitude",
+      "sauté", "échappé", "passé", "equilíbrio", "épaulement",
     ],
     forbiddenTerms: [
-      "bumbum", "caixa", "chimbal", "bumbo", "prato", "rudimento",
-      "pedal de bumbo", "hi-hat",
-      "mão esquerda e mão direita separadas para cada pauta",
-      "nota grave na clave de fá",
-      "vocalise", "projeção vocal", "dicção", "respiração diafragmática",
-      "embocadura", "língua dupla",
-      "arco", "golpe de arco", "pizzicato",
+      "sapateado", "bate-pé de sapateado", "freeze", "power move", "headspin",
+      "passo de hip hop", "passo de forró", "condução de salão", "acrobacia aérea",
+      "ponta (para iniciante)", "exercício de acrobacia sem supervisão",
     ],
-    warmupDescription: "Exercícios de aquecimento dos dedos no braço do instrumento, sem pressionar as cordas com força excessiva",
+    warmupDescription: "Aquecimento articulando pés, tornozelos e quadril antes da barra, com foco em alinhamento postural",
     warmupExamples: [
-      "Exercício cromático (1-2-3-4) no braço, subindo e descendo os trastes devagar",
-      "Abrir e fechar os dedos da mão de fretes lentamente sobre uma superfície plana",
-      "Tocar as cordas soltas alternando dedos indicador e médio (ou palheta) em ritmo lento e constante",
+      "Rolamento de pés e tornozelos + movimentação de quadril, 5 min, com apoio leve na barra",
+      "Alongamento suave de panturrilha e posterior de coxa + ativação do abdômen antes da barra",
     ],
     technicalFocusExamples: [
-      "Formação e troca limpa de acordes",
-      "Desenvolvimento da pestana (dedo índice cobrindo todas as cordas em um traste)",
-      "Palhetada alternada em velocidade controlada",
-      "Dedilhado padrão (p-i-m-a) nas cordas",
-      "Leitura de tablatura",
-      "Técnica de palm mute (abafamento com a palma)",
+      "Alinhamento do corpo no plié e tendu (joelhos alinhados aos pés, quadril neutro)",
+      "Controle do en dehors nas posições de base e equilíbrio no passé",
+      "Preparação de giro simples com foco em cabeça de giro e tronco firme",
     ],
     challengeExamples: [
-      "Trocar entre dois acordes sem parar o ritmo em X segundos",
-      "Tocar um riff ou trecho de música do início ao fim sem errar",
-      "Gravar 30 segundos tocando e ouvir para identificar erros",
+      "Executar a combinação da barra inteira sem pausas, mantendo o alinhamento",
+      "Fazer 3 equilíbrios seguidos no passé (cada lado) com apenas 1 apoio",
     ],
     levelHints: {
-      iniciante:
-        "Use linguagem muito simples. Diga exatamente quais dedos usar (indicador, médio, anelar, mínimo). Evite termos técnicos em inglês. Descreva a postura da mão. Limite a 2-3 acordes por exercício.",
-      intermediario:
-        "Pode usar termos como 'palhetada alternada', 'pestana', 'arpejo'. Foque na limpeza do som e troca fluida entre acordes. Introduza posições além da primeira posição.",
-      avancado:
-        "Use terminologia técnica completa. Foque em velocidade, expressividade, dinâmica e musicalidade. Pode incluir improvisação sobre escalas e progressões.",
+      iniciante: "Explique cada posição pelo nome em português e use comparações simples (ex.: 'como se fosse um ímã no chão').",
+      intermediario: "Use os nomes franceses com o movimento descrito; foque em precisão de alinhamento e musicalidade.",
+      avancado: "Use terminologia clássica completa; foque em refinamento artístico, controle e amplitude segura.",
     },
-    extraInstruction:
-      "NUNCA mencione termos de bateria, piano ou instrumentos de sopro. Todos os exercícios devem ser realizados com o instrumento de cordas.",
+    extraInstruction: "NUNCA sugira exercícios de pontas para alunas sem avaliação física; deixe claro que pontas exigem liberação do professor.",
   },
 
-  // ─── TECLADO / TECLADO MODERNO ────────────────────────────────────────────
-  teclado: {
+  // ─── JAZZ / LÍRICO / MUSICAL ───────────────────────────────────────────
+  jazz: {
     terminology: [
-      // Técnica de mão
-      "mão direita", "mão esquerda", "posição dos dedos", "dedilhado",
-      "legato", "staccato", "acentuação", "articulação",
-      "dinâmica (piano, forte, mezzoforte)", "controle de expressão",
-      // Harmonia aplicada
-      "voicing", "close voicing", "open voicing", "spread voicing", "rootless voicing",
-      "quartal voicing", "upper structures", "shell voicings", "cluster",
-      "drop 2", "drop 3", "condução de vozes", "voice leading",
-      "voz / vozes (camada polifônica)", "4 vozes (soprano, contralto, tenor, baixo)",
-      // Técnicas de acompanhamento
-      "pads", "comping", "acompanhamento rítmico", "arpejos", "broken chords",
-      "baixo na mão esquerda", "acordes na mão direita",
-      // Timbres e configuração eletrônica
-      "timbre", "layer", "split", "piano", "órgão", "lead", "synth", "strings",
-      "pedal de sustain", "velocity", "sustain",
-      // Música e contexto
-      "escala", "arpejo", "oitava", "tecla", "nota", "compasso",
-      // Estilos
-      "worship", "gospel", "pop", "rock", "mpb", "jazz", "música congregacional",
+      "isolamento de quadril", "isolação de ombros", "cabeça de jazz", "clean", "kick ball change",
+      "pas de bourrée", "grapevine", "chassé", "pivot", "jazz square",
+      "ondulação de tronco", "contração", "extensão", "energia", "precisão",
     ],
     forbiddenTerms: [
-      "acorde com pestana", "traste", "corda solta", "palheta", "palm mute",
-      "bumbo", "caixa", "chimbal", "rudimento", "pedal de bumbo",
-      "vocalise de cantor", "projeção vocal", "dicção", "respiração diafragmática",
-      "embocadura", "arco de violino", "pizzicato",
-      "slap", "thumb", "fingerstyle de baixo", "ghost note de baixo",
+      "sapateado", "bate-pé", "fouetté de pontas", "barra clássica obrigatória",
+      "condução a dois", "power move", "headspin", "acrobacia aérea sem supervisão",
     ],
-    warmupDescription: "Escala na posição de cinco dedos com cada mão separadamente + voicing fechado devagar",
+    warmupDescription: "Aquecimento com isolamentos articulados (cabeça, ombros, quadril) e ativação de pernas antes dos deslocamentos",
     warmupExamples: [
-      "Escala de Dó maior (ou tonalidade da meta) — mão direita devagar, nota por nota",
-      "Mesma escala — mão esquerda devagar",
-      "Shell voicing (1ª-3ª-7ª) do acorde da meta — monte lentamente, tecla por tecla",
-      "Broken chords em arpejo ascendente/descendente da tonalidade — ambas as mãos",
+      "Isolamento de cabeça, ombros e quadril por 4 músicas, uma articulação por vez",
+      "Alongamento dinâmico de posteriores + ativação de panturrilha e core",
     ],
     technicalFocusExamples: [
-      "Voicing fechado (close voicing) na mão direita: ex. Dm7 = D-F-A-C com dedos 1-2-3-5",
-      "Rootless voicing: acorde sem fundamental, mão esq. no baixo, mão dir. nas tensões",
-      "Upper structures: tríade no topo sobre acorde dominante na esquerda",
-      "Condução de vozes (voice leading): movimento suave entre acordes, vozes internas mínimas",
-      "Comping: mão direita marca acordes em síncope enquanto esquerda sustenta baixo",
-      "Layer / Split: configurar dois timbres separados (ex: piano grave + pad agudo)",
+      "Limpeza (clean) da combinação de pas de bourrée + chassé no tempo forte",
+      "Ondulação de tronco contínua com controle respiratório",
+      "Pivot preciso com manutenção do foco visual",
     ],
     challengeExamples: [
-      "Tocar progressão II-V-I com rootless voicings em 3 tonalidades sem parar",
-      "Improvisar pads de worship em 4 vozes por 2 minutos mantendo voice leading",
-      "Executar comping de jazz (mão dir. síncope) com walking bass simplificado na esq.",
+      "Gravar a combinação de 8 tempos em velocidade da música original",
+      "Improvisar 30s usando 3 elementos aprendidos (isolamento, chassé, pivot)",
     ],
     levelHints: {
-      iniciante:
-        "Use linguagem simples. Explique mão direita e esquerda separadamente. Comece com shell voicings (raiz-3ª-7ª). Evite termos eletrônicos complexos. Dedos: 1=polegar, 2=indicador, 3=médio, 4=anelar, 5=mínimo.",
-      intermediario:
-        "Introduza close e open voicing, rootless voicings básicos, condução de vozes. Trabalhe dinâmica, articulação e coordenação entre as mãos. Contextos: worship, pop, gospel.",
-      avancado:
-        "Explore upper structures, quartal voicing, drop 2/3, spread voicings, comping sofisticado, layers/splits avançados. Foque em voice leading musical e performance ao vivo.",
+      iniciante: "Explique contagem em 8 tempo por tempo e faça o movimento por partes antes de juntar.",
+      intermediario: "Trabalhe qualidade de movimento e dinâmica (forte/fraco) mantendo a contagem.",
+      avancado: "Foque em interpretação, textura de movimento e variações de nível (chão/ar).",
     },
-    extraInstruction:
-      "Em TECLADO: 'voz/vozes/voicing' = camada polifônica / disposição do acorde (ex: 4 vozes = SATB; voicing = Dm7 fechado D-F-A-C na mão direita). NUNCA confundir com canto/vocalise. NUNCA usar termos de bateria (bumbo, caixa, chimbal) ou de baixo (slap, thumb). Descreva qual mão usa qual timbre quando for relevante.",
+    extraInstruction: "Diferencie 'força' de 'tensão': pedir força demais gera lesão; oriente movimento com apoio ativo do core.",
   },
 
-  // ─── PERCUSSÃO / BATERIA ──────────────────────────────────────────────────
-  percussao: {
+  // ─── DANÇAS URBANAS / HIP HOP / BREAKING / K-POP ───────────────────────
+  urbanas: {
     terminology: [
-      // Peças da bateria
-      "bumbo", "caixa", "chimbal (hi-hat)", "prato de condução", "prato de ataque (crash)",
-      "prato de ride", "tons (tom-tom)", "surdo",
-      // Técnicas de mão
-      "baqueta", "moeller technique", "finger control", "wrist technique", "rebound",
-      "ghost notes", "rimshot", "cross stick", "buzz roll", "open roll", "closed roll",
-      // Pés
-      "pedal de bumbo", "pedal do chimbal", "pé direito", "pé esquerdo",
-      // Rudimentos
-      "rudimento", "single stroke roll", "double stroke roll", "paradiddle", "double paradiddle",
-      "triple paradiddle", "flam", "flam accent", "flam tap", "drag", "ruff", "ratamacue",
-      // Rítmica
-      "groove", "fill (virada)", "ostinato", "compasso", "subdivisão", "semicolcheia",
-      "tercina", "quiáltera", "síncope", "deslocamento rítmico", "polirritmia", "polimetria",
-      "independência de membros", "coordenação linear",
-      // Estilos
-      "rock", "pop", "gospel", "funk", "blues", "jazz", "samba", "bossa nova",
-      "baião", "forró", "shuffle", "reggae", "worship", "fusion",
-      // Controle
-      "BPM", "metrônomo", "dinâmica", "resistência", "velocidade",
+      "bounce", "rock", "groove", "top rock", "footwork", "freeze",
+      "wave", "pop", "lock", "isolation", "foundation", "musicalidade",
+      "cypher", "batalha", "set", "flow",
     ],
     forbiddenTerms: [
-      "acorde", "nota harmônica", "Dó", "Ré", "Mi", "Fá", "Sol", "Lá", "Si",
-      "pestana", "traste", "corda solta", "palheta", "dedilhado",
-      "bend", "vibrato melódico", "hammer-on", "pull-off", "slap de baixo",
-      "vocalise", "projeção vocal", "respiração diafragmática",
-      "embocadura", "arco de violino", "pizzicato",
-      "voicing", "voice leading", "inversão de acorde",
+      "en dehors clássico", "barra de ballet", "pontas", "sapateado",
+      "condução de salão", "passo de forró", "acrobacia aérea sem supervisão",
+      "power move (para iniciante)", "headspin (para iniciante)",
     ],
-    warmupDescription: "Rudimentos básicos com mãos e pés separados, usando Moeller Technique para relaxamento, em BPM lento",
+    warmupDescription: "Aquecimento articular com bounce e ativação de tornozelos, joelhos e ombros, preparando impacto",
     warmupExamples: [
-      "Single Stroke Roll (RLRL) nas coxas — 2 min devagar, foco em rebound natural",
-      "Double Stroke Roll (RRLL) — pulso relaxado, deixar a baqueta ricocheteando (rebound)",
-      "Bumbo em semínimas + chimbal em colcheias (pé esquerdo) — 60 BPM por 1 min",
-      "Paradiddle (RLRR LRLL) nas coxas — devagar, contando em voz alta",
+      "Bounce básico por 3 músicas alternando rock lento e rápido",
+      "Aquecimento de tornozelos, joelhos e quadril + ativação de ombros para waves",
     ],
     technicalFocusExamples: [
-      "Groove de rock com bumbo nos tempos 1 e 3, caixa nos tempos 2 e 4, chimbal em colcheias",
-      "Ghost notes na caixa: toques suaves intermediários entre os acentos principais",
-      "Independência: chimbal em semínimas (pé esq.), bumbo em padrão sincopado",
-      "Moeller Technique: movimento de chicote do pulso para economia de energia",
-      "Polirritmia 3 contra 2: mão direita em tercinas, mão esquerda em colcheias",
-      "Fill de 4 compassos pelos tons + reentrada precisa no groove",
+      "Groove constante com contratempo (musicalidade) sem perder o bounce",
+      "Fundamento de top rock com postura e olhar presentes",
+      "Isolamento de peito e cabeça para composição de wave",
     ],
     challengeExamples: [
-      "Tocar groove de funk com ghost notes por 3 min a 80 BPM sem perder o bolso",
-      "Executar paradiddle com accents deslocados (acento no segundo golpe) a 100 BPM",
-      "Gravar groove + fill e ouvir para verificar precisão rítmica e dinâmica",
+      "Criar 1 set de 16 tempos com top rock + footwork + freeze de segurança",
+      "Batalha amistosa: apresentar o set para o espelho sem perder o tempo",
     ],
     levelHints: {
-      iniciante:
-        "Comece com mãos e pés separados. Explique cada peça da bateria por nome (bumbo, caixa, chimbal). Use metrônomo a 60–80 BPM. Foque em regularidade antes da velocidade. Evite fills nos primeiros exercícios.",
-      intermediario:
-        "Introduza ghost notes, fills simples e grooves de estilos variados (rock, samba, funk). Trabalhe independência de membros. Aumente BPM em blocos de 5. Instrua subdivisões e controle de dinâmica.",
-      avancado:
-        "Explore polirritmia, polimetria, deslocamento rítmico, Moeller Technique avançado e leitura de partitura de bateria. Estilos: jazz, fusion, baião. Foque em dinâmica expressiva e fills complexos.",
+      iniciante: "Ensine fundamento antes de estilo: bounce e musicalidade valem mais que movimento bonito.",
+      intermediario: "Aumente dificuldade de footwork e transições, mantendo limpeza do groove.",
+      avancado: "Trabalhe dinâmica, freestyle e variações de freeze com segurança.",
     },
-    extraInstruction:
-      "NUNCA mencione notas musicais (Dó, Ré, Mi...), acordes, escalas ou qualquer conteúdo harmônico/melódico. A bateria é instrumento RÍTMICO. Todos os exercícios envolvem ritmo, tempo, coordenação, dinâmica e técnica de mão/pé. NUNCA use termos como 'bend', 'slap de baixo', 'voicing' ou 'pestana'.",
+    extraInstruction: "PROIBIDO ensinar power moves (headspin, windmill, flare) sem colchão, professor presente e aluno com base de força — risco altíssimo de lesão cervical.",
   },
 
-  // ─── VOZ / CANTO ─────────────────────────────────────────────────────────
-  voz: {
+  // ─── DANÇA DE SALÃO / A DOIS / FORRÓ / SAMBA / TANGO ───────────────────
+  salao: {
     terminology: [
-      "respiração diafragmática",
-      "apoio vocal",
-      "projeção vocal",
-      "vocalise",
-      "dicção",
-      "articulação",
-      "afinação",
-      "tessitura",
-      "passagem de registro",
-      "voz de peito",
-      "voz de cabeça",
-      "falsete",
-      "vibrato vocal",
-      "ressonância",
-      "aquecimento vocal",
-      "resfriamento vocal",
-      "frase musical",
-      "dinâmica vocal (piano, forte)",
-      "postura corporal para o canto",
+      "condução", "base", "dama", "cavalheiro", "giro simples", "marcha",
+      "passo básico", "fechamento", "abertura", "troca de mão", "postura de par",
+      "tempo forte", "contratempo", "musicalidade a dois",
     ],
     forbiddenTerms: [
-      "traste", "corda solta", "acorde com pestana", "palheta", "palm mute",
-      "bumbum", "caixa", "chimbal", "rudimento", "pedal de bumbo",
-      "arco", "golpe de arco", "pizzicato",
-      "embocadura de bocal", "língua dupla",
+      "en dehors de ballet", "barra clássica", "sapateado", "freeze", "power move",
+      "headspin", "isolamento de hip hop", "pontas", "acrobacia aérea",
     ],
-    warmupDescription: "Aquecimento vocal com exercícios de respiração e vocalises curtos em tons confortáveis",
+    warmupDescription: "Aquecimento individual de quadril e coluna + prática de condução sem música antes do par",
     warmupExamples: [
-      "Respiração diafragmática: inspirar em 4 tempos, segurar 2, soltar em 8",
-      "Humming (cantarolar com boca fechada) em escala ascendente e descendente",
-      "Vocalise com vogal 'mah' do Dó até o Sol e voltando",
+      "Mobilidade de quadril e coluna, 5 min, com foco em eixo e equilíbrio",
+      "Caminhada no ritmo contando 1-2-3 sem música, depois com música lenta",
     ],
     technicalFocusExamples: [
-      "Afinação em escala maior",
-      "Dicção e articulação de consoantes na letra",
-      "Passagem de registro (voz de peito para voz de cabeça)",
-      "Vibrato natural e controlado",
-      "Dinâmica: cantar piano (suave) e forte com controle",
-      "Projeção vocal sem forçar a garganta",
+      "Condução clara pela estrutura da mão/braço (sem empurrar a dama)",
+      "Postura de par com eixo no próprio corpo e olhar disponível",
+      "Passo básico com tempo forte correto e sem atropelar a música",
     ],
     challengeExamples: [
-      "Cantar uma frase da música com olhos fechados, focando só na afinação",
-      "Gravar um trecho do repertório e ouvir para identificar pontos de melhoria",
-      "Cantar a mesma frase 3 vezes mais forte e 3 vezes mais suave mantendo afinação",
+      "Dançar 1 música inteira sem perder o tempo e sem apertar a mão do par",
+      "Trocar de par 3 vezes mantendo a condução clara",
     ],
     levelHints: {
-      iniciante:
-        "Foque em respiração correta e postura corporal. Vocalises simples em âmbito curto. Evite notas extremas da tessitura. Linguagem simples, sem termos técnicos excessivos.",
-      intermediario:
-        "Introduza passagem de registro, vibrato inicial e trabalho de dicção. Repertório mais desafiador. Foque na afinação em intervalos maiores.",
-      avancado:
-        "Trabalhe expressividade, fraseado, vibrato refinado, coloração vocal e domínio da dinâmica completa. Inclua técnicas avançadas de acordo com o estilo.",
+      iniciante: "Separe papel de conduzir e ser conduzido(a); ensine o passo básico contando em voz alta.",
+      intermediario: "Adicione giros e variações mantendo a condução simples e confortável.",
+      avancado: "Trabalhe contramovimento, figuras encadeadas e interpretação musical a dois.",
     },
-    extraInstruction:
-      "A voz é o instrumento. NUNCA mencione instrumento físico nas mãos (violão, teclas, baqueta). Todos os exercícios são para a voz, corpo e respiração. Se houver acompanhamento de instrumento, mencione apenas como referência de afinação.",
+    extraInstruction: "Reforce consentimento e conforto: o par pode pedir pausa a qualquer momento; condução nunca é força.",
   },
 
-  // ─── SOPROS: Flauta, Saxofone, Clarinete, Trompete, Trombone, etc. ───────
-  sopro: {
+  // ─── SAPATEADO / TAP ───────────────────────────────────────────────────
+  sapateado: {
     terminology: [
-      "embocadura",
-      "coluna de ar",
-      "apoio de ar",
-      "língua simples",
-      "língua dupla",
-      "articulação",
-      "digitação",
-      "chaves",
-      "nota longa (long tone)",
-      "afinação",
-      "vibrato",
-      "dinâmica (piano, forte)",
-      "ligado",
-      "staccato",
-      "respiração circular (avançado)",
-      "bocal",
-      "palheta (sopros de palheta: sax, clarinete)",
-      "registo (grave, médio, agudo)",
+      "flat", "ball", "heel", "toe", "shuffle", "flap", "ball change",
+      "dig", "stamp", "stomp", "brush", "pickup", "clareza de som", "ritmo",
     ],
     forbiddenTerms: [
-      "traste", "corda solta", "acorde com pestana", "palheta da guitarra",
-      "bumbum", "caixa", "chimbal", "rudimento",
-      "vocalise (termo de canto)", "projeção vocal do cantor",
-      "mão direita e esquerda no teclado", "tecla",
-      "arco", "pizzicato",
+      "en dehors clássico obrigatório", "barra de ballet obrigatória", "freeze",
+      "power move", "headspin", "condução de salão", "passo de forró",
     ],
-    warmupDescription: "Exercícios de embocadura e notas longas para aquecer o instrumento e a musculatura facial",
+    warmupDescription: "Aquecimento de tornozelos e pés + prática de sons lentos para clareza antes da velocidade",
     warmupExamples: [
-      "Notas longas (long tones): sustentar cada nota por 8 tempos com ar constante e controlado",
-      "Escala de Dó maior (ou escala da meta) em semínimas no metrônomo em BPM lento",
-      "Exercício de articulação: tocar a mesma nota repetindo a sílaba 'tu-tu-tu' com língua",
+      "Aquecimento de tornozelos e panturrilha, 4 min, seguido de flats e balls lentos",
+      "Sequência lenta de shuffle + flap no centro, sem música, buscando som limpo",
     ],
     technicalFocusExamples: [
-      "Embocadura firme e estável nas notas agudas",
-      "Suavidade nas ligações entre notas (legato)",
-      "Articulação staccato clara e limpa",
-      "Digitação rápida e precisa nas chaves",
-      "Controle de dinâmica (crescendo e decrescendo numa mesma nota)",
-      "Afinação comparada ao afinador eletrônico",
+      "Clareza de som no shuffle: som separado do flap e sem arrastar o pé",
+      "Peso distribuído corretamente entre ball e heel na troca de apoio",
+      "Marcação rítmica em compassos de 4 tempos com palmas antes de sapatear",
     ],
     challengeExamples: [
-      "Tocar um trecho de música do início ao fim sem parar, focando na afinação",
-      "Aumentar BPM em 5 a cada repetição sem perder a limpeza das notas",
-      "Gravar um exercício e comparar afinação com o afinador",
+      "Executar a sequência de 8 sons em 3 velocidades diferentes com som limpo",
+      "Criar 1 frase de 4 tempos usando 3 sons aprendidos",
     ],
     levelHints: {
-      iniciante:
-        "Foque na formação correta da embocadura e na produção de som limpo. Explique a respiração diafragmática adaptada ao sopro. Comece com poucas notas e escala simples.",
-      intermediario:
-        "Introduza articulação variada (legato e staccato), vibrato suave e controle de dinâmica. Trabalhe escalas maiores e repertório intermediário.",
-      avancado:
-        "Foque em expressividade, vibrato refinado, velocidade e técnicas avançadas como língua dupla e respiração circular.",
+      iniciante: "Priorize som limpo em andamento lento; nunca acelere antes da clareza.",
+      intermediario: "Aumente velocidade e adicione sincopas mantendo a postura ereta.",
+      avancado: "Trabalhe dinâmica (piano/forte), a cappella e improvisação rítmica.",
     },
-    extraInstruction:
-      "NUNCA mencione cordas, trastes, teclas de piano ou peças de bateria. Todos os exercícios devem envolver ar, embocadura, digitação e articulação específicas do instrumento de sopro.",
+    extraInstruction: "Sapateado exige piso adequado e aquecimento de tornozelo — evite exercícios de impacto em piso duro sem orientação.",
   },
 
-  // ─── CORDAS COM ARCO: Violino, Viola, Violoncelo, Contrabaixo ────────────
-  cordas_arco: {
+  // ─── CONTEMPORÂNEO / MODERNO / LÍRICO ──────────────────────────────────
+  contemporaneo: {
     terminology: [
-      "arco",
-      "golpe de arco",
-      "détaché",
-      "legato com arco",
-      "staccato com arco",
-      "spiccato",
-      "pressão do arco",
-      "velocidade do arco",
-      "crina do arco",
-      "ponto de contato (corda vs. arco)",
-      "mão esquerda (posição)",
-      "mão direita (arco)",
-      "corda",
-      "posições (1ª, 2ª, 3ª posição...)",
-      "vibrato de corda",
-      "pizzicato",
-      "escala",
-      "afinação por ouvido",
-      "bequadro, sustenido, bemol",
+      "peso", "queda controlada", "gravidade", "contração", "release",
+      "espiral", "fluxo", "níveis (chão/médio/alto)", "respiração", "eixo",
+      "qualidade de movimento", "improvisação", "partitura de movimento",
     ],
     forbiddenTerms: [
-      "traste", "palheta da guitarra", "acorde com pestana",
-      "bumbum", "caixa", "chimbal", "rudimento",
-      "vocalise de cantor", "embocadura de sopro",
-      "tecla", "pedal de piano",
+      "barra clássica obrigatória", "en dehors rígido", "sapateado", "freeze",
+      "power move", "headspin", "passo de forró", "acrobacia aérea sem supervisão",
     ],
-    warmupDescription: "Exercícios de arco em cordas soltas e notas longas para aquecimento de mão direita e escala de posição para mão esquerda",
+    warmupDescription: "Aquecimento de coluna e respiração, explorando transferência de peso e contato com o chão",
     warmupExamples: [
-      "Notas longas nas cordas soltas: arco inteiro de ponta a talão, ouvindo a qualidade do som",
-      "Escala de Ré maior (ou escala da meta) em 1ª posição, uma nota por arco, devagar",
-      "Exercício de détaché suave: colcheia por colcheia na corda mais grave",
+      "Rolamentos de coluna + respiração diafragmática, 5 min, percebendo o peso do corpo",
+      "Exploração de transferência de peso entre os pés em câmera lenta",
     ],
     technicalFocusExamples: [
-      "Distribuição de arco (talão, meio, ponta) em diferentes golpes",
-      "Afinação por ouvido na posição",
-      "Vibrato suave e controlado",
-      "Cruzamento de cordas sem ruído",
-      "Golpes de arco: détaché, legato, staccato, spiccato",
-      "Mudança de posição fluida",
+      "Queda controlada com rolamento e subida sem travar a respiração",
+      "Espiral de tronco mantendo eixo e olhar ativo",
+      "Uso de níveis (chão → médio → alto) numa frase de movimento",
     ],
     challengeExamples: [
-      "Tocar um trecho de música do início ao fim com arco constante e afinação correta",
-      "Gravar e comparar com referência gravada para identificar afinação e timbre",
-      "Tocar pizzicato um trecho que normalmente é tocado com arco, focando na afinação",
+      "Criar uma partitura de 30s usando queda, espiral e mudança de nível",
+      "Improvisar 1 min com pausas propositais e respiração audível",
     ],
     levelHints: {
-      iniciante:
-        "Foque na postura do arco e na produção de som limpo nas cordas soltas. Explique a diferença entre mão do arco e mão das posições. Use linguagem simples e muitos detalhes de postura.",
-      intermediario:
-        "Introduza golpes de arco variados, mudanças de posição e vibrato inicial. Trabalhe afinação em escalas e peças de repertório.",
-      avancado:
-        "Foque em expressividade, vibrato refinado, golpes de arco avançados, dinâmica e musicalidade. Pode incluir cordas duplas e harmônicos.",
+      iniciante: "Comece pelo chão: segurança e rolamento antes de movimentos aéreos.",
+      intermediario: "Trabalhe fluidez entre níveis e qualidade de movimento (peso/tempo).",
+      avancado: "Aprofunde interpretação, contato-improvisação e assinatura autoral do movimento.",
     },
-    extraInstruction:
-      "NUNCA mencione trastes, teclas, palheta de guitarra ou peças de bateria. O instrumento tem arco e cordas sem trastes. A afinação é feita pelo ouvido e por posição dos dedos na corda, não por trastes.",
+    extraInstruction: "SLAM/queda de peso só com colchão e progressão adequada; nunca peça queda de altura para iniciante.",
   },
 
-  // ─── GENÉRICO (Fallback para instrumento não mapeado) ────────────────────
+  // ─── DANÇA INFANTIL / BABY CLASS / KIDS ────────────────────────────────
+  kids: {
+    terminology: [
+      "brincadeira dançada", "historinha", "jogo rítmico", "pular", "girar",
+      "esquerda e direita", "marcha", "equilíbrio", "coordenação", "espelho",
+      "contagem com palmas", "alongamento divertido",
+    ],
+    forbiddenTerms: [
+      "pontas", "en dehors extremo", "fouetté", "acrobacia aérea", "power move",
+      "headspin", "salto com impacto", "alongamento passivo forçado",
+    ],
+    warmupDescription: "Aquecimento lúdico com música, imitação de animais e movimentos amplos, em blocos curtos",
+    warmupExamples: [
+      "Brincadeira 'siga o mestre' por 3 músicas: marchar, pular, girar devagar",
+      "Aquecimento dos pés com história (ex.: 'pés de patinho') e alongamento leve",
+    ],
+    technicalFocusExamples: [
+      "Coordenação de braços e pernas em marcha com palmas no tempo",
+      "Equilíbrio em um pé com apoio visual (segurar a mão do professor)",
+      "Noção de espaço: andar na linha/formação sem esbarrar nos colegas",
+    ],
+    challengeExamples: [
+      "Dançar a coreografia da turma inteira sem parar, com sorriso e olhar para o público",
+      "Criar 1 movimento novo para a historinha da aula",
+    ],
+    levelHints: {
+      iniciante: "Use linguagem lúdica, blocos de 3-5 minutos e MUITA repetição positiva.",
+      intermediario: "Introduza pequenas sequências de memória e trocas de formação.",
+      avancado: "Aumente duração da sequência e precisão rítmica mantendo o caráter lúdico.",
+    },
+    extraInstruction: "Turmas kids: NUNCA alongamento passivo forçado nem movimentos de impacto; priorize coordenação, escuta musical e diversão.",
+  },
+
+  // ─── FITNESS & LIVRE / ZUMBA / ALONGAMENTO ─────────────────────────────
+  fitness: {
+    terminology: [
+      "aquecimento cardiovascular", "condicionamento", "core", "amplitude",
+      "mobilidade", "resistência", "alongamento ativo", "respiração",
+      "intensidade", "recuperação", "frequência cardíaca", "hidratação",
+    ],
+    forbiddenTerms: [
+      "en dehors clássico", "barra de ballet", "pontas", "sapateado",
+      "freeze", "power move", "headspin", "condução de salão",
+    ],
+    warmupDescription: "Aquecimento progressivo do baixo para o alto impacto, com mobilidade articular completa",
+    warmupExamples: [
+      "Mobilidade de tornozelo, quadril e ombros + 5 min de cardio leve",
+      "Sequência de ativação de core e glúteos antes da coreografia",
+    ],
+    technicalFocusExamples: [
+      "Postura neutra e respiração durante a coreografia de alta intensidade",
+      "Amplitude completa nos movimentos de agachamento e afundo",
+      "Controle de intensidade por percepção de esforço (leve/moderado/intenso)",
+    ],
+    challengeExamples: [
+      "Completar a coreografia inteira mantendo a técnica mesmo cansado(a)",
+      "Fazer 2 blocos seguidos com controle de respiração e sem perder o tempo",
+    ],
+    levelHints: {
+      iniciante: "Adapte impacto (versão sem salto) e priorize constância na execução.",
+      intermediario: "Aumente volume e intensidade mantendo qualidade técnica.",
+      avancado: "Trabalhe potência, resistência e variações de alta intensidade com recuperação planejada.",
+    },
+    extraInstruction: "Aula fitness não é consulta médica: oriente parar em caso de dor, tontura ou falta de ar e procurar avaliação profissional.",
+  },
+
+  // ─── GERAL / NÃO MAPEADA (dança) ───────────────────────────────────────
   geral: {
     terminology: [
-      "instrumento",
-      "nota",
-      "ritmo",
-      "melodia",
-      "técnica",
-      "postura",
-      "dedos",
-      "prática",
-      "repetição",
-      "metrônomo",
+      "aquecimento", "postura", "equilíbrio", "coordenação", "musicalidade",
+      "contagem", "memória coreográfica", "alongamento", "expressão",
+      "marcação", "coreografia", "ensaio",
     ],
     forbiddenTerms: [],
-    warmupDescription: "Exercício de aquecimento adequado ao instrumento do aluno",
+    warmupDescription: "Aquecimento geral de articulações (tornozelos, joelhos, quadril, coluna e ombros) antes da parte técnica",
     warmupExamples: [
-      "Exercício de aquecimento muscular dos membros usados no instrumento",
-      "Tocar notas ou sons simples em ritmo lento para aquecer",
+      "Mobilidade articular completa, 5 min, dos pés à cabeça",
+      "Alongamento ativo leve + ativação de core antes da coreografia",
     ],
     technicalFocusExamples: [
-      "Técnica básica do instrumento",
-      "Exercício de ritmo e tempo",
-      "Repertório inicial do nível do aluno",
+      "Postura e equilíbrio nas transições de peso",
+      "Memorização de uma sequência curta com contagem em 8 tempos",
+      "Musicalidade: marcar o tempo forte com o corpo",
     ],
     challengeExamples: [
-      "Tocar um trecho de música do início ao fim",
-      "Repetir o exercício aumentando a velocidade gradualmente",
+      "Executar a sequência completa sem parar e sem perder a contagem",
+      "Gravar a sequência em vídeo e comparar com a marcação do professor",
     ],
     levelHints: {
-      iniciante:
-        "Use linguagem muito simples, passo a passo, voltada para quem está começando. Evite jargão técnico excessivo.",
-      intermediario:
-        "Use linguagem natural com termos básicos do instrumento. Foque na qualidade do som e precisão técnica.",
-      avancado:
-        "Use terminologia técnica completa. Foque em refinamento, expressividade e musicalidade.",
+      iniciante: "Use linguagem simples, demonstre devagar e valide cada passo antes de juntar.",
+      intermediario: "Aumente a velocidade e junte passos em combinações maiores.",
+      avancado: "Refine qualidade de movimento, dinâmica e interpretação.",
     },
-    extraInstruction:
-      "⚠️ O instrumento deste aluno não está mapeado no sistema. Crie exercícios adequados ao instrumento mencionado no contexto, adaptando a linguagem ao nível do aluno.",
-  },
-
-  // ─── CONTRABAIXO ELÉTRICO ─────────────────────────────────────────────────
-  baixo: {
-    terminology: [
-      // Técnicas de mão direita
-      "slap", "pop", "thumb", "double thumb", "fingerstyle", "palheta", "palm muting",
-      "dead notes", "ghost notes", "tapping",
-      // Técnicas de mão esquerda
-      "hammer-on", "pull-off", "slides", "vibrato", "harmônicos naturais",
-      "harmônicos artificiais", "muting",
-      // Conceitos musicais de baixo
-      "walking bass", "groove", "pocket", "time", "feel", "condução de baixo",
-      "notas de aproximação", "cromatismo", "arpejos", "escalas",
-      "chord tones", "target notes", "pedal point",
-      // Técnica de instrumento
-      "alternância de dedos", "sincronização entre as mãos", "precisão rítmica",
-      "resistência", "velocidade", "mudança de posição", "saltos de corda",
-      "string crossing",
-      // Configuração
-      "4 cordas", "5 cordas", "6 cordas", "captador", "braço", "trastes", "escala do instrumento",
-      "afinação", "BPM", "metrônomo",
-    ],
-    forbiddenTerms: [
-      // Bateria
-      "rudimento", "paradiddle", "flam", "bumbo", "caixa", "chimbal",
-      "pedal de bumbo", "pedal do chimbal", "baqueta", "ghost note de bateria",
-      "groove de bateria (bumbo-caixa)", "fill de bateria",
-      // Teclado
-      "voicing de teclado", "layer", "split de teclado", "synth pad",
-      "mão direita de piano", "mão esquerda de piano",
-      // Outros
-      "vocalise", "embocadura", "arco de violino", "pizzicato de corda arco",
-    ],
-    warmupDescription: "Alternância de dedos indicador e médio em exercícios cromáticos no braço, slap básico devagar",
-    warmupExamples: [
-      "Cromático 1-2-3-4 no braço (indicador-médio-anelar-mínimo) — subindo e descendo, devagar",
-      "Alternância i-m nas cordas soltas (E A D G) — 60 BPM, foco em igualdade de toque",
-      "Slap básico: polegar (T) no Mi grave, bounce natural, sem força — 10 repetições",
-      "Muting prático: tocar nota e abafar imediatamente com a palma ou os dedos",
-    ],
-    technicalFocusExamples: [
-      "Slap + Pop: T no Mi, P no Sol — alternando, construindo groove sincopado",
-      "Walking bass em II-V-I: notas de aproximação cromática, chord tones nos tempos fortes",
-      "Ghost notes: toque leve entre notas principais, sem pressão total, criando textura rítmica",
-      "Fingerstyle groove de funk: alternância i-m rápida com palm muting parcial",
-      "Exercício de target notes: identifique a nota alvo de cada acorde e resolva por cromatismo",
-      "Double thumb: thumb down + thumb up + pop — sequência rítmica progressiva",
-    ],
-    challengeExamples: [
-      "Tocar groove de funk com slap por 3 minutos a 80 BPM sem perder o pocket",
-      "Improvisar walking bass sobre progressão II-V-I por 2 minutos usando chord tones",
-      "Gravar groove e avaliar: ghost notes audíveis? Pocket junto ao metrônomo?",
-    ],
-    levelHints: {
-      iniciante:
-        "Comece com fingerstyle simples (alternância i-m) e palm muting básico. Explique posição do polegar na traseira, curvatura dos dedos. BPM lento (60–80). Foque em groove limpo antes de slap.",
-      intermediario:
-        "Introduza slap básico, ghost notes, walking bass simples e exercícios de notas de aproximação. Trabalhe pocket e time com metrônomo. Expanda para grooves de funk e gospel.",
-      avancado:
-        "Explore double thumb, tapping, harmônicos, walking bass elaborado, polirritmia aplicada ao baixo, improvisação sobre standards. Adapte ao número de cordas do instrumento (5 ou 6 cordas quando aplicável).",
-    },
-    extraInstruction:
-      "NUNCA use rudimentos de bateria (paradiddle, flam) nem voicings de teclado. Baixo é instrumento de cordas com trastes — exercícios envolvem técnica de mão direita (slap/fingerstyle), mão esquerda (hammer-on/pull-off) e conceitos musicais de baixo (walking bass, groove, pocket). Se o aluno tiver baixo de 5 ou 6 cordas, adapte os exercícios para incluir as cordas extras.",
-  },
-
-  // ─── PIANO CLÁSSICO / ACÚSTICO ────────────────────────────────────────────
-  piano: {
-    terminology: [
-      // Técnica pianística
-      "postura", "curvatura dos dedos", "independência das mãos", "coordenação",
-      "técnica de dedos", "passagem do polegar", "cruzamento de polegar",
-      "legato", "staccato", "acentuação", "articulação", "dinâmica",
-      "controle de toque", "toque suave / toque firme",
-      // Exercícios clássicos
-      "hanon", "czerny", "escala", "arpejo",
-      // Pedais
-      "pedal de sustain (damper pedal)", "una corda", "sostenuto",
-      "pedalização harmônica", "troca de pedal",
-      // Harmonia aplicada ao piano
-      "voicing", "close voicing", "open voicing", "drop 2", "drop 3",
-      "shell voicings", "rootless voicings", "quartal harmony", "spread voicings",
-      "upper structures", "inversão de acorde", "condução de vozes", "voice leading",
-      // Técnicas de acompanhamento
-      "acordes na mão direita", "baixo na mão esquerda", "arpejos", "broken chords",
-      "acompanhamento rítmico", "walking bass no piano", "stride piano", "comping",
-      // Leitura
-      "pauta (clave de sol)", "pauta (clave de fá)", "leitura em duas claves",
-      "nota", "tecla", "oitava", "compasso",
-    ],
-    forbiddenTerms: [
-      // Teclado eletrônico
-      "layer", "split de teclado", "synth", "pad eletrônico", "timbre de teclado",
-      // Bateria
-      "rudimento", "bumbo", "caixa", "chimbal", "baqueta",
-      // Baixo
-      "slap", "thumb", "fingerstyle de baixo", "ghost note de baixo",
-      // Sopro/Voz
-      "vocalise", "embocadura", "coluna de ar",
-      // Cordas
-      "pestana", "palhetada", "traste de violão", "palheta de guitarra",
-    ],
-    warmupDescription: "Exercícios de Hanon ou escala com cada mão separadamente + arpejo com passagem de polegar",
-    warmupExamples: [
-      "Hanon n.1: cada dedo independente em sequência ascendente e descendente — mão direita 60 BPM",
-      "Mesma sequência com mão esquerda — atenção à curvatura dos dedos",
-      "Arpejo de Dó maior em posição fechada — cruzamento de polegar suave e sem pular",
-      "Escala da tonalidade da meta: ambas as mãos separadas, depois juntas",
-    ],
-    technicalFocusExamples: [
-      "Passagem do polegar: mão direita na escala ascendente sem levantar os demais dedos",
-      "Legato em 2 oitavas: notas conectadas sem buracos, pedal de sustain com troca harmônica",
-      "Voicing fechado (close voicing) na mão direita: dedos 1-3-5 no acorde da meta",
-      "Drop 2 na mão direita: nota do tenor para baixo uma oitava — textura aberta",
-      "Stride piano simples: mão esq. alterna baixo (tempo forte) e acorde (contratempo)",
-      "Troca de pedal harmônica: trocar o pedal de sustain a cada mudança de acorde",
-    ],
-    challengeExamples: [
-      "Tocar escala em terças na mão direita — 2 oitavas em legato a 70 BPM",
-      "Executar II-V-I com close voicing (mão dir.) + baixo (mão esq.) em 3 tonalidades",
-      "Tocar trecho de repertório com pedal de sustain correto — gravar e avaliar pedalização",
-    ],
-    levelHints: {
-      iniciante:
-        "Foque em postura correta (curvatura dos dedos, pulsos relaxados), escala simples mão por mão, Hanon n.1. Explique clave de sol (mão direita) e clave de fá (mão esquerda). Sem pedal até postura estabilizar.",
-      intermediario:
-        "Introduza leitura em duas claves, uso do pedal de sustain, coordenação entre mãos, dinâmica (piano/forte). Trabalhe Czerny para velocidade de dedos e peças de repertório simples.",
-      avancado:
-        "Explore voicings (close, drop 2/3, rootless), técnica de pedal harmônico, velocity e controle expressivo. Foque em estilo e musicalidade além da técnica pura. Introduza ornamentos.",
-    },
-    extraInstruction:
-      "Piano é instrumento acústico — NUNCA use 'layer', 'split eletrônico' ou 'timbre de teclado'. Trabalhe postura, dedos e pedais. Diferencie do teclado moderno: no piano, o foco é na técnica pianística clássica (Hanon, Czerny, postura, pedal harmônico) e harmonia aplicada ao instrumento acústico.",
+    extraInstruction: "Este aluno está em uma modalidade ainda não mapeada no sistema — crie exercícios coerentes com a modalidade informada no contexto, sempre focando técnica, musicalidade e segurança.",
   },
 };
 
+/** Normaliza texto para busca de palavras-chave (sem acentos, minúsculo). */
+function normalizeKey(value: string): string {
+  return (value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /**
- * Retorna o contexto pedagógico para um dado nome/categoria de instrumento.
- * Faz correspondência por categoria (campo do banco) ou por nome do instrumento.
+ * Resolve o contexto pedagógico a partir do nome da modalidade e/ou da
+ * categoria cadastrada em Modalidades & Ritmos. Fallback = "geral" (dança).
  */
 export function getInstrumentContext(
   instrumentName: string,
   instrumentCategory: string
 ): { context: InstrumentContext; resolvedCategory: InstrumentCategory } {
-  const cat = instrumentCategory.toLowerCase().trim();
-  const name = instrumentName.toLowerCase().trim();
+  const cat = normalizeKey(instrumentCategory);
+  const name = normalizeKey(instrumentName);
+  const source = `${cat} ${name}`;
 
-  // Mapeamento por categoria (campo direto do banco)
-  const categoryMap: Record<string, InstrumentCategory> = {
-    // Contrabaixo / Baixo Elétrico — ESPECIALISTA DEDICADO
-    baixo: "baixo",
-    "baixo elétrico": "baixo",
-    "contrabaixo elétrico": "baixo",
-    "bass guitar": "baixo",
-    "electric bass": "baixo",
-    // Piano — ESPECIALISTA DEDICADO
-    piano: "piano",
-    "piano acústico": "piano",
-    "piano clássico": "piano",
-    // Cordas dedilhadas (violão, guitarra — sem baixo)
-    cordas: "cordas_dedilhadas",
-    "cordas dedilhadas": "cordas_dedilhadas",
-    cordas_dedilhadas: "cordas_dedilhadas",
-    violao: "cordas_dedilhadas",
-    "violão": "cordas_dedilhadas",
-    guitarra: "cordas_dedilhadas",
-    ukulele: "cordas_dedilhadas",
-    cavaquinho: "cordas_dedilhadas",
-    bandolim: "cordas_dedilhadas",
-    // Teclado / Teclado moderno
-    teclado: "teclado",
-    orgao: "teclado",
-    "órgão": "teclado",
-    "teclado/piano": "teclado",
-    "keyboard": "teclado",
-    // Percussão / Bateria
-    percussao: "percussao",
-    "percussão": "percussao",
-    bateria: "percussao",
-    // Voz / Canto
-    voz: "voz",
-    canto: "voz",
-    vocal: "voz",
-    "tecnica vocal": "voz",
-    "técnica vocal": "voz",
-    // Sopros
-    sopros: "sopro",
-    sopro: "sopro",
-    flauta: "sopro",
-    saxofone: "sopro",
-    clarinete: "sopro",
-    trompete: "sopro",
-    trombone: "sopro",
-    tuba: "sopro",
-    oboa: "sopro",
-    fagote: "sopro",
-    // Cordas com arco
-    "cordas com arco": "cordas_arco",
-    cordas_arco: "cordas_arco",
-    violino: "cordas_arco",
-    viola: "cordas_arco",
-    violoncelo: "cordas_arco",
-    contrabaixo: "baixo",      // contrabaixo elétrico → BassSpecialist
-    celo: "cordas_arco",
-  };
+  const rules: Array<{ category: InstrumentCategory; keys: string[] }> = [
+    {
+      category: "ballet",
+      keys: ["ballet", "bale", "classico", "classica", "pontas", "repertorio", "danca classica"],
+    },
+    {
+      category: "urbanas",
+      keys: ["urbana", "urbanas", "urban", "hip hop", "hiphop", "street", "breaking", "breakdance", "popping", "locking", "house", "kpop", "k-pop", "funk", "dancehall", "dance hall", "passinho"],
+    },
+    {
+      category: "salao",
+      keys: ["salao", "a dois", "forro", "samba", "tango", "bolero", "salsa", "bachata", "zouk", "kizomba", "valsa", "gaucho", "pagode", "rasga", "danca de salao"],
+    },
+    {
+      category: "sapateado",
+      keys: ["sapateado", "tap", "claquete"],
+    },
+    {
+      category: "jazz",
+      keys: ["jazz", "lirico", "musical", "theatre", "teatro musical", "broadway"],
+    },
+    {
+      category: "kids",
+      keys: ["infantil", "kids", "baby", "baby class", "crianca", "danca infantil"],
+    },
+    {
+      category: "fitness",
+      keys: ["fitness", "livre", "zumba", "fitdance", "fit dance", "alongamento", "flexibilidade", "pilates", "ritmos", "condicionamento"],
+    },
+    {
+      category: "contemporaneo",
+      keys: ["contemporaneo", "contemporanea", "moderno", "moderna", "danca moderna", "improvisacao"],
+    },
+  ];
 
-  // Tenta categoria primeiro
-  if (categoryMap[cat]) {
-    const resolved = categoryMap[cat];
-    return { context: INSTRUMENT_CONTEXTS[resolved], resolvedCategory: resolved };
-  }
-
-  // Tenta pelo nome do instrumento
-  if (categoryMap[name]) {
-    const resolved = categoryMap[name];
-    return { context: INSTRUMENT_CONTEXTS[resolved], resolvedCategory: resolved };
-  }
-
-  // Detecção prioritária por nome: baixo elétrico antes de match parcial genérico
-  if (name.includes("baixo") || name.includes("bass") || name.includes("contrabaixo")) {
-    // Exclui violoncelo/contrabaixo de orquestra (cordas com arco): esses têm "arco" no nome
-    if (!name.includes("arco") && !name.includes("orquestra") && !name.includes("acústico")) {
-      return { context: INSTRUMENT_CONTEXTS["baixo"], resolvedCategory: "baixo" };
+  for (const rule of rules) {
+    if (rule.keys.some((key) => source.includes(key))) {
+      return { context: INSTRUMENT_CONTEXTS[rule.category], resolvedCategory: rule.category };
     }
   }
 
-  // Tenta match parcial no nome
-  for (const [key, resolved] of Object.entries(categoryMap)) {
-    if (name.includes(key) || key.includes(name)) {
-      return { context: INSTRUMENT_CONTEXTS[resolved], resolvedCategory: resolved };
-    }
-  }
-
-  // Fallback genérico
   return { context: INSTRUMENT_CONTEXTS.geral, resolvedCategory: "geral" };
 }

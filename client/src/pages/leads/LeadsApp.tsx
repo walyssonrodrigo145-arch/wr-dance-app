@@ -361,7 +361,7 @@ export default function LeadsApp() {
               {activeMenu === "origens" && <><PieChart className="text-emerald-400" size={24} /> Origem das Oportunidades</>}
               {activeMenu === "configuracoes" && <><Settings className="text-slate-400" size={24} /> Configurações Gerais</>}
             </h1>
-            <p className="text-xs text-slate-400 font-medium mt-0.5">Gestão comercial inteligente e integrada para captação de alunos e aulas de música.</p>
+            <p className="text-xs text-slate-400 font-medium mt-0.5">Gestão comercial inteligente e integrada para captação de alunos e aulas de dança.</p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -426,7 +426,7 @@ export default function LeadsApp() {
                   <div className="relative min-w-[240px] flex-1">
                     <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
                     <Input
-                      placeholder="Buscar por nome, telefone ou instrumento..."
+                      placeholder="Buscar por nome, telefone ou modalidade..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-9 h-10 text-xs bg-[#0B091A] border-indigo-950/80 text-white rounded-xl focus:border-indigo-500"
@@ -485,7 +485,7 @@ export default function LeadsApp() {
                     <thead className="bg-[#0B091A] text-slate-400 uppercase font-black text-[10px] tracking-wider border-b border-indigo-950/50">
                       <tr>
                         <th className="py-3.5 px-4">Lead / Aluno</th>
-                        <th className="py-3.5 px-4">Curso / Instrumento</th>
+                        <th className="py-3.5 px-4">Curso / Modalidade</th>
                         <th className="py-3.5 px-4">Modalidade</th>
                         <th className="py-3.5 px-4">Mensalidade</th>
                         <th className="py-3.5 px-4">Origem</th>
@@ -511,7 +511,7 @@ export default function LeadsApp() {
                           </td>
                           <td className="py-3.5 px-4">
                             <Badge className="bg-indigo-500/10 text-indigo-300 border-indigo-500/20 text-[10px]">
-                              🎵 {lead.instrument || lead.productService || "Música"}
+                              💃 {lead.instrument || lead.productService || "Dança"}
                             </Badge>
                           </td>
                           <td className="py-3.5 px-4 text-slate-300 font-medium">{lead.modality || "Presencial"}</td>
@@ -621,7 +621,7 @@ export default function LeadsApp() {
 
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   <Badge className="bg-indigo-500/10 text-indigo-300 border-indigo-500/20 text-[9px] px-1.5 py-0">
-                                    🎵 {item.instrument || item.productService || "Música"}
+                                    💃 {item.instrument || item.productService || "Dança"}
                                   </Badge>
                                   <span className="text-[10px] text-slate-400 font-medium">{item.modality || "Presencial"}</span>
                                 </div>
@@ -745,7 +745,7 @@ export default function LeadsApp() {
                       <div className="flex items-start justify-between">
                         <div>
                           <h4 className="font-bold text-sm text-white font-outfit">{prop.lead}</h4>
-                          <p className="text-[11px] text-indigo-300 font-bold mt-0.5">🎵 {prop.inst}</p>
+                          <p className="text-[11px] text-indigo-300 font-bold mt-0.5">💃 {prop.inst}</p>
                         </div>
                         <Badge className="bg-blue-500/10 text-blue-300 border-blue-500/20 text-[9px]">{prop.status}</Badge>
                       </div>
@@ -851,7 +851,7 @@ export default function LeadsApp() {
                     <thead className="bg-[#0B091A] text-slate-400 uppercase font-black text-[10px] tracking-wider">
                       <tr>
                         <th className="p-3.5">Aluno</th>
-                        <th className="p-3.5">Curso / Instrumento</th>
+                        <th className="p-3.5">Curso / Modalidade</th>
                         <th className="p-3.5">Modalidade</th>
                         <th className="p-3.5">Mensalidade</th>
                         <th className="p-3.5">Origem</th>
@@ -870,7 +870,7 @@ export default function LeadsApp() {
                               <p className="text-[11px] text-slate-400 font-normal">{item.phone || "—"}</p>
                             </div>
                           </td>
-                          <td className="p-3.5 text-slate-300 font-medium">{item.instrument || item.productService || "Música"}</td>
+                          <td className="p-3.5 text-slate-300 font-medium">{item.instrument || item.productService || "Dança"}</td>
                           <td className="p-3.5 text-slate-300">{item.modality || "Presencial"}</td>
                           <td className="p-3.5 font-black text-emerald-400">R$ {Number(item.value || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/mês</td>
                           <td className="p-3.5 text-slate-400">{item.source || "WhatsApp"}</td>
@@ -908,7 +908,7 @@ export default function LeadsApp() {
                       <div className="flex items-center justify-between">
                         <div>
                           <h4 className="font-bold text-sm text-white font-outfit">{std.name}</h4>
-                          <p className="text-xs text-indigo-400 font-bold mt-0.5">🎵 Curso de {std.inst} • {std.start}</p>
+                          <p className="text-xs text-indigo-400 font-bold mt-0.5">💃 Curso de {std.inst} • {std.start}</p>
                         </div>
                         <Badge className="bg-amber-500/10 text-amber-300 border-amber-500/20 text-[10px]">Em Onboarding</Badge>
                       </div>
@@ -1163,7 +1163,7 @@ function CreateLeadModal({ open, onClose }: any) {
       <DialogContent className="sm:max-w-[480px] bg-[#110E29] text-slate-200 border border-indigo-950/80 text-xs">
         <DialogHeader>
           <DialogTitle className="font-outfit font-bold text-base text-white flex items-center gap-2">
-            <Music className="text-indigo-400" size={18} /> Cadastrar Lead para Aula de Música
+            <Music className="text-indigo-400" size={18} /> Cadastrar Lead para Aula de Dança
           </DialogTitle>
         </DialogHeader>
 
@@ -1203,7 +1203,7 @@ function CreateLeadModal({ open, onClose }: any) {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="font-bold text-slate-400">Instrumento de Interesse</label>
+              <label className="font-bold text-slate-400">Modalidade de Interesse</label>
               <select
                 value={instrument}
                 onChange={(e) => setInstrument(e.target.value)}
@@ -1300,7 +1300,7 @@ function ScheduleTrialModal({ lead, open, onClose }: any) {
           className="space-y-3 py-2"
         >
           <p className="text-slate-300">
-            Confirme o agendamento da aula experimental para <strong className="text-white">{lead?.name}</strong> ({lead?.instrument || "Música"}).
+            Confirme o agendamento da aula experimental para <strong className="text-white">{lead?.name}</strong> ({lead?.instrument || "Dança"}).
           </p>
 
           <div className="grid grid-cols-2 gap-3">
@@ -1363,7 +1363,7 @@ function ConvertToStudentModal({ lead, open, onClose }: any) {
           className="space-y-3.5 py-2"
         >
           <p className="text-slate-300">
-            Você está matriculando <strong className="text-white">{lead?.name}</strong> no curso de <strong className="text-indigo-300">{lead?.instrument || "Música"}</strong>.
+            Você está matriculando <strong className="text-white">{lead?.name}</strong> no curso de <strong className="text-indigo-300">{lead?.instrument || "Dança"}</strong>.
           </p>
 
           <div className="grid grid-cols-2 gap-3">
@@ -1518,7 +1518,7 @@ function LeadProfileModal({ leadId, open, onClose, onDelete }: any) {
           <DialogTitle className="font-outfit font-bold text-lg text-white flex items-center justify-between">
             <span>{lead.name}</span>
             <Badge className="bg-indigo-500/20 text-indigo-300 border-indigo-500/30 text-xs">
-              🎵 {lead.instrument || lead.productService || "Música"}
+              💃 {lead.instrument || lead.productService || "Dança"}
             </Badge>
           </DialogTitle>
         </DialogHeader>

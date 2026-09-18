@@ -400,7 +400,7 @@ export function PaymentRulesDialog({ professor, open, onOpenChange }: { professo
               ))}
 
               {/* Regras por instrumento */}
-              {section("Regras específicas por instrumento (prioridade: instrumento > regra geral)", <GraduationCap size={13} />, (
+              {section("Regras específicas por modalidade (prioridade: modalidade > regra geral)", <GraduationCap size={13} />, (
                 <div className="space-y-2">
                   {courseRules.length === 0 && <p className="text-[11px] text-muted-foreground">Nenhuma regra específica — usa a regra geral.</p>}
                   {courseRules.map((cr, i) => (
@@ -421,7 +421,7 @@ export function PaymentRulesDialog({ professor, open, onOpenChange }: { professo
                     </div>
                   ))}
                   <Button variant="outline" size="sm" onClick={() => setCourseRules([...courseRules, { instrumentId: instruments[0]?.id || 0, ruleType: "por_aula", amountPerClass: "30", percentage: "0", fixedAmount: "0" }])} className="rounded-xl text-xs">
-                    <Plus size={13} /> Adicionar regra por instrumento
+                    <Plus size={13} /> Adicionar regra por modalidade
                   </Button>
                 </div>
               ))}

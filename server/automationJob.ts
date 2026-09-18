@@ -1,7 +1,7 @@
 /**
- * Job de automação de lembretes e notificações do WhatsApp
- * Roda periodicamente (a cada 1 minuto) e gerencia o ciclo completo de cobranças e aulas
- * de acordo com as regras de negócio de automação avançada.
+ * Job de automaÃ§Ã£o de lembretes e notificaÃ§Ãµes do WhatsApp
+ * Roda periodicamente (a cada 1 minuto) e gerencia o ciclo completo de cobranÃ§as e aulas
+ * de acordo com as regras de negÃ³cio de automaÃ§Ã£o avanÃ§ada.
  */
 
 import { debugLog } from "./_core/logger";
@@ -15,29 +15,29 @@ import { decryptSecret } from "./utils/integrationCrypto";
 import { BillingEngine } from "./services/BillingEngine";
 import { computeDaysRemaining, computeMonthsRemaining, computeTotalLessons, computeLessonsRemaining, isContractExpiryTriggered } from "./services/ContractExpiryEngine";
 
-// Guard de concorrência: impede que duas execuções do robô rodem ao mesmo tempo
+// Guard de concorrÃªncia: impede que duas execuÃ§Ãµes do robÃ´ rodem ao mesmo tempo
 let isAutomationRunning = false;
 
-// Rastreia a data do último cleanup semanal por usuário.
+// Rastreia a data do Ãºltimo cleanup semanal por usuÃ¡rio.
 const lastCleanupByUser = new Map<string, string>();
 
-// Rastreia o último timestamp de keep-alive executado por sessão para garantir ping real
+// Rastreia o Ãºltimo timestamp de keep-alive executado por sessÃ£o para garantir ping real
 const lastKeepAliveBySession = new Map<string, number>(); // chave: sessionId, valor: timestamp ms
 const KEEP_ALIVE_INTERVAL_MS = 10 * 60 * 1000; // 10 minutos (antes: 15 min impreciso)
 
-// Rastreia tentativas de reconexão automática para evitar flood
+// Rastreia tentativas de reconexÃ£o automÃ¡tica para evitar flood
 const autoReconnectAttempts = new Map<string, { count: number; lastAt: number }>();
 const MAX_AUTO_RECONNECT = 3;
 const AUTO_RECONNECT_COOLDOWN_MS = 15 * 60 * 1000; // 15 min entre tentativas
 
-// ─── ANTI-BAN: Rate Limiter por professor ────────────────────────────────────
-// Controla quantas mensagens de WhatsApp cada organização/usuário pode enviar por hora.
-// Limite padrão: 30 mensagens/hora. Isso evita comportamento de spam detectado pelo WA.
+// â”€â”€â”€ ANTI-BAN: Rate Limiter por professor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Controla quantas mensagens de WhatsApp cada organizaÃ§Ã£o/usuÃ¡rio pode enviar por hora.
+// Limite padrÃ£o: 30 mensagens/hora. Isso evita comportamento de spam detectado pelo WA.
 const whatsappSentByUser = new Map<number, { count: number; windowStart: number }>();
 const MAX_WA_PER_HOUR = 30;
 
 async function canSendWhatsApp(userId: number, organizationId?: number): Promise<boolean> {
-  // 1. Tenta checagem persistente atômica no banco caso organizationId esteja disponível
+  // 1. Tenta checagem persistente atÃ´mica no banco caso organizationId esteja disponÃ­vel
   if (organizationId) {
     try {
       const db = await getDb();
@@ -46,11 +46,11 @@ async function canSendWhatsApp(userId: number, organizationId?: number): Promise
         return await checkAndIncrementWhatsAppRateLimit(db, organizationId, userId, MAX_WA_PER_HOUR);
       }
     } catch (e) {
-      debugLog("[AntiBan] Falha no rate limit persistente, utilizando memória:", e);
+      debugLog("[AntiBan] Falha no rate limit persistente, utilizando memÃ³ria:", e);
     }
   }
 
-  // 2. Fallback de proteção em memória (por processo)
+  // 2. Fallback de proteÃ§Ã£o em memÃ³ria (por processo)
   const now = Date.now();
   const entry = whatsappSentByUser.get(userId);
   if (!entry || (now - entry.windowStart) > 60 * 60 * 1000) {
@@ -58,7 +58,7 @@ async function canSendWhatsApp(userId: number, organizationId?: number): Promise
     return true;
   }
   if (entry.count >= MAX_WA_PER_HOUR) {
-    console.warn(`[ANTI-BAN] Usuário ${userId} atingiu o limite de ${MAX_WA_PER_HOUR} msgs/hora no WhatsApp. Envio bloqueado.`);
+    console.warn(`[ANTI-BAN] UsuÃ¡rio ${userId} atingiu o limite de ${MAX_WA_PER_HOUR} msgs/hora no WhatsApp. Envio bloqueado.`);
     return false;
   }
   entry.count++;
@@ -67,52 +67,52 @@ async function canSendWhatsApp(userId: number, organizationId?: number): Promise
 
 
 /**
- * Sessões atualmente em processo de PAREAMENTO (QR Code ou Código Numérico).
- * Enquanto uma sessão está neste mapa, o Keep-Alive NÃO tenta reconectar,
- * pois isso destruiria o QR Code/Pairing Code que o usuário está tentando usar.
- * A sessão é removida quando: conecta com sucesso, usuário cancela, ou timeout de 3 minutos.
+ * SessÃµes atualmente em processo de PAREAMENTO (QR Code ou CÃ³digo NumÃ©rico).
+ * Enquanto uma sessÃ£o estÃ¡ neste mapa, o Keep-Alive NÃƒO tenta reconectar,
+ * pois isso destruiria o QR Code/Pairing Code que o usuÃ¡rio estÃ¡ tentando usar.
+ * A sessÃ£o Ã© removida quando: conecta com sucesso, usuÃ¡rio cancela, ou timeout de 3 minutos.
  */
-export const pairingActiveSessions = new Map<string, number>(); // sessionId → timestamp de início
+export const pairingActiveSessions = new Map<string, number>(); // sessionId â†’ timestamp de inÃ­cio
 const PAIRING_SESSION_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutos
 
 async function runAutomation() {
   if (isAutomationRunning) {
-    debugLog("[Automation] Skipping — execução anterior ainda em andamento.");
+    debugLog("[Automation] Skipping â€” execuÃ§Ã£o anterior ainda em andamento.");
     return;
   }
   isAutomationRunning = true;
 
   // BUG-012 FIX: Guard adicional via DB para ambientes multi-process.
-  // O campo automationLastRun por usuário serve como lock pragmático:
-  // se foi atualizado há menos de 50s, provavelmente outro processo já está processando.
-  // Não requer migration de schema pois o campo já existe.
+  // O campo automationLastRun por usuÃ¡rio serve como lock pragmÃ¡tico:
+  // se foi atualizado hÃ¡ menos de 50s, provavelmente outro processo jÃ¡ estÃ¡ processando.
+  // NÃ£o requer migration de schema pois o campo jÃ¡ existe.
 
   try {
     const db = await getDb();
     if (!db) return;
 
-    // RANKINGS (PRD_SISTEMA_RANKINGS §48/§49): encerramento automático de rankings
-    // vencidos + persistência horária de posições. Independente da automação de
-    // WhatsApp — roda antes do early-return de settings.
+    // RANKINGS (PRD_SISTEMA_RANKINGS Â§48/Â§49): encerramento automÃ¡tico de rankings
+    // vencidos + persistÃªncia horÃ¡ria de posiÃ§Ãµes. Independente da automaÃ§Ã£o de
+    // WhatsApp â€” roda antes do early-return de settings.
     try {
       const { runRankingsMaintenance } = await import("./services/RankingEngine");
       await runRankingsMaintenance();
     } catch (e) {
-      debugLog("[Automation] Erro na manutenção de rankings:", e);
+      debugLog("[Automation] Erro na manutenÃ§Ã£o de rankings:", e);
     }
 
-    // DESPESAS FIXAS: geração automática no virar do mês — o usuário não precisa
-    // mais clicar em "Gerar despesas do mês". Idempotente (dedup por descrição).
+    // DESPESAS FIXAS: geraÃ§Ã£o automÃ¡tica no virar do mÃªs â€” o usuÃ¡rio nÃ£o precisa
+    // mais clicar em "Gerar despesas do mÃªs". Idempotente (dedup por descriÃ§Ã£o).
     try {
       const { runRecurringExpensesMaintenance } = await import("./services/RecurringExpenseEngine");
       await runRecurringExpensesMaintenance();
     } catch (e) {
-      debugLog("[Automation] Erro na geração automática de despesas fixas:", e);
+      debugLog("[Automation] Erro na geraÃ§Ã£o automÃ¡tica de despesas fixas:", e);
     }
 
-    // PLANOS & BOLSAS (regra comercial): fatura de bolsa em atraso após o dia
-    // limite → aplica o VALOR CHEIO (ajuste direto na fatura, ou fatura
-    // complementar da diferença se já emitida em gateway). Idempotente.
+    // PLANOS & BOLSAS (regra comercial): fatura de bolsa em atraso apÃ³s o dia
+    // limite â†’ aplica o VALOR CHEIO (ajuste direto na fatura, ou fatura
+    // complementar da diferenÃ§a se jÃ¡ emitida em gateway). Idempotente.
     try {
       const { applyScholarshipLateFullValue } = await import("./services/BillingEngine");
       const scholarship = await applyScholarshipLateFullValue();
@@ -123,8 +123,8 @@ async function runAutomation() {
       debugLog("[Automation] Erro na regra de valor cheio das bolsas:", e);
     }
 
-    // TRIAL: garante que os 7 dias grátis NÃO gerem cobrança automática — cancela
-    // assinaturas pré-criadas de organizações ainda em "trialing" (sem consentimento).
+    // TRIAL: garante que os 7 dias grÃ¡tis NÃƒO gerem cobranÃ§a automÃ¡tica â€” cancela
+    // assinaturas prÃ©-criadas de organizaÃ§Ãµes ainda em "trialing" (sem consentimento).
     try {
       const { runTrialBillingGuard } = await import("./services/TrialBillingGuard");
       const guard = await runTrialBillingGuard();
@@ -158,9 +158,9 @@ async function runAutomation() {
   const now = new Date();
   const todayStr = now.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }); // YYYY-MM-DD no fuso BRT
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-  // BUG-AUTO-004 FIX: `startOfDay` deve respeitar o timezone de Brasília.
-  // O servidor VPS roda em UTC — sem correção, o anti-spam resetava às 21h BRT
-  // (meia-noite UTC), podendo reenviar lembretes no período 21h-00h BRT.
+  // BUG-AUTO-004 FIX: `startOfDay` deve respeitar o timezone de BrasÃ­lia.
+  // O servidor VPS roda em UTC â€” sem correÃ§Ã£o, o anti-spam resetava Ã s 21h BRT
+  // (meia-noite UTC), podendo reenviar lembretes no perÃ­odo 21h-00h BRT.
   const brazilNowStr = now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" });
   const brazilNow = new Date(brazilNowStr);
   const startOfDayBRT = new Date(brazilNow.getFullYear(), brazilNow.getMonth(), brazilNow.getDate(), 0, 0, 0);
@@ -172,22 +172,22 @@ async function runAutomation() {
     const userId = userSettings.userId;
     const orgId = userSettings.organizationId;
 
-    // BUG-012: Se automationLastRun foi atualizado há menos de 50s por outro processo, pula este usuário
+    // BUG-012: Se automationLastRun foi atualizado hÃ¡ menos de 50s por outro processo, pula este usuÃ¡rio
     if (userSettings.automationLastRun) {
       const msSinceLastRun = now.getTime() - new Date(userSettings.automationLastRun).getTime();
       if (msSinceLastRun < 50 * 1000) {
-        debugLog(`[Automation] Skipping userId=${userId} — outro processo executou há ${Math.round(msSinceLastRun / 1000)}s (DB lock).`);
+        debugLog(`[Automation] Skipping userId=${userId} â€” outro processo executou hÃ¡ ${Math.round(msSinceLastRun / 1000)}s (DB lock).`);
         continue;
       }
     }
 
-    // Sem organizationId não conseguimos isolar os dados — pula
+    // Sem organizationId nÃ£o conseguimos isolar os dados â€” pula
     if (!orgId) {
       console.warn(`[Automation] Skipping userId=${userId}: no organizationId found.`);
       continue;
     }
 
-    // --- KEEP-ALIVE PARA O WHATSAPP (baseado em timestamp — confiável) ---
+    // --- KEEP-ALIVE PARA O WHATSAPP (baseado em timestamp â€” confiÃ¡vel) ---
     // Usa timestamp real em vez de now.getMinutes() % 15 para evitar ciclos perdidos
     if (userSettings.whatsappAutoSend === 1 && userSettings.whatsappBotUrl) {
       const sessionId = `prof_${userId}`;
@@ -195,22 +195,22 @@ async function runAutomation() {
       const timeSinceLastPing = now.getTime() - lastPing;
 
       if (timeSinceLastPing >= KEEP_ALIVE_INTERVAL_MS) {
-        // ── PROTEÇÃO DE PAREAMENTO ──────────────────────────────────────────────
-        // Se a sessão está em processo de pareamento ativo, NÃO interrompemos.
+        // â”€â”€ PROTEÃ‡ÃƒO DE PAREAMENTO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // Se a sessÃ£o estÃ¡ em processo de pareamento ativo, NÃƒO interrompemos.
         const pairingStartedAt = pairingActiveSessions.get(sessionId);
         if (pairingStartedAt) {
           const elapsed = now.getTime() - pairingStartedAt;
           if (elapsed < PAIRING_SESSION_TIMEOUT_MS) {
-            // Ainda dentro do tempo de pareamento → pula o keep-alive
-            debugLog(`[Keep-Alive] Sessão ${sessionId} em pareamento ativo — ignorando reconexão automática.`);
+            // Ainda dentro do tempo de pareamento â†’ pula o keep-alive
+            debugLog(`[Keep-Alive] SessÃ£o ${sessionId} em pareamento ativo â€” ignorando reconexÃ£o automÃ¡tica.`);
             lastKeepAliveBySession.set(sessionId, now.getTime());
-            continue; // ← pula para o próximo usuário
+            continue; // â† pula para o prÃ³ximo usuÃ¡rio
           } else {
-            // Timeout expirado → limpa o flag de pareamento
+            // Timeout expirado â†’ limpa o flag de pareamento
             pairingActiveSessions.delete(sessionId);
           }
         }
-        // ───────────────────────────────────────────────────────────────────────
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         try {
           debugLog('[Trace] Calling getWhatsAppSessionStatus'); const statusResult = await getWhatsAppSessionStatus({
@@ -219,16 +219,16 @@ async function runAutomation() {
             sessionId,
           });
           lastKeepAliveBySession.set(sessionId, now.getTime());
-          debugLog(`[Keep-Alive] Ping OK para sessão ${sessionId} — status: ${statusResult.status}`);
+          debugLog(`[Keep-Alive] Ping OK para sessÃ£o ${sessionId} â€” status: ${statusResult.status}`);
 
-          // Se detectou que a sessão caiu, tenta reconectar automaticamente
+          // Se detectou que a sessÃ£o caiu, tenta reconectar automaticamente
           if (statusResult.status === 'DISCONNECTED') {
             const reconnectInfo = autoReconnectAttempts.get(sessionId);
             const canRetry = !reconnectInfo ||
               (reconnectInfo.count < MAX_AUTO_RECONNECT && now.getTime() - reconnectInfo.lastAt >= AUTO_RECONNECT_COOLDOWN_MS);
 
             if (canRetry) {
-              debugLog(`[Keep-Alive] Sessão ${sessionId} DESCONECTADA — tentando reconexão automática...`);
+              debugLog(`[Keep-Alive] SessÃ£o ${sessionId} DESCONECTADA â€” tentando reconexÃ£o automÃ¡tica...`);
               try {
                 await reconnectWhatsAppSession({
                   url: userSettings.whatsappBotUrl || undefined,
@@ -239,15 +239,15 @@ async function runAutomation() {
                   count: (reconnectInfo?.count ?? 0) + 1,
                   lastAt: now.getTime(),
                 });
-                debugLog(`[Keep-Alive] Reconexão automática solicitada para ${sessionId}`);
+                debugLog(`[Keep-Alive] ReconexÃ£o automÃ¡tica solicitada para ${sessionId}`);
               } catch (reconErr) {
-                console.error(`[Keep-Alive] Falha na reconexão automática para ${sessionId}:`, reconErr);
+                console.error(`[Keep-Alive] Falha na reconexÃ£o automÃ¡tica para ${sessionId}:`, reconErr);
               }
             } else {
-              console.warn(`[Keep-Alive] Sessão ${sessionId} desconectada — limite de reconexões automáticas atingido. Admin deve reconectar manualmente.`);
+              console.warn(`[Keep-Alive] SessÃ£o ${sessionId} desconectada â€” limite de reconexÃµes automÃ¡ticas atingido. Admin deve reconectar manualmente.`);
             }
           } else {
-            // Sessão OK: reseta contadores de reconexão
+            // SessÃ£o OK: reseta contadores de reconexÃ£o
             if (autoReconnectAttempts.has(sessionId)) {
               autoReconnectAttempts.delete(sessionId);
             }
@@ -262,8 +262,8 @@ async function runAutomation() {
     const generatedLogs: string[] = [];
 
     try {
-      // ─── CANCELAMENTO AUTOMÁTICO DE LEMBRETES OBSOLETOS ─────────────────────
-      // Cancela lembretes pendentes de alunos inativos/pausados/cancelados, mensalidades pagas ou aulas canceladas/concluídas
+      // â”€â”€â”€ CANCELAMENTO AUTOMÃTICO DE LEMBRETES OBSOLETOS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // Cancela lembretes pendentes de alunos inativos/pausados/cancelados, mensalidades pagas ou aulas canceladas/concluÃ­das
       await db.execute(sql`
         UPDATE reminders 
         SET status = 'cancelado', "updatedAt" = now()
@@ -277,26 +277,26 @@ async function runAutomation() {
           )
       `);
 
-      // ─── LIMPEZA SEMANAL AUTOMÁTICA (Domingo 00:00 Horário de Brasília) ───────────────
+      // â”€â”€â”€ LIMPEZA SEMANAL AUTOMÃTICA (Domingo 00:00 HorÃ¡rio de BrasÃ­lia) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       // Apaga lembretes antigos (enviados e cancelados) para manter a tela limpa.
-      // Mantém os lembretes de aulas futuras (recentes dos últimos 2 dias ou futuros)
-      // para servirem como travas e evitar que a automação os recrie e envie de novo.
+      // MantÃ©m os lembretes de aulas futuras (recentes dos Ãºltimos 2 dias ou futuros)
+      // para servirem como travas e evitar que a automaÃ§Ã£o os recrie e envie de novo.
       const brazilDateStr = now.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
       const brazilDay = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })).getDay(); // 0 = domingo
       const cleanupKey = `${orgId}-${userId}`;
       let ranCleanupThisCycle = false;
 
       if (brazilDay === 0 && lastCleanupByUser.get(cleanupKey) !== brazilDateStr) {
-        // [MODIFIED] Não deletar mais os lembretes do banco.
-        // Manter o histórico no banco é essencial para as travas anti-duplicação funcionarem.
-        // O limite de visualização já é gerenciado pelo tRPC limit(200) na tela.
+        // [MODIFIED] NÃ£o deletar mais os lembretes do banco.
+        // Manter o histÃ³rico no banco Ã© essencial para as travas anti-duplicaÃ§Ã£o funcionarem.
+        // O limite de visualizaÃ§Ã£o jÃ¡ Ã© gerenciado pelo tRPC limit(200) na tela.
         lastCleanupByUser.set(cleanupKey, brazilDateStr);
         ranCleanupThisCycle = true;
-        debugLog(`[Automation] ✅ Limpeza semanal (pular deleção para manter histórico) — domingo ${brazilDateStr} (userId=${userId})`);
+        debugLog(`[Automation] âœ… Limpeza semanal (pular deleÃ§Ã£o para manter histÃ³rico) â€” domingo ${brazilDateStr} (userId=${userId})`);
       }
 
 
-      // ─── 3.5 ALERTA DE PAGAMENTO PENDENTE (HOJE) ─────────────────────────
+      // â”€â”€â”€ 3.5 ALERTA DE PAGAMENTO PENDENTE (HOJE) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (userSettings.notifyPaymentDue === 1) {
         // Busca pagamentos com vencimento hoje
         const duesToday = await db.select({
@@ -316,7 +316,7 @@ async function runAutomation() {
         for (const due of duesToday) {
           const actionUrl = `/financeiro?paymentId=${due.id}`;
           
-          // Verifica se já enviou notificação interna para este pagamento hoje
+          // Verifica se jÃ¡ enviou notificaÃ§Ã£o interna para este pagamento hoje
           const existingNotifs = await db.select({ id: notifications.id })
             .from(notifications)
             .where(and(
@@ -333,14 +333,14 @@ async function runAutomation() {
             await db.insert(notifications).values({
               organizationId: orgId,
               userId: userId,
-              title: "⚠️ Mensalidade Vencendo Hoje",
+              title: "âš ï¸ Mensalidade Vencendo Hoje",
               message: content,
               type: "warning",
               actionUrl: actionUrl,
             });
 
             try {
-              await notifyUser(userId, { title: "⚠️ Mensalidade Vencendo Hoje", content });
+              await notifyUser(userId, { title: "âš ï¸ Mensalidade Vencendo Hoje", content });
             } catch (e) {
               console.error("[Automation] Erro ao enviar push de pagamento:", e);
             }
@@ -348,8 +348,8 @@ async function runAutomation() {
         }
       }
 
-      // ─── 4. ALERTA DE AULA (1 HORA OU 30 MINUTOS ANTES) ─────────────────────
-      // Busca aulas agendadas nas próximas 1h15m (75 minutos)
+      // â”€â”€â”€ 4. ALERTA DE AULA (1 HORA OU 30 MINUTOS ANTES) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // Busca aulas agendadas nas prÃ³ximas 1h15m (75 minutos)
       const maxAlertTime = new Date(now.getTime() + 75 * 60 * 1000);
       const upcomingLessons = await db
         .select({
@@ -378,15 +378,15 @@ async function runAutomation() {
                 if (lesson.allowAutoReminders === false) continue;
         const diffMinutes = Math.round((new Date(lesson.scheduledAt).getTime() - now.getTime()) / (60 * 1000));
         
-        // Alerta de 1 hora (entre 50 e 70 minutos para tolerância)
+        // Alerta de 1 hora (entre 50 e 70 minutos para tolerÃ¢ncia)
         if (diffMinutes >= 50 && diffMinutes <= 70 && !lesson.alertSent1h) {
           const timeStr = new Date(lesson.scheduledAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
           const dateStr = new Date(lesson.scheduledAt).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
           
           if (userSettings.notifyLessonReminder === 1) {
             await notifyUser(userId, {
-              title: `🎸 Lembrete de Aula: ${lesson.title}`,
-              content: `👤 Aluno: ${lesson.studentName || "Aluno"}\n📱 Número: ${lesson.studentPhone || "Não cadastrado"}\n📅 Data: ${dateStr}\n⏰ Horário: ${timeStr}`
+              title: `ðŸ©° Lembrete de Aula: ${lesson.title}`,
+              content: `ðŸ‘¤ Aluno: ${lesson.studentName || "Aluno"}\nðŸ“± NÃºmero: ${lesson.studentPhone || "NÃ£o cadastrado"}\nðŸ“… Data: ${dateStr}\nâ° HorÃ¡rio: ${timeStr}`
             });
           }
           
@@ -396,15 +396,15 @@ async function runAutomation() {
             .where(eq(lessons.id, lesson.id));
         }
         
-        // Alerta de 30 minutos (entre 20 e 40 minutos para tolerância)
+        // Alerta de 30 minutos (entre 20 e 40 minutos para tolerÃ¢ncia)
         if (diffMinutes >= 20 && diffMinutes <= 40 && !lesson.alertSent30m) {
           const timeStr = new Date(lesson.scheduledAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
           const dateStr = new Date(lesson.scheduledAt).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
           
           if (userSettings.notifyLessonReminder === 1) {
             await notifyUser(userId, {
-              title: `🎸 Lembrete de Aula: ${lesson.title}`,
-              content: `👤 Aluno: ${lesson.studentName || "Aluno"}\n📱 Número: ${lesson.studentPhone || "Não cadastrado"}\n📅 Data: ${dateStr}\n⏰ Horário: ${timeStr}`
+              title: `ðŸ©° Lembrete de Aula: ${lesson.title}`,
+              content: `ðŸ‘¤ Aluno: ${lesson.studentName || "Aluno"}\nðŸ“± NÃºmero: ${lesson.studentPhone || "NÃ£o cadastrado"}\nðŸ“… Data: ${dateStr}\nâ° HorÃ¡rio: ${timeStr}`
             });
           }
           
@@ -415,7 +415,7 @@ async function runAutomation() {
         }
       }
       
-      // ─── 4.1 LEMBRETE DE AULA EXPERIMENTAL (24h e 1h) ─────────────────────────
+      // â”€â”€â”€ 4.1 LEMBRETE DE AULA EXPERIMENTAL (24h e 1h) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (userSettings.whatsappAutoSend === 1 && userSettings.whatsappBotUrl) {
         const maxExperimentalTime = new Date(now.getTime() + 24.5 * 60 * 60 * 1000);
         const expLessons = await db
@@ -450,13 +450,13 @@ async function runAutomation() {
           if (diffHours >= 23.5 && diffHours <= 24.5) {
             refType = "lesson-exp-24h-" + lesson.id;
             const hora = new Date(lesson.scheduledAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
-            msgText = `Olá ${lesson.experimentalName || "Aluno"}! Tudo bem? Passando para lembrar da sua aula experimental de música agendada para amanhã às ${hora}. Te esperamos lá! 🎸`;
+            msgText = `OlÃ¡ ${lesson.experimentalName || "Aluno"}! Tudo bem? Passando para lembrar da sua aula experimental de danÃ§a agendada para amanhÃ£ Ã s ${hora}. Te esperamos lÃ¡! ðŸ©°`;
           }
           // 1 hora (entre 0.8 e 1.2 horas = 48 a 72 min)
           else if (diffHours >= 0.8 && diffHours <= 1.2) {
             refType = "lesson-exp-1h-" + lesson.id;
             const hora = new Date(lesson.scheduledAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
-            msgText = `Olá ${lesson.experimentalName || "Aluno"}! Falta apenas 1 horinha para a nossa aula experimental (às ${hora}). Até logo! 🎶`;
+            msgText = `OlÃ¡ ${lesson.experimentalName || "Aluno"}! Falta apenas 1 horinha para a nossa aula experimental (Ã s ${hora}). AtÃ© logo! ðŸŽ¶`;
           }
 
           if (refType) {
@@ -492,12 +492,12 @@ async function runAutomation() {
 
       for (const log of generatedLogs) {
         await notifyUser(userId, {
-          title: "⏳ Lembrete Gerado",
+          title: "â³ Lembrete Gerado",
           content: log
         });
       }
 
-      // ─── 3. DISPARO AUTOMÁTICO COM CONTROLE DE FILA E PRIORIDADE ────────────
+      // â”€â”€â”€ 3. DISPARO AUTOMÃTICO COM CONTROLE DE FILA E PRIORIDADE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (userSettings.whatsappAutoSend === 1 && userSettings.whatsappBotUrl) {
         const pendingReminders = await db
           .select({
@@ -522,10 +522,10 @@ async function runAutomation() {
               eq(reminders.userId, userId),
               eq(reminders.status, "pendente"),
               lte(reminders.scheduledAt, now),
-              // ── BUG-001 FIX: Excluir lembretes do Rules Loop do Loop Principal ──
-              // Lembretes gerados por regras de automação (auto-rule-*) são enviados
+              // â”€â”€ BUG-001 FIX: Excluir lembretes do Rules Loop do Loop Principal â”€â”€
+              // Lembretes gerados por regras de automaÃ§Ã£o (auto-rule-*) sÃ£o enviados
               // e marcados como 'enviado' imediatamente dentro do Rules Loop.
-              // O Loop Principal nunca deve processá-los para evitar duplicação.
+              // O Loop Principal nunca deve processÃ¡-los para evitar duplicaÃ§Ã£o.
               sql`(${reminders.refId} IS NULL OR ${reminders.refId} NOT LIKE 'auto-rule-%')`
             )
           );
@@ -556,9 +556,9 @@ async function runAutomation() {
           );
 
         const getRemKey = (studentId: number | null, type: string, refId: string | null) => {
-          // ── BUG-003 FIX: Reconhece lembretes gerados pelo Rules Loop (auto-rule-*) ──
+          // â”€â”€ BUG-003 FIX: Reconhece lembretes gerados pelo Rules Loop (auto-rule-*) â”€â”€
           // Sem esse match, o Anti-Spam do Loop Principal nunca bloqueava lembretes
-          // gerados por regras de automação, causando reenvios.
+          // gerados por regras de automaÃ§Ã£o, causando reenvios.
           const autoRuleLessonMatch = refId?.match(/^auto-rule-\d+-lesson-(\d+)/);
           if (autoRuleLessonMatch) return `${studentId}-auto-aula-${autoRuleLessonMatch[1]}`;
 
@@ -572,7 +572,7 @@ async function runAutomation() {
           const lessonMatch = refId?.match(/^lesson-(?:exp-[^-]+-)?(\d+)/);
           if (lessonMatch) return `${studentId}-aula-${lessonMatch[1]}`;
 
-          // Extrai paymentDueId para diferenciar cobranças do mesmo aluno em meses diferentes
+          // Extrai paymentDueId para diferenciar cobranÃ§as do mesmo aluno em meses diferentes
           const payMatch = refId?.match(/(?:payment-|overdue-|pay-prev-|pay-hoje-)(\d+)/);
           if (payMatch) return `${studentId}-cobranca-${payMatch[1]}`;
 
@@ -592,7 +592,7 @@ async function runAutomation() {
         for (const rem of pendingReminders) {
                 if (rem.allowAutoReminders === false) continue;
           if (messagesSentThisCycle >= MAX_MESSAGES_PER_MINUTE) {
-            debugLog(`[Automation] Limite de ${MAX_MESSAGES_PER_MINUTE} mensagem/min atingido. Fila continua no próximo ciclo.`);
+            debugLog(`[Automation] Limite de ${MAX_MESSAGES_PER_MINUTE} mensagem/min atingido. Fila continua no prÃ³ximo ciclo.`);
             break;
           }
 
@@ -611,13 +611,13 @@ async function runAutomation() {
           }
 
           if (!targetPhone) {
-            await db.update(reminders).set({ errorMessage: "Aluno/Responsável sem telefone cadastrado.", updatedAt: new Date() }).where(eq(reminders.id, rem.id));
+            await db.update(reminders).set({ errorMessage: "Aluno/ResponsÃ¡vel sem telefone cadastrado.", updatedAt: new Date() }).where(eq(reminders.id, rem.id));
             continue;
           }
 
           const remKey = getRemKey(rem.studentId, rem.type, rem.refId);
           if (sentMap.has(remKey)) {
-            await db.update(reminders).set({ status: "enviado", sentAt: new Date(), errorMessage: "Bloqueio Anti-Spam: Lembrete do mesmo tipo já enviado hoje.", updatedAt: new Date() }).where(eq(reminders.id, rem.id));
+            await db.update(reminders).set({ status: "enviado", sentAt: new Date(), errorMessage: "Bloqueio Anti-Spam: Lembrete do mesmo tipo jÃ¡ enviado hoje.", updatedAt: new Date() }).where(eq(reminders.id, rem.id));
             continue;
           }
 
@@ -649,10 +649,10 @@ async function runAutomation() {
             messagesSentThisCycle++;
 
             const timeStr = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
-            const remType = (rem.type as string) === "aula" ? "Aula" : (rem.type as string) === "cobranca" ? "Cobrança" : (rem.type as string) === "aniversario" ? "Aniversário" : (rem.type as string) === "aula_experimental" ? "Aula Experimental" : "Estudo";
+            const remType = (rem.type as string) === "aula" ? "Aula" : (rem.type as string) === "cobranca" ? "CobranÃ§a" : (rem.type as string) === "aniversario" ? "AniversÃ¡rio" : (rem.type as string) === "aula_experimental" ? "Aula Experimental" : "Estudo";
             await notifyUser(userId, {
-              title: `✅ Enviado: ${remType}`,
-              content: `👤 Aluno: ${rem.studentName || "Aluno"}\n📱 Número: ${targetPhone}\n⏰ Horário: ${timeStr}`
+              title: `âœ… Enviado: ${remType}`,
+              content: `ðŸ‘¤ Aluno: ${rem.studentName || "Aluno"}\nðŸ“± NÃºmero: ${targetPhone}\nâ° HorÃ¡rio: ${timeStr}`
             });
           } else {
             await db.update(reminders)
@@ -669,7 +669,7 @@ async function runAutomation() {
     }
   }
 
-  // ─── PROCESSAMENTO DE REGRAS DE AUTOMAÇÃO PERSONALIZADAS ─────────────────
+  // â”€â”€â”€ PROCESSAMENTO DE REGRAS DE AUTOMAÃ‡ÃƒO PERSONALIZADAS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   try {
     const db = await getDb();
     if (db) {
@@ -698,8 +698,8 @@ async function runAutomation() {
         .where(eq(settings.automationEnabled, 1));
 
       for (const userSet of activeSettingsForRules) {
-        // Nota: o controle de allowAutoReminders é POR ALUNO (students.allowAutoReminders),
-        // verificado dentro de cada loop de aluno mais abaixo. Não existe allowAutoReminders na tabela settings.
+        // Nota: o controle de allowAutoReminders Ã© POR ALUNO (students.allowAutoReminders),
+        // verificado dentro de cada loop de aluno mais abaixo. NÃ£o existe allowAutoReminders na tabela settings.
         const userId = userSet.userId;
         const orgId = userSet.organizationId;
         if (!orgId) continue;
@@ -729,7 +729,7 @@ async function runAutomation() {
         for (const rule of activeRules) {
           try {
             if (rule.trigger === "payment_due" || rule.trigger === "payment_overdue") {
-              // ── MENSALIDADES ──────────────────────────────────────────────────
+              // â”€â”€ MENSALIDADES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               const pendingDues = await db
                 .select({
                   id: paymentDues.id,
@@ -758,12 +758,12 @@ async function runAutomation() {
                   and(
                     eq(paymentDues.organizationId, orgId),
                     eq(paymentDues.userId, userId),
-                    // BUG-AUTO-006 FIX: O status 'atrasado' NUNCA é salvo no banco — ele é calculado
-                    // apenas em memória no frontend (routers.ts). Por isso, a query anterior que
+                    // BUG-AUTO-006 FIX: O status 'atrasado' NUNCA Ã© salvo no banco â€” ele Ã© calculado
+                    // apenas em memÃ³ria no frontend (routers.ts). Por isso, a query anterior que
                     // filtrava por `status = 'atrasado'` para o trigger `payment_overdue` nunca
-                    // encontrava nenhum pagamento, e o robô nunca disparava.
-                    // Solução: buscar pagamentos 'pendente' cujo dueDate já passou (lógica idêntica
-                    // ao frontend), pois esses são os realmente "atrasados" no banco.
+                    // encontrava nenhum pagamento, e o robÃ´ nunca disparava.
+                    // SoluÃ§Ã£o: buscar pagamentos 'pendente' cujo dueDate jÃ¡ passou (lÃ³gica idÃªntica
+                    // ao frontend), pois esses sÃ£o os realmente "atrasados" no banco.
                     rule.trigger === "payment_overdue"
                       ? and(
                           eq(paymentDues.status, "pendente"),
@@ -805,7 +805,7 @@ async function runAutomation() {
                 const valor = Number(due.amount).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
                 const vencimento = dueDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric", timeZone: "America/Sao_Paulo" });
 
-                // Tenta recuperar ou gerar link de pagamento caso não exista
+                // Tenta recuperar ou gerar link de pagamento caso nÃ£o exista
                 const pGateway = userSet.paymentGateway ?? "asaas";
                 let paymentLink = pGateway === "mercadopago"
                   ? (due.mpPaymentLink ?? null)
@@ -815,7 +815,7 @@ async function runAutomation() {
 
                 if (!paymentLink) {
                   if (pGateway === "infinitepay" && userSet.infinitepayHandle && (userSet.infinitepayEnabled === 1 || userSet.infinitepayEnabled === undefined || userSet.infinitepayEnabled === null)) {
-                    // ── INFINITEPAY: gera link de pagamento on-the-fly ──────────
+                    // â”€â”€ INFINITEPAY: gera link de pagamento on-the-fly â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                     try {
                       const { createInfinitePayLink, buildInfinitePayWebhookUrl, brlToCents, resolveInfinitePayApiKey } = await import("./utils/infinitepay");
                       const { createPaymentShortLink } = await import("./utils/shortlinks");
@@ -827,7 +827,7 @@ async function runAutomation() {
                           price: brlToCents(due.amount),
                           description: `Mensalidade ${due.month}/${due.year} - ${due.studentName}`,
                         }],
-                        redirectUrl: `https://wrmusicpro.com.br/painel/mensalidades`,
+                        redirectUrl: `${process.env.APP_URL || "https://dancepro.wrmusicpro.com.br"}/painel/mensalidades`,
                         webhookUrl: buildInfinitePayWebhookUrl(due.id),
                         apiKey: resolveInfinitePayApiKey(userSet.infinitepayApiKey),
                         customer: {
@@ -849,7 +849,7 @@ async function runAutomation() {
                         .where(eq(paymentDues.id, due.id));
                       paymentLink = shareUrl;
                     } catch (err) {
-                      console.error("[AutomationJob] Erro ao gerar cobrança InfinitePay on-the-fly:", err);
+                      console.error("[AutomationJob] Erro ao gerar cobranÃ§a InfinitePay on-the-fly:", err);
                     }
                   } else if (pGateway === "asaas" && userSet.asaasApiKey && (userSet.asaasEnabled === 1 || userSet.asaasEnabled === undefined || userSet.asaasEnabled === null)) {
                     try {
@@ -891,10 +891,10 @@ async function runAutomation() {
                         paymentLink = charge.invoiceUrl;
                       }
                     } catch (err) {
-                      console.error("[AutomationJob] Erro ao gerar cobrança Asaas on-the-fly:", err);
+                      console.error("[AutomationJob] Erro ao gerar cobranÃ§a Asaas on-the-fly:", err);
                     }
                   } else if (pGateway === "mercadopago" && userSet.mpAccessToken) {
-                    // ── MERCADO PAGO: gera link de pagamento on-the-fly ──────────
+                    // â”€â”€ MERCADO PAGO: gera link de pagamento on-the-fly â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                     try {
                       const { createMPPreference } = await import("./utils/mercadopago");
                       const pref = await createMPPreference({
@@ -906,10 +906,10 @@ async function runAutomation() {
                         }],
                         payer: {
                           name: due.studentName || "Aluno",
-                          email: due.studentEmail || "aluno@musicpro.com.br",
+                          email: due.studentEmail || "aluno@dancepro.com.br",
                         },
                         external_reference: due.id.toString(),
-                        successUrl: `https://wrmusicpro.com.br/painel/mensalidades`,
+                        successUrl: `${process.env.APP_URL || "https://dancepro.wrmusicpro.com.br"}/painel/mensalidades`,
                       }, decryptSecret(userSet.mpAccessToken));
 
                       await db.update(paymentDues)
@@ -917,7 +917,7 @@ async function runAutomation() {
                         .where(eq(paymentDues.id, due.id));
                       paymentLink = pref.init_point;
                     } catch (err) {
-                      console.error("[AutomationJob] Erro ao gerar cobrança Mercado Pago on-the-fly:", err);
+                      console.error("[AutomationJob] Erro ao gerar cobranÃ§a Mercado Pago on-the-fly:", err);
                     }
                   }
                 }
@@ -935,8 +935,8 @@ async function runAutomation() {
                   .replace(/\{nome_aluno\}/g, due.studentName ?? "Aluno")
                   .replace(/\{nome_professor\}/g, professorName)
                   .replace(/\{nome_escola\}/g, schoolName)
-                  .replace(/\{curso\}/g, due.instrumentName ?? "música")
-                  .replace(/\{instrumento\}/g, due.instrumentName ?? "música")
+                  .replace(/\{curso\}/g, due.instrumentName ?? "danÃ§a")
+                  .replace(/\{instrumento\}/g, due.instrumentName ?? "danÃ§a").replace(/\{modalidade\}/g, due.instrumentName ?? "danÃ§a")
                   .replace(/\{valor_original\}/g, valorOriginalFmt)
                   .replace(/\{multa\}/g, multaFmt)
                   .replace(/\{juros\}/g, jurosFmt)
@@ -956,23 +956,23 @@ async function runAutomation() {
                     .replace(/\{payment_link\}/g, pixReplacement);
                 } else if (paymentLink) {
                   const gatewayName = pGateway === "mercadopago" ? "Mercado Pago" : pGateway === "infinitepay" ? "InfinitePay" : "Asaas";
-                  message += `\n\n💳 *Link de pagamento (${gatewayName}):*\n${paymentLink}`;
+                  message += `\n\nðŸ’³ *Link de pagamento (${gatewayName}):*\n${paymentLink}`;
                 } else if (userSet.pixKey) {
-                  message += `\n\n💳 *PIX:* ${userSet.pixKey}`;
+                  message += `\n\nðŸ’³ *PIX:* ${userSet.pixKey}`;
                 }
                 
                 message = message.replace(/\{[^}]+\}/g, '');
 
-                // ✅ FIX: INSERT PRIMEIRO — garante registro no banco antes do envio.
-                // Se o INSERT falhar após o envio, o próximo ciclo não teria como saber que já foi enviado.
-                if (!due.studentPhone && !due.guardianPhone) continue; // sem telefone, não insere
+                // âœ… FIX: INSERT PRIMEIRO â€” garante registro no banco antes do envio.
+                // Se o INSERT falhar apÃ³s o envio, o prÃ³ximo ciclo nÃ£o teria como saber que jÃ¡ foi enviado.
+                if (!due.studentPhone && !due.guardianPhone) continue; // sem telefone, nÃ£o insere
 
                 await db.insert(reminders).values({
                   organizationId: orgId, userId, studentId: due.studentId, paymentDueId: due.id,
                   type: "cobranca", message, scheduledAt: now2, status: "pendente", autoGenerated: 1, refId,
                 });
 
-                // Envia e marca como "enviado" imediatamente — impede que o main dispatch loop reenvie no próximo ciclo
+                // Envia e marca como "enviado" imediatamente â€” impede que o main dispatch loop reenvie no prÃ³ximo ciclo
                 if (userSet.whatsappAutoSend === 1 && userSet.whatsappBotUrl && await canSendWhatsApp(userId, orgId)) {
                   const routingRes = await sendSmartWhatsAppNotification({
                     sendToStudent: (rule as any).sendToStudent === 1 || (rule as any).sendToStudent === undefined,
@@ -992,10 +992,10 @@ async function runAutomation() {
                         errorMessage: null,
                         updatedAt: new Date(),
                       }).where(eq(reminders.id, newRem.id));
-                    } else if (routingRes.errors?.[0] === "Nenhum telefone válido encontrado para envio.") {
+                    } else if (routingRes.errors?.[0] === "Nenhum telefone vÃ¡lido encontrado para envio.") {
                       await db.update(reminders).set({
                         status: "cancelado",
-                        errorMessage: "Sem telefone válido para envio.",
+                        errorMessage: "Sem telefone vÃ¡lido para envio.",
                         updatedAt: new Date(),
                       }).where(eq(reminders.id, newRem.id));
                     } else {
@@ -1010,7 +1010,7 @@ async function runAutomation() {
               }
 
             } else if (rule.trigger === "lesson_scheduled") {
-              // ── AULAS ─────────────────────────────────────────────────────────
+              // â”€â”€ AULAS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               const offsetMs = (rule.offsetHours ?? 0) * 60 * 60 * 1000;
               const monday = new Date(now2);
               monday.setDate(monday.getDate() - monday.getDay());
@@ -1047,17 +1047,17 @@ async function runAutomation() {
               for (const lesson of upcomingLessons2) {
                 if (lesson.allowAutoReminders === false) continue;
                 const lessonTime = new Date(lesson.scheduledAt);
-                const triggerTime = new Date(lessonTime.getTime() + offsetMs); // offsetHours=-24 → 24h before
+                const triggerTime = new Date(lessonTime.getTime() + offsetMs); // offsetHours=-24 â†’ 24h before
                 
-                // Só dispara se o tempo já passou...
+                // SÃ³ dispara se o tempo jÃ¡ passou...
                 if (triggerTime > now2) continue;
                 
-                // E só dispara se AINDA for o mesmo dia calendário (BRT) planejado para o disparo.
-                // Se virar a meia-noite, a mensagem perderia o contexto (ex: falaria 'amanhã' no dia da aula).
-                // CORREÇÃO: Removida a verificação triggerDayStr !== nowDayStr que impedia o envio de lembretes na virada da meia-noite.
+                // E sÃ³ dispara se AINDA for o mesmo dia calendÃ¡rio (BRT) planejado para o disparo.
+                // Se virar a meia-noite, a mensagem perderia o contexto (ex: falaria 'amanhÃ£' no dia da aula).
+                // CORREÃ‡ÃƒO: Removida a verificaÃ§Ã£o triggerDayStr !== nowDayStr que impedia o envio de lembretes na virada da meia-noite.
 
                 const lessonDateStr = lessonTime.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
-                // ✅ FIX: Lock exclusivo por Regra. Permite que o usuário tenha múltiplas automações para a mesma aula (ex: 24h antes E 1h antes).
+                // âœ… FIX: Lock exclusivo por Regra. Permite que o usuÃ¡rio tenha mÃºltiplas automaÃ§Ãµes para a mesma aula (ex: 24h antes E 1h antes).
                 const refId = `auto-rule-${rule.id}-lesson-${lesson.id}-${lessonDateStr}`;
                 const existing = await db.select({ id: reminders.id }).from(reminders)
                   .where(and(
@@ -1073,19 +1073,19 @@ async function runAutomation() {
                   .replace(/\{nome_aluno\}/g, lesson.studentName ?? "Aluno")
                   .replace(/\{nome_professor\}/g, professorName)
                   .replace(/\{nome_escola\}/g, schoolName)
-                  .replace(/\{curso\}/g, lesson.instrumentName ?? "m\u00fasica")
-                  .replace(/\{instrumento\}/g, lesson.instrumentName ?? "m\u00fasica")
+                  .replace(/\{curso\}/g, lesson.instrumentName ?? "dança")
+                  .replace(/\{instrumento\}/g, lesson.instrumentName ?? "dança").replace(/\{modalidade\}/g, lesson.instrumentName ?? "dança")
                   .replace(/\{data_aula\}/g, dataAula)
                   .replace(/\{hora_aula\}/g, horaAula)
                   .replace(/\{[^}]+\}/g, '');
 
-                // ✅ FIX: INSERT PRIMEIRO — garante registro no banco antes do envio
+                // âœ… FIX: INSERT PRIMEIRO â€” garante registro no banco antes do envio
                 await db.insert(reminders).values({
                   organizationId: orgId, userId, studentId: lesson.studentId, lessonId: lesson.id,
                   type: "aula", message, scheduledAt: triggerTime, status: "pendente", autoGenerated: 1, refId,
                 });
 
-                // Envia e marca como "enviado" imediatamente — impede que o main dispatch loop reenvie no próximo ciclo
+                // Envia e marca como "enviado" imediatamente â€” impede que o main dispatch loop reenvie no prÃ³ximo ciclo
                 if (userSet.whatsappAutoSend === 1 && userSet.whatsappBotUrl && await canSendWhatsApp(userId, orgId)) {
                   const routingRes = await sendSmartWhatsAppNotification({
                     sendToStudent: (rule as any).sendToStudent === 1 || (rule as any).sendToStudent === undefined,
@@ -1123,7 +1123,7 @@ async function runAutomation() {
               }
 
             } else if (rule.trigger === "birthday") {
-              // ── ANIVERSÁRIOS ─────────────────────────────────────────────────
+              // â”€â”€ ANIVERSÃRIOS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               const allStudents = await db
                 .select({ id: students.id, name: students.name, phone: students.phone, guardianPhone: students.guardianPhone, birthDate: students.birthDate,
                   allowAutoReminders: students.allowAutoReminders, instrumentName: instruments.name })
@@ -1146,13 +1146,13 @@ async function runAutomation() {
                   .replace(/\{nome_aluno\}/g, student.name ?? "Aluno")
                   .replace(/\{nome_professor\}/g, professorName)
                   .replace(/\{nome_escola\}/g, schoolName)
-                  .replace(/\{curso\}/g, student.instrumentName ?? "música")
-                  .replace(/\{instrumento\}/g, student.instrumentName ?? "música");
+                  .replace(/\{curso\}/g, student.instrumentName ?? "danÃ§a")
+                  .replace(/\{instrumento\}/g, student.instrumentName ?? "danÃ§a").replace(/\{modalidade\}/g, student.instrumentName ?? "danÃ§a");
 
                 const targetPhone = student.phone || student.guardianPhone;
                 if (!targetPhone) continue;
 
-                // ✅ FIX: INSERT PRIMEIRO, depois envia e marca como enviado
+                // âœ… FIX: INSERT PRIMEIRO, depois envia e marca como enviado
                 await db.insert(reminders).values({
                   organizationId: orgId, userId, studentId: student.id,
                   type: "manual", message, scheduledAt: now2, status: "pendente", autoGenerated: 1, refId,
@@ -1179,7 +1179,7 @@ async function runAutomation() {
               }
 
             } else if (rule.trigger === "student_inactive") {
-              // ── ALUNOS INATIVOS ──────────────────────────────────────────────
+              // â”€â”€ ALUNOS INATIVOS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               const inactiveDays = rule.offsetDays ?? 30;
               const thresholdDate = new Date(now2);
               thresholdDate.setDate(thresholdDate.getDate() - inactiveDays);
@@ -1222,8 +1222,8 @@ async function runAutomation() {
                   .replace(/\{nome_aluno\}/g, row.studentName ?? "Aluno")
                   .replace(/\{nome_professor\}/g, professorName)
                   .replace(/\{nome_escola\}/g, schoolName)
-                  .replace(/\{curso\}/g, row.instrumentName ?? "música")
-                  .replace(/\{instrumento\}/g, row.instrumentName ?? "música")
+                  .replace(/\{curso\}/g, row.instrumentName ?? "danÃ§a")
+                  .replace(/\{instrumento\}/g, row.instrumentName ?? "danÃ§a").replace(/\{modalidade\}/g, row.instrumentName ?? "danÃ§a")
                   .replace(/\{dias_sem_estudo\}/g, String(daysSince));
 
                 const targetPhone = row.studentPhone || row.guardianPhone;
@@ -1234,7 +1234,7 @@ async function runAutomation() {
                   type: "manual", message, scheduledAt: now2, status: "pendente", autoGenerated: 1, refId,
                 });
 
-                // ✅ FIX: INSERT PRIMEIRO, depois envia e marca como enviado
+                // âœ… FIX: INSERT PRIMEIRO, depois envia e marca como enviado
                 if (userSet.whatsappAutoSend === 1 && userSet.whatsappBotUrl && await canSendWhatsApp(userId, orgId)) {
                   const sendRes = await sendSmartWhatsAppNotification({
                     sendToStudent: (rule as any).sendToStudent === 1 || (rule as any).sendToStudent === undefined,
@@ -1257,7 +1257,7 @@ async function runAutomation() {
               }
 
             } else if (rule.trigger === "new_student") {
-              // ── NOVOS ALUNOS ─────────────────────────────────────────────────
+              // â”€â”€ NOVOS ALUNOS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               const offsetMs2 = (rule.offsetDays ?? 0) * 24 * 60 * 60 * 1000;
               const newStudents2 = await db
                 .select({
@@ -1295,10 +1295,10 @@ async function runAutomation() {
                   .replace(/\{nome_aluno\}/g, student.name ?? "Aluno")
                   .replace(/\{nome_professor\}/g, professorName)
                   .replace(/\{nome_escola\}/g, schoolName)
-                  .replace(/\{curso\}/g, student.instrumentName ?? "música")
-                  .replace(/\{instrumento\}/g, student.instrumentName ?? "música");
+                  .replace(/\{curso\}/g, student.instrumentName ?? "danÃ§a")
+                  .replace(/\{instrumento\}/g, student.instrumentName ?? "danÃ§a").replace(/\{modalidade\}/g, student.instrumentName ?? "danÃ§a");
 
-                // ✅ FIX: INSERT PRIMEIRO — garante registro no banco antes do envio
+                // âœ… FIX: INSERT PRIMEIRO â€” garante registro no banco antes do envio
                 if (!student.phone && !student.guardianPhone) continue;
 
                 await db.insert(reminders).values({
@@ -1306,7 +1306,7 @@ async function runAutomation() {
                   type: "manual", message, scheduledAt: now2, status: "pendente", autoGenerated: 1, refId,
                 });
 
-                // Envia e marca como "enviado" imediatamente — impede que o main dispatch loop reenvie no próximo ciclo
+                // Envia e marca como "enviado" imediatamente â€” impede que o main dispatch loop reenvie no prÃ³ximo ciclo
                 if (userSet.whatsappAutoSend === 1 && userSet.whatsappBotUrl && await canSendWhatsApp(userId, orgId)) {
                   const routingRes = await sendSmartWhatsAppNotification({
                     sendToStudent: (rule as any).sendToStudent === 1 || (rule as any).sendToStudent === undefined,
@@ -1320,8 +1320,8 @@ async function runAutomation() {
                   if (newRem) {
                     if (routingRes.success) {
                       await db.update(reminders).set({ status: "enviado", sentAt: new Date(), errorMessage: null, updatedAt: new Date() }).where(eq(reminders.id, newRem.id));
-                    } else if (routingRes.errors?.[0] === "Nenhum telefone válido encontrado para envio.") {
-                      await db.update(reminders).set({ status: "cancelado", errorMessage: "Sem telefone válido para envio.", updatedAt: new Date() }).where(eq(reminders.id, newRem.id));
+                    } else if (routingRes.errors?.[0] === "Nenhum telefone vÃ¡lido encontrado para envio.") {
+                      await db.update(reminders).set({ status: "cancelado", errorMessage: "Sem telefone vÃ¡lido para envio.", updatedAt: new Date() }).where(eq(reminders.id, newRem.id));
                     } else {
                       await db.update(reminders).set({ errorMessage: routingRes.errors?.join(", ") ?? "Erro ao enviar mensagem.", updatedAt: new Date() }).where(eq(reminders.id, newRem.id));
                     }
@@ -1331,7 +1331,7 @@ async function runAutomation() {
               }
 
             } else if (rule.trigger === "payment_confirmed") {
-              // ── PAGAMENTO CONFIRMADO ─────────────────────────────────────────
+              // â”€â”€ PAGAMENTO CONFIRMADO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               // Find payments confirmed today (paidAt >= start of today)
               const startOfToday = new Date(now2.getFullYear(), now2.getMonth(), now2.getDate(), 0, 0, 0);
               const confirmedToday = await db
@@ -1371,11 +1371,11 @@ async function runAutomation() {
                   .replace(/\{nome_aluno\}/g, payment.studentName ?? "Aluno")
                   .replace(/\{nome_professor\}/g, professorName)
                   .replace(/\{nome_escola\}/g, schoolName)
-                  .replace(/\{curso\}/g, payment.instrumentName ?? "m\u00fasica")
+                  .replace(/\{curso\}/g, payment.instrumentName ?? "dança")
                   .replace(/\{valor_mensalidade\}/g, valor)
                   .replace(/\{[^}]+\}/g, '');
 
-                // ✅ FIX: INSERT PRIMEIRO — garante registro no banco antes do envio
+                // âœ… FIX: INSERT PRIMEIRO â€” garante registro no banco antes do envio
                 if (!payment.studentPhone && !payment.guardianPhone) continue;
 
                 await db.insert(reminders).values({
@@ -1383,7 +1383,7 @@ async function runAutomation() {
                   type: "cobranca", message, scheduledAt: now2, status: "pendente", autoGenerated: 1, refId,
                 });
 
-                // Envia e marca como "enviado" imediatamente — impede que o main dispatch loop reenvie no próximo ciclo
+                // Envia e marca como "enviado" imediatamente â€” impede que o main dispatch loop reenvie no prÃ³ximo ciclo
                 if (userSet.whatsappAutoSend === 1 && userSet.whatsappBotUrl && await canSendWhatsApp(userId, orgId)) {
                   const routingRes = await sendSmartWhatsAppNotification({
                     sendToStudent: (rule as any).sendToStudent === 1 || (rule as any).sendToStudent === undefined,
@@ -1420,11 +1420,11 @@ async function runAutomation() {
 
               }
             } else if (rule.trigger === "daily_study") {
-              // ── LEMBRETE DE ESTUDO DIÁRIO ─────────────────────────────────────
-              // Configuração armazenada no campo `conditions` como JSON:
+              // â”€â”€ LEMBRETE DE ESTUDO DIÃRIO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              // ConfiguraÃ§Ã£o armazenada no campo `conditions` como JSON:
               // { "daysOfWeek": [0,1,2,3,4,5,6], "sendTime": "08:00" }
-              // daysOfWeek: 0=Domingo, 1=Segunda, ..., 6=Sábado
-              let daysOfWeek: number[] = [1, 2, 3, 4, 5]; // padrão: seg a sex
+              // daysOfWeek: 0=Domingo, 1=Segunda, ..., 6=SÃ¡bado
+              let daysOfWeek: number[] = [1, 2, 3, 4, 5]; // padrÃ£o: seg a sex
               let sendTime = "08:00";
               try {
                 if (rule.conditions) {
@@ -1432,23 +1432,23 @@ async function runAutomation() {
                   if (Array.isArray(cond.daysOfWeek)) daysOfWeek = cond.daysOfWeek;
                   if (typeof cond.sendTime === "string") sendTime = cond.sendTime;
                 }
-              } catch { /* mantém defaults */ }
+              } catch { /* mantÃ©m defaults */ }
 
-              // BUG#1+#2 FIX: usar horário e dia de semana do timezone de Brasília
-              // now2.getDay() e getHours() retornam UTC — no horário de Brasília isso pode ser um dia/hora diferente
+              // BUG#1+#2 FIX: usar horÃ¡rio e dia de semana do timezone de BrasÃ­lia
+              // now2.getDay() e getHours() retornam UTC â€” no horÃ¡rio de BrasÃ­lia isso pode ser um dia/hora diferente
               const brazilLocale = now2.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" });
               const brazilDate = new Date(brazilLocale);
-              const currentDayOfWeek = brazilDate.getDay(); // 0=Dom, 1=Seg... em horário BRT
+              const currentDayOfWeek = brazilDate.getDay(); // 0=Dom, 1=Seg... em horÃ¡rio BRT
               if (!daysOfWeek.includes(currentDayOfWeek)) continue;
 
-              // Verificar se o horário atual já passou do horário configurado (com tolerância de até 30 minutos).
-              // Isso é robusto contra ciclos lentos ou reinícios do servidor.
-              // BUG-008 FIX: O refId usa `todayStr2` (data do dia) — não a hora — garantindo que
-              // dispara UMA VEZ POR DIA independentemente de reinícios dentro da janela de 30min.
+              // Verificar se o horÃ¡rio atual jÃ¡ passou do horÃ¡rio configurado (com tolerÃ¢ncia de atÃ© 30 minutos).
+              // Isso Ã© robusto contra ciclos lentos ou reinÃ­cios do servidor.
+              // BUG-008 FIX: O refId usa `todayStr2` (data do dia) â€” nÃ£o a hora â€” garantindo que
+              // dispara UMA VEZ POR DIA independentemente de reinÃ­cios dentro da janela de 30min.
               const [sendHour, sendMin] = sendTime.split(":").map(Number);
               const nowTotalMin = brazilDate.getHours() * 60 + brazilDate.getMinutes(); // hora BRT
               const targetTotalMin = sendHour * 60 + sendMin;
-              // Só dispara depois do horário configurado (0 a +30 min de tolerância)
+              // SÃ³ dispara depois do horÃ¡rio configurado (0 a +30 min de tolerÃ¢ncia)
               if (nowTotalMin < targetTotalMin || nowTotalMin > targetTotalMin + 30) continue;
 
               // Buscar todos os alunos ativos do professor
@@ -1476,7 +1476,7 @@ async function runAutomation() {
                 if (!student.allowAutoReminders) continue;
                 if (!student.phone && !student.guardianPhone) continue;
 
-                // Deduplicação: 1 lembrete por aluno por dia por regra
+                // DeduplicaÃ§Ã£o: 1 lembrete por aluno por dia por regra
                 const refId = `auto-rule-${rule.id}-dailystudy-${student.id}-${todayStr2}`;
                 const existing = await db.select({ id: reminders.id }).from(reminders)
                   .where(and(eq(reminders.organizationId, orgId), eq(reminders.refId, refId))).limit(1);
@@ -1486,10 +1486,10 @@ async function runAutomation() {
                   .replace(/\{nome_aluno\}/g, student.name ?? "Aluno")
                   .replace(/\{nome_professor\}/g, professorName)
                   .replace(/\{nome_escola\}/g, schoolName)
-                  .replace(/\{curso\}/g, student.instrumentName ?? "música")
-                  .replace(/\{instrumento\}/g, student.instrumentName ?? "música");
+                  .replace(/\{curso\}/g, student.instrumentName ?? "danÃ§a")
+                  .replace(/\{instrumento\}/g, student.instrumentName ?? "danÃ§a").replace(/\{modalidade\}/g, student.instrumentName ?? "danÃ§a");
 
-                // INSERT PRIMEIRO — garante registro no banco antes do envio
+                // INSERT PRIMEIRO â€” garante registro no banco antes do envio
                 await db.insert(reminders).values({
                   organizationId: orgId, userId, studentId: student.id,
                   type: "manual", message, scheduledAt: now2, status: "pendente", autoGenerated: 1, refId,
@@ -1509,8 +1509,8 @@ async function runAutomation() {
                   if (newRem) {
                     if (sendRes.success) {
                       await db.update(reminders).set({ status: "enviado", sentAt: new Date(), errorMessage: null, updatedAt: new Date() }).where(eq(reminders.id, newRem.id));
-                    } else if (sendRes.errors?.[0] === "Nenhum telefone válido encontrado para envio.") {
-                      await db.update(reminders).set({ status: "cancelado", errorMessage: "Sem telefone válido para envio.", updatedAt: new Date() }).where(eq(reminders.id, newRem.id));
+                    } else if (sendRes.errors?.[0] === "Nenhum telefone vÃ¡lido encontrado para envio.") {
+                      await db.update(reminders).set({ status: "cancelado", errorMessage: "Sem telefone vÃ¡lido para envio.", updatedAt: new Date() }).where(eq(reminders.id, newRem.id));
                     } else {
                       await db.update(reminders).set({ errorMessage: sendRes.errors?.join(", ") ?? "Erro ao enviar mensagem.", updatedAt: new Date() }).where(eq(reminders.id, newRem.id));
                     }
@@ -1518,7 +1518,7 @@ async function runAutomation() {
                 }
               }
             } else if (rule.trigger === "daily_report") {
-              // ── RELATÓRIO DIÁRIO DE TREINOS CUSTOMIZADO ──────────────────────────────────
+              // â”€â”€ RELATÃ“RIO DIÃRIO DE TREINOS CUSTOMIZADO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               let daysOfWeek: number[] = [1, 2, 3, 4, 5]; 
               let sendTime = "20:00";
               try {
@@ -1527,7 +1527,7 @@ async function runAutomation() {
                   if (Array.isArray(cond.daysOfWeek)) daysOfWeek = cond.daysOfWeek;
                   if (typeof cond.sendTime === "string") sendTime = cond.sendTime;
                 }
-              } catch { /* mantém defaults */ }
+              } catch { /* mantÃ©m defaults */ }
 
               const brazilLocale = now2.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" });
               const brazilDate = new Date(brazilLocale);
@@ -1542,7 +1542,7 @@ async function runAutomation() {
               const { dailyStudyPlans, notifications } = await import("../drizzle/schema");
               
               const existingReport = await db.select({ id: notifications.id }).from(notifications)
-                .where(and(eq(notifications.organizationId, orgId), eq(notifications.title, "Relatório Diário de Treinos 📊"), gte(notifications.createdAt, startOfDayUTC))).limit(1);
+                .where(and(eq(notifications.organizationId, orgId), eq(notifications.title, "RelatÃ³rio DiÃ¡rio de Treinos ðŸ“Š"), gte(notifications.createdAt, startOfDayUTC))).limit(1);
               
               if (existingReport.length === 0) {
                 const plans = await db.select({ studentName: students.name, updatedAt: dailyStudyPlans.updatedAt })
@@ -1558,7 +1558,7 @@ async function runAutomation() {
                     if (!p.studentName) continue;
                     anyStudent = true;
                     const updatedToday = p.updatedAt && new Date(p.updatedAt).getTime() >= startOfDayUTC.getTime();
-                    resumo += `\n${updatedToday ? '✅' : '❌'} ${p.studentName.split(' ')[0]}`;
+                    resumo += `\n${updatedToday ? 'âœ…' : 'âŒ'} ${p.studentName.split(' ')[0]}`;
                   }
 
                   if (anyStudent) {
@@ -1569,23 +1569,23 @@ async function runAutomation() {
 
                     if (userSet.notifyWeeklyReport === 1) {
                       await db.insert(notifications).values({
-                        organizationId: orgId, userId, title: "Relatório Diário de Treinos 📊", message: message, type: "info", actionUrl: "/progresso",
+                        organizationId: orgId, userId, title: "RelatÃ³rio DiÃ¡rio de Treinos ðŸ“Š", message: message, type: "info", actionUrl: "/progresso",
                       });
 
                       try {
-                        await notifyUser(userId, { title: "Relatório Diário de Treinos 📊", content: message });
+                        await notifyUser(userId, { title: "RelatÃ³rio DiÃ¡rio de Treinos ðŸ“Š", content: message });
                       } catch (e) {
-                        console.error("[Automation] Erro ao enviar push de relatório:", e);
+                        console.error("[Automation] Erro ao enviar push de relatÃ³rio:", e);
                       }
                     }
                   }
                 }
               }
             } else if (rule.trigger === "contract_expiring") {
-              // ── FIM DE CONTRATO ───────────────────────────────────────────────
-              // Avisa o aluno quando o contrato está próximo do fim, em 2 modos:
+              // â”€â”€ FIM DE CONTRATO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              // Avisa o aluno quando o contrato estÃ¡ prÃ³ximo do fim, em 2 modos:
               // 'meses' (faltando X meses) ou 'aulas' (faltando X aulas), definidos
-              // na regra via triggerUnit. Segue o mesmo padrão das outras automações
+              // na regra via triggerUnit. Segue o mesmo padrÃ£o das outras automaÃ§Ãµes
               // (insert reminder com dedup refId + WhatsApp + alerta no dashboard).
               const triggerUnit = (((rule as any).triggerUnit) || "meses") as "meses" | "aulas";
               const triggerValue = Math.max(1, Number(rule.offsetDays) || 1);
@@ -1612,7 +1612,7 @@ async function runAutomation() {
                   if (!contract.endDate) continue;
                   const daysRemaining = computeDaysRemaining(contract.endDate, now2);
                   const monthsRemaining = computeMonthsRemaining(contract.endDate, now2);
-                  if (daysRemaining <= 0) continue; // já encerrado
+                  if (daysRemaining <= 0) continue; // jÃ¡ encerrado
 
                   const [student] = await db
                     .select({
@@ -1635,7 +1635,7 @@ async function runAutomation() {
                   if (student.allowAutoReminders === false) continue;
                   if (student.status !== "ativo") continue;
 
-                  // Cálculo do critério
+                  // CÃ¡lculo do critÃ©rio
                   let lessonsRemaining = 0;
                   if (triggerUnit === "aulas") {
                     const [plan] = await db
@@ -1646,7 +1646,7 @@ async function runAutomation() {
                     const aulasPorSemana = plan?.aulasPorSemana ?? null;
                     const duracaoMeses = plan?.duracaoMeses ?? null;
                     if (!aulasPorSemana || !duracaoMeses) {
-                      debugLog(`[Automation] Contract ${contract.id}: aluno sem plano (schoolPlanId=${student.schoolPlanId}) — pulando modo aulas.`);
+                      debugLog(`[Automation] Contract ${contract.id}: aluno sem plano (schoolPlanId=${student.schoolPlanId}) â€” pulando modo aulas.`);
                       continue;
                     }
                     const total = computeTotalLessons(aulasPorSemana, duracaoMeses);
@@ -1666,7 +1666,7 @@ async function runAutomation() {
                   const met = isContractExpiryTriggered(triggerUnit, triggerValue, daysRemaining, monthsRemaining, lessonsRemaining);
                   if (!met) continue;
 
-                  // Dedup por contrato + regra (uma notificação por contrato por regra)
+                  // Dedup por contrato + regra (uma notificaÃ§Ã£o por contrato por regra)
                   const refId = `auto-rule-${rule.id}-contract-${contract.id}`;
                   const existing = await db.select({ id: reminders.id }).from(reminders)
                     .where(and(eq(reminders.organizationId, orgId), eq(reminders.refId, refId))).limit(1);
@@ -1677,25 +1677,25 @@ async function runAutomation() {
                     .replace(/\{nome_aluno\}/g, student.name ?? "Aluno")
                     .replace(/\{nome_professor\}/g, professorName)
                     .replace(/\{nome_escola\}/g, schoolName)
-                    .replace(/\{curso\}/g, student.instrumentName ?? "música")
-                    .replace(/\{instrumento\}/g, student.instrumentName ?? "música")
+                    .replace(/\{curso\}/g, student.instrumentName ?? "danÃ§a")
+                    .replace(/\{instrumento\}/g, student.instrumentName ?? "danÃ§a").replace(/\{modalidade\}/g, student.instrumentName ?? "danÃ§a")
                     .replace(/\{data_fim_contrato\}/g, dataFim)
                     .replace(/\{meses_restantes\}/g, String(Math.max(0, monthsRemaining)))
                     .replace(/\{aulas_restantes\}/g, String(lessonsRemaining))
                     .replace(/\{[^}]+\}/g, '');
 
-                  // INSERT PRIMEIRO — garante registro no banco antes do envio
+                  // INSERT PRIMEIRO â€” garante registro no banco antes do envio
                   await db.insert(reminders).values({
                     organizationId: orgId, userId, studentId: contract.studentId,
                     type: "manual", message, scheduledAt: now2, status: "pendente", autoGenerated: 1, refId,
                   });
 
-                  // Alerta no dashboard do aluno (notifications → userId do login do aluno)
+                  // Alerta no dashboard do aluno (notifications â†’ userId do login do aluno)
                   if (student.studentUserId) {
                     await db.insert(notifications).values({
                       organizationId: orgId,
                       userId: student.studentUserId,
-                      title: "📄 Contrato próximo do fim",
+                      title: "ðŸ“„ Contrato prÃ³ximo do fim",
                       message,
                       type: "warning",
                       actionUrl: "/aluno/contratos",
@@ -1718,8 +1718,8 @@ async function runAutomation() {
                     if (newRem) {
                       if (routingRes.success) {
                         await db.update(reminders).set({ status: "enviado", sentAt: new Date(), errorMessage: null, updatedAt: new Date() }).where(eq(reminders.id, newRem.id));
-                      } else if (routingRes.errors?.[0] === "Nenhum telefone válido encontrado para envio.") {
-                        await db.update(reminders).set({ status: "cancelado", errorMessage: "Sem telefone válido para envio.", updatedAt: new Date() }).where(eq(reminders.id, newRem.id));
+                      } else if (routingRes.errors?.[0] === "Nenhum telefone vÃ¡lido encontrado para envio.") {
+                        await db.update(reminders).set({ status: "cancelado", errorMessage: "Sem telefone vÃ¡lido para envio.", updatedAt: new Date() }).where(eq(reminders.id, newRem.id));
                       } else {
                         await db.update(reminders).set({ errorMessage: routingRes.errors?.join(", ") ?? "Erro ao enviar mensagem.", updatedAt: new Date() }).where(eq(reminders.id, newRem.id));
                       }
@@ -1740,8 +1740,8 @@ async function runAutomation() {
     console.error("[Automation] Error in automation rules processing:", automationRulesErr);
   }
 
-  // ── ⭐ Ciclos de Avaliação de Professores (PRD módulo 2) ──
-  // Independente das regras: abre novo ciclo quando a frequência configurada venceu.
+  // â”€â”€ â­ Ciclos de AvaliaÃ§Ã£o de Professores (PRD mÃ³dulo 2) â”€â”€
+  // Independente das regras: abre novo ciclo quando a frequÃªncia configurada venceu.
   try {
     const db2 = await getDb();
     if (db2) {
@@ -1758,12 +1758,12 @@ async function runAutomation() {
 }
 
 export function startAutomationJob() {
-  // Executa imediatamente na subida do servidor e agenda repetições a cada 1 minuto
+  // Executa imediatamente na subida do servidor e agenda repetiÃ§Ãµes a cada 1 minuto
   runAutomation().catch(err => console.error("[Automation] Initial run error:", err));
   setInterval(() => {
     runAutomation().catch(err => console.error("[Automation] Scheduled run error:", err));
   }, 60 * 1000);
 
-  debugLog("[Automation] Job scheduler started — runs every 1 minute");
+  debugLog("[Automation] Job scheduler started â€” runs every 1 minute");
 }
 

@@ -682,20 +682,6 @@ export default function StudentProgress() {
                                 <Timer size={10} /> {ex.duration}
                               </div>
                             )}
-                            {/* PRD 03 — BPM recomendado + início rápido do metrônomo (§46) */}
-                            {typeof ex.bpm === "number" && ex.bpm > 0 && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  // metronome.start(ex.bpm); // Removido
-                                  // toast.success(`Metrônomo iniciado em ${ex.bpm} BPM`);
-                                }}
-                                title={`Iniciar metrônomo em ${ex.bpm} BPM`}
-                                className="flex items-center gap-1.5 text-[9px] font-black text-violet-600 bg-violet-50 hover:bg-violet-100 px-2 py-0.5 rounded-md uppercase tracking-widest transition-all active:scale-95 cursor-pointer"
-                              >
-                                <Play size={10} className="fill-current" /> {ex.bpm} BPM
-                              </button>
-                            )}
                           </div>
                         </div>
                       </div>

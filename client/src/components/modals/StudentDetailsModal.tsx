@@ -41,7 +41,7 @@ function RepertoireSummarySection({ studentId }: { studentId: number }) {
         <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground/60">Gerenciar em Progresso → Repertório</span>
       </div>
       {items.length === 0 ? (
-        <p className="text-[10px] text-muted-foreground font-medium">Nenhuma música ainda — adicione na aba Repertório do Progresso.</p>
+        <p className="text-[10px] text-muted-foreground font-medium">Nenhuma trilha/material ainda — adicione na aba Progresso.</p>
       ) : (
         <div className="space-y-1">
           {(items as any[]).slice(0, 5).map((r) => (
@@ -59,7 +59,7 @@ function RepertoireSummarySection({ studentId }: { studentId: number }) {
             </div>
           ))}
           {items.length > 5 && (
-            <p className="text-[9px] text-muted-foreground font-bold text-center pt-0.5">+ {items.length - 5} música(s) — veja todas na aba Repertório</p>
+            <p className="text-[9px] text-muted-foreground font-bold text-center pt-0.5">+ {items.length - 5} trilha(s) — veja todas na aba Progresso</p>
           )}
         </div>
       )}

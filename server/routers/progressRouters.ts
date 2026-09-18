@@ -55,7 +55,6 @@ import { getInstrumentContext } from "../utils/instrumentContexts";
 import { resolveSpecialist, buildSpecialistPromptBlock, validatePlanText, validatePlanTextForInstrument, validateBeginnerLanguage, BEGINNER_JARGON_TERMS, getSpecialistById } from "../services/InstrumentSpecialistService";
 import { buildCustomSpecialistPromptBlock } from "../services/CustomSpecialistService";
 import { renderPromptVariables, defaultPromptVariables } from "../services/PromptVariables";
-import { buildMusicTheoryPromptBlock, validateMusicTheoryConcepts } from "../services/MusicTheoryValidator";
 import { resolveAiCredentials } from "../utils/aiProvider";
 import { studentPedagogicalMemory } from "../../drizzle/schema";
 export const progressRouters = {
@@ -798,42 +797,39 @@ ${mem.pedagogicalDirectives ? `- Diretriz pedagógica: ${mem.pedagogicalDirectiv
         },
       });
 
-      // ── 9. BLOCO DE TEORIA MUSICAL (PRD RF-016 — Camada 2) ─────────────────
-      const musicTheoryBlock = buildMusicTheoryPromptBlock(specialist.id);
-
       // ── 10. CONSTRUÇÃO DO PROMPT — STATIC-FIRST (PRD_OTIMIZACAO_PLANO_DIARIO RF-006) ──
       // Blocos estáticos primeiro (cacheáveis), dados dinâmicos do aluno por último.
       // RF-005: bloco fixo de técnica só quando NÃO há especialista mapeado.
       const levelLanguageRule = buildLevelLanguageRule(studentLevel);
       const techniqueRulesBlock = specialist.id === "geral" ? `
-### REGRAS DE TÉCNICA POR INSTRUMENTO:
-- **Teclado:** voicings na mão direita (ex: Dm7=D-F-A-C), baixo na mão esquerda. NUNCA confundir "voz/voicing" com canto.
-- **Piano:** técnica pianística (Hanon/Czerny, passagem do polegar, pedais). NUNCA layer/split eletrônico.
-- **Violão/Guitarra:** especificar cordas, casas, dedos (1-Indicador, 2-Médio, 3-Anelar, 4-Mínimo) e levada.
-- **Contrabaixo:** T=polegar (slap), P=pop, i-m=alternância. Nunca rudimentos de bateria.
-- **Bateria:** APENAS ritmo (bumbo, caixa, chimbal, rudimentos). NUNCA notas harmônicas, acordes ou escalas.
-- **Canto:** respiração diafragmática, vocalises, tessitura. NUNCA termos de instrumentos físicos.
+### REGRAS DE TÉCNICA POR MODALIDADE (DANÇA):
+- **Ballet:** alinhamento, en dehors, barra/centro, equilíbrio e preparação de giro. NUNCA sugerir pontas sem avaliação física.
+- **Jazz:** isolamentos, deslocamentos, giros e interpretação com dinâmica.
+- **Urbanas:** fundamentos (bounce, rock, groove), footwork e musicalidade. Power moves só para avançados e com colchão.
+- **Salão:** condução clara, passo básico e tempo forte correto; nunca puxar o par.
+- **Sapateado:** clareza de som antes de velocidade; aquecer tornozelos.
+- **Contemporâneo:** peso, respiração, níveis e queda controlada com colchão.
+- **Kids:** lúdico, blocos curtos, coordenação — nunca alongamento passivo forçado.
+- **Fitness:** progressão de intensidade, versão sem impacto para iniciantes.
 ` : "";
 
-      const prompt = `# 🎼 MusicPro AI — Personal Trainer de ${instrumentName.toUpperCase()}
+      const prompt = `# 💃 DancePro AI — Treino de ${instrumentName.toUpperCase()}
 
 Você é um professor especialista em **${instrumentName}** (nível: **${studentLevel}**) — Especialista: ${specialist.displayName} (${specialist.id}).
 Sua missão é criar uma rotina de treino diário de ${daysCount} dias focada **EXCLUSIVAMENTE no ROTEIRO DO PROFESSOR** (metas + observação, seção DADOS DO ALUNO no final).
 
 # 🎯 FIO CONDUTOR ÚNICO (REGRA MÁXIMA — ANTI-CONTEÚDO ALEATÓRIO)
 - O plano inteiro nasce SOMENTE do que o professor pediu: as METAS CADASTRADAS e a OBSERVAÇÃO DO PROFESSOR (se houver). Trate isso como um ROTEIRO FECHADO.
-- Se o professor citou acordes, uma sequência, uma música ou um objetivo específico, use EXATAMENTE esses — repita-os literalmente em todos os dias.
-- Os 6 blocos do dia NÃO são temas diferentes: são FATIAS DE TEMPO do MESMO conteúdo do roteiro. Ex.: Revisão = rever o material citado; Aquecimento = preparar a mão nas posições do material; Técnica = aperfeiçoar o detalhe citado; Conceito Musical = entender a ordem/estrutura do material; Aplicação = executar o material; Desafio = executar com um critério mensurável.
-- PROIBIDO introduzir assunto que o professor NÃO pediu: outra música, escalas, outros acordes, técnica não mencionada, teoria não solicitada, BPM/metrônomo (só se o roteiro pedir) e aquecimentos genéricos desconectados.
+- Se o professor citou uma coreografia, uma sequência de passos, uma música/trilha ou um objetivo específico, use EXATAMENTE esses — repita-os literalmente em todos os dias.
+- Os 6 blocos do dia NÃO são temas diferentes: são FATIAS DE TEMPO do MESMO conteúdo do roteiro. Ex.: Revisão = rever o material citado; Aquecimento = preparar o corpo para o material; Técnica = aperfeiçoar o detalhe citado; Musicalidade = entender tempo/contagem e expressão do material; Aplicação = executar o material; Desafio = executar com um critério mensurável.
+- PROIBIDO introduzir assunto que o professor NÃO pediu: outra coreografia, outra música, passos de outra modalidade, técnica não mencionada e aquecimentos genéricos desconectados.
 - Na dúvida, REPITA e APROFUNDE o conteúdo pedido em vez de inventar conteúdo novo.
 ---
 ${modeInstruction}
 ---
 ${specialistPromptBlock}
 
-${musicTheoryBlock}
-
-# 🎸 DIRETRIZES TÉCNICAS PARA: ${instrumentName.toUpperCase()}
+# 💃 DIRETRIZES TÉCNICAS PARA: ${instrumentName.toUpperCase()}
 ${terminologyBlock}
 ${forbiddenBlock}
 
@@ -842,12 +838,12 @@ ${levelLanguageRule}${techniqueRulesBlock}---
 
 # 📈 PROGRESSÃO DOS ${daysCount} DIAS (SOBRE O MESMO ROTEIRO — NUNCA TROCA DE TEMA):
 Cada dia aprofunda o MESMO conteúdo do roteiro, evoluindo apenas a execução:
-- **Dia 1:** Entender o material e executá-lo devagar, com atenção (ex.: acordes limpos, corda por corda).
-- **Dia 2:** Isolar a maior dificuldade do roteiro (ex.: a troca entre dois acordes) e repetir.
+- **Dia 1:** Entender o material e executá-lo devagar, com atenção (ex.: passos marcados, contagem em voz alta).
+- **Dia 2:** Isolar a maior dificuldade do roteiro (ex.: a transição entre dois passos) e repetir.
 - **Dia 3:** Juntar o roteiro completo (ex.: a sequência inteira) mantendo a qualidade.
-- **Dia 4:** Ganhar fluidez/velocidade no roteiro sem perder a limpeza.
-- **Dia 5:** Tocar o roteiro de ponta a ponta como se fosse a música, sem parar.
-- **Dias 6 a ${daysCount}:** repita o ciclo aprofundando o MESMO roteiro (mais repetição, menos pausa, mais precisão — BPM/metrônomo só se o roteiro pedir).
+- **Dia 4:** Ganhar fluidez/velocidade no roteiro sem perder a limpeza e a musicalidade.
+- **Dia 5:** Executar o roteiro de ponta a ponta como se fosse a apresentação, sem parar.
+- **Dias 6 a ${daysCount}:** repita o ciclo aprofundando o MESMO roteiro (mais repetição, menos pausa, mais precisão).
 
 ---
 
@@ -855,7 +851,7 @@ Cada dia aprofunda o MESMO conteúdo do roteiro, evoluindo apenas a execução:
 - Revisão: **${revisaoMin} min** (10%)
 - Aquecimento: **${warmMin} min** (15%)
 - Técnica: **${adjustedTecnicaMin} min** (30%)
-- Conceito Musical: **${conceitoMin} min** (15%)
+- Musicalidade: **${conceitoMin} min** (15%)
 - Aplicação: **${aplicacaoMin} min** (20%)
 - Desafio: **${desafioMin} min** (10%)
 A soma DEVE ser exatamente ${totalMinutes} min em todos os dias. Os 6 blocos dividem o MESMO roteiro: cada bloco é uma FATIA DE TEMPO do conteúdo pedido, não um assunto novo.
@@ -864,11 +860,12 @@ A soma DEVE ser exatamente ${totalMinutes} min em todos os dias. Os 6 blocos div
 
 # ⚠️ REGRAS ABSOLUTAS:
 1. **NUNCA COLOQUE NOME DE ALUNO/PESSOA NO PLANO.** Use linguagem direta e impessoal.
-2. **NUNCA USE SUBTÍTULOS GENÉRICOS OU METALINGUAGEM.** Crie subtítulos musicais técnicos reais.
+2. **NUNCA USE SUBTÍTULOS GENÉRICOS OU METALINGUAGEM.** Crie subtítulos técnicos de dança reais.
 ${goalScopeRule}
 4. **TODOS OS EXERCÍCIOS DEVEM SER ESPECÍFICOS PARA ${instrumentName.toUpperCase()}.**
-5. **OBRIGATÓRIO: 6 BLOCOS DE EXERCÍCIO POR DIA** (Revisão, Aquecimento, Técnica, Conceito Musical, Aplicação, Desafio).
+5. **OBRIGATÓRIO: 6 BLOCOS DE EXERCÍCIO POR DIA** (Revisão, Aquecimento, Técnica, Musicalidade, Aplicação, Desafio).
 6. **RESPEITE OS LIMITES DE CONCISÃO** do formato de saída (subtitle até 8 palavras, points até 12 palavras).
+7. **SEGURANÇA EM PRIMEIRO LUGAR:** nunca proponha exercício de risco (acrobacia, queda de altura, pontas) sem supervisão; inclua aquecimento em todo dia.
 
 ---
 
@@ -969,12 +966,12 @@ ${lessonsText}`;
           // ── Validador pós-geração: detecta contaminação cruzada ──
           const validation = validatePlanText(JSON.stringify(candidate), specialist.id);
           if (!validation.passed) {
-            console.warn(`[InstrumentSpecialist] Validação falhou (attempt ${attempt + 1}, ${specialist.id}):`, validation.found, "instrumento=", instrumentName);
+            console.warn(`[InstrumentSpecialist] Validação falhou (attempt ${attempt + 1}, ${specialist.id}):`, validation.found, "modalidade=", instrumentName);
             lastValidation = validation;
             if (attempt === 0) continue; // retry com instrução reforçada
             throw new TRPCError({
               code: "PRECONDITION_FAILED",
-              message: `O plano gerado conteve termos de outro instrumento (${validation.found.slice(0, 3).join(", ")}). Tente reformular a meta ou gere novamente.`,
+              message: `O plano gerado conteve termos de outra modalidade (${validation.found.slice(0, 3).join(", ")}). Tente reformular a meta ou gere novamente.`,
             });
           }
 
@@ -990,19 +987,7 @@ ${lessonsText}`;
             });
           }
 
-          // ── Segunda camada: validação de teoria musical (PRD RF-016) ────────
-          const theoryValidation = validateMusicTheoryConcepts(JSON.stringify(candidate), specialist.id);
-          if (!theoryValidation.passed) {
-            console.warn(`[MusicTheoryValidator] Teoria inválida (attempt ${attempt + 1}, ${specialist.id}):`, theoryValidation.warnings);
-            if (attempt === 0) {
-              lastValidation = { passed: false, found: theoryValidation.warnings };
-              continue;
-            }
-            // Na segunda tentativa, apenas loga — não bloqueia (pode ser falso positivo)
-            console.warn(`[MusicTheoryValidator] Aviso de teoria não bloqueante (attempt ${attempt + 1}):`, theoryValidation.warnings.slice(0, 3));
-          }
-
-          // Sucesso: passou nas duas camadas de validação
+          // Sucesso: passou nas camadas de validação
           if (attempt > 0) console.warn(`[InstrumentSpecialist] Retry bem-sucedido (${specialist.id}) na tentativa ${attempt + 1}`);
           else console.warn(`[InstrumentSpecialist] Validação passou (${specialist.id}) — termos proibidos: 0`);
           parsedPlan = candidate;
