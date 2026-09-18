@@ -53,6 +53,35 @@ import { schoolAiRouter } from "../schoolAiRouter";
 import { fiscalRouter } from "../fiscalRouter";
 import { FiscalService } from "../services/fiscal/FiscalService";
 import { loginAttempts, safeEqualStr, isReservedSuperAdminEmail, getOrgPlanLimits, syncOrgAsaasSubscription, reconcileOrgAsaasCharges, runCreateAssinafyContract } from "./helpers";
+
+/** Apenas dígitos — usado para comparar telefones independentemente do formato. */
+function normalizePhoneDigits(value: string | null | undefined) {
+  return (value || "").replace(/\D/g, "");
+}
+
+/**
+ * Guard de permissão da importação de alunos (server-side).
+ * Admin/dono sempre pode; professor precisa da permissão `alunos_editar`
+ * (professores.permissions, com ou sem prefixo "/").
+ */
+async function assertCanImportStudents(db: any, ctx: any) {
+  if (ctx.user.role === "admin" || ctx.user.openId === ENV.ownerOpenId) return;
+  const orgId = ctx.user.organizationId!;
+  const [prof] = await db.select({ permissions: professores.permissions }).from(professores)
+    .where(and(eq(professores.organizationId, orgId), eq(professores.userId, ctx.user.id)))
+    .limit(1);
+  const raw = Array.isArray(prof?.permissions) ? (prof!.permissions as string[]) : [];
+  const allowed = raw.some((p) => String(p).replace(/^\//, "") === "alunos_editar");
+  if (!allowed) {
+    console.warn("[importBatch] acesso negado: usuário sem permissão alunos_editar", {
+      orgId,
+      userId: ctx.user.id,
+      role: ctx.user.role,
+    });
+    throw new TRPCError({ code: "FORBIDDEN", message: "Você não tem permissão para importar alunos." });
+  }
+}
+
 export const studentsRouters = {
   students: router({
     list: protectedProcedure.query(async ({ ctx }) => {
@@ -970,6 +999,38 @@ export const studentsRouters = {
         sql`LOWER(name) LIKE ${term} OR LOWER(email) LIKE ${term}`
       )).limit(8);
     }),
+    /** Fase 1 (importação): pré-checagem de duplicados para a prévia do modal. */
+    importPrecheck: protectedProcedure.input(z.object({
+      emails: z.array(z.string().trim().max(320)).max(300).default([]),
+      phones: z.array(z.string().trim().max(30)).max(300).default([]),
+    })).query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return { existingEmails: [] as string[], phoneOwners: {} as Record<string, string> };
+      await assertCanImportStudents(db, ctx);
+      const orgId = ctx.user.organizationId!;
+
+      const emails = Array.from(new Set(input.emails.map((e) => e.trim()).filter(Boolean)));
+      const existingEmails = emails.length > 0
+        ? (await db.select({ email: students.email }).from(students)
+            .where(and(eq(students.organizationId, orgId), inArray(students.email, emails))))
+            .map((r) => r.email)
+            .filter((e): e is string => Boolean(e))
+        : [];
+
+      const phones = Array.from(new Set(input.phones.map(normalizePhoneDigits).filter((p) => p.length >= 8)));
+      const phoneOwners: Record<string, string> = {};
+      if (phones.length > 0) {
+        const rows = await db.select({ phone: students.phone, name: students.name }).from(students)
+          .where(and(eq(students.organizationId, orgId), ne(students.phone, "")));
+        for (const row of rows) {
+          const digits = normalizePhoneDigits(row.phone);
+          if (digits && phones.includes(digits) && !phoneOwners[digits]) phoneOwners[digits] = row.name;
+        }
+      }
+
+      return { existingEmails, phoneOwners };
+    }),
+
     /**
      * Fase 3 (produtividade): importação em lote de alunos a partir de CSV colado.
      * Cria cadastros básicos (sem cobrança/portal) — responsável define professor
@@ -989,6 +1050,7 @@ export const studentsRouters = {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
       const orgId = ctx.user.organizationId!;
+      await assertCanImportStudents(db, ctx);
 
       const [professor] = await db.select({ id: users.id }).from(users)
         .where(and(eq(users.id, input.professorId), eq(users.organizationId, orgId))).limit(1);
@@ -1035,12 +1097,12 @@ export const studentsRouters = {
       }
 
       const seenEmails = new Set<string>();
-      const skippedNames: string[] = [];
+      const skipped: Array<{ name: string; reason: string }> = [];
       const toImport = valid.filter((row) => {
         const email = (row.email || "").trim();
         if (!email) return true;
         if (existingEmails.has(email) || seenEmails.has(email)) {
-          skippedNames.push(row.name.trim());
+          skipped.push({ name: row.name.trim(), reason: "E-mail já cadastrado nesta escola" });
           return false;
         }
         seenEmails.add(email);
@@ -1073,7 +1135,7 @@ export const studentsRouters = {
         success: true,
         imported: toImport.length,
         skipped: input.rows.length - toImport.length,
-        skippedNames: skippedNames.slice(0, 10),
+        skippedDetails: skipped.slice(0, 50),
       };
     }),
   }),

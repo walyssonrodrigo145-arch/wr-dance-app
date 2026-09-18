@@ -26,6 +26,19 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.18.1",
+    date: "2026-09-18",
+    title: "Importação de alunos turbinada: prévia, modelo e relatório",
+    summary: "Importar a carteira ficou à prova de planilha: aceita o arquivo exportado do DancePro e do Excel, mostra prévia editável com avisos por linha e um relatório do que ficou de fora.",
+    items: [
+      { type: "novo", title: "Prévia editável antes de importar", description: "Cada linha aparece com nome, telefone, e-mail, nascimento e status (pronto/aviso/erro). Dá para corrigir, remover, marcar/desmarcar e paginar antes de confirmar." },
+      { type: "novo", title: "Reimporta o CSV exportado do sistema", description: "O arquivo do botão Exportar CSV (Excel/Sheets) agora é reconhecido pelo cabeçalho, sem depender da ordem das colunas — e o parser entende aspas, ponto-e-vírgula e BOM do Excel." },
+      { type: "novo", title: "Deduplicação assistida", description: "E-mails já cadastrados e telefones repetidos são sinalizados na prévia. Telefone é aviso (irmãos compartilham); e-mail dá para importar sem o campo." },
+      { type: "novo", title: "Modelo e relatório de importação", description: "Baixe um modelo pronto de CSV e, ao final, veja os não importados com o motivo — com download em .csv." },
+      { type: "correcao", title: "Importação com permissão verificada", description: "Só administradores e professores com a permissão 'Editar dados dos alunos' podem importar — validado também no servidor, não só no botão." },
+    ],
+  },
+  {
     version: "2026.09.18",
     date: "2026-09-18",
     title: "Escola no ar em 10 minutos: checklist, importação de alunos e Atenção Hoje",
