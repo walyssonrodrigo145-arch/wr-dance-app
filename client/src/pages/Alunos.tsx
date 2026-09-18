@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { isSameDay, startOfDay } from "date-fns";
 import {
   Users, Search, Plus, Pencil, Trash2,
-  CheckCircle2, X, Loader2, Clock, MoreVertical, Bell, TrendingUp, Activity, Eye, Edit, Download, Send,
+  CheckCircle2, X, Loader2, Clock, MoreVertical, Bell, TrendingUp, Activity, Eye, Edit, Download, FileUp, Send,
   Link as LinkIcon, Copy, ExternalLink, Sparkles
 } from "lucide-react";
 import { exportToCSV } from "@/lib/exportUtils";
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { StudentDetailsModal } from "@/components/modals/StudentDetailsModal";
 import { GenerateAccessModal } from "@/components/modals/GenerateAccessModal";
+import { ImportStudentsModal } from "@/components/alunos/ImportStudentsModal";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,7 @@ export default function Alunos() {
 
   // ── Auto-Matrícula Modal State ──────────────────────────────────────────────
   const [isEnrollmentModalOpen, setIsEnrollmentModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [enrollmentInstrumentId, setEnrollmentInstrumentId] = useState<string>("all");
   const [enrollmentFee, setEnrollmentFee] = useState<string>("");
   const [enrollmentContractTemplateId, setEnrollmentContractTemplateId] = useState<string>("auto");
@@ -212,6 +214,18 @@ export default function Alunos() {
                <Download size={16} />
                <span className="hidden sm:inline">Exportar CSV</span>
              </Button>
+
+             {canEdit && (
+               <Button
+                 variant="outline"
+                 onClick={() => setIsImportModalOpen(true)}
+                 className="h-10 rounded-xl px-3 lg:px-4 text-xs font-bold gap-2 border-border/80 shadow-sm shrink-0"
+                 title="Importar lista de alunos em CSV"
+               >
+                 <FileUp size={16} />
+                 <span className="hidden sm:inline">Importar CSV</span>
+               </Button>
+             )}
 
              {/* Botão Gerar Link de Matrícula (Auto-cadastro pelo aluno) */}
              {canEdit && (
@@ -722,6 +736,8 @@ export default function Alunos() {
       )}
 
       {/* ── MODAL GERAR LINK DE AUTO-MATRÍCULA ────────────────────────── */}
+      <ImportStudentsModal open={isImportModalOpen} onOpenChange={setIsImportModalOpen} />
+
       <Dialog open={isEnrollmentModalOpen} onOpenChange={setIsEnrollmentModalOpen}>
         <DialogContent className="sm:max-w-[480px] bg-card border-border">
           <DialogHeader>

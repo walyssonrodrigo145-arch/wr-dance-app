@@ -18,7 +18,7 @@ import {
   updateUserProfile,
   getExperimentalStats,
 } from "../db";
-import { organizations, users, students, lessons, instruments, reminders, reminderTemplates, paymentDues, asaasCustomers, settings, studentGoals, studentTimeline, studentFiles, announcements, chatMessages, rescheduleRequests, studentEvolution, aiConversations, aiMessages, aiDocuments, expenses, dailyStudyPlans, notifications, professores, professorPayments, attendanceTokens, attendanceLogs, contracts, fileComments, studioRooms, schoolIntegrations, contractTemplates, contractEvents, crmLeads, crmGoals, crmActivities, fiscalCompanies, fiscalInvoices, fiscalServices, fiscalJobs, fiscalLogs } from "../../drizzle/schema";
+import { organizations, users, students, lessons, instruments, reminders, reminderTemplates, paymentDues, asaasCustomers, settings, studentGoals, studentTimeline, studentFiles, announcements, chatMessages, rescheduleRequests, studentEvolution, aiConversations, aiMessages, aiDocuments, expenses, dailyStudyPlans, notifications, professores, professorPayments, attendanceTokens, attendanceLogs, contracts, fileComments, studioRooms, schoolIntegrations, contractTemplates, contractEvents, crmLeads, crmGoals, crmActivities, fiscalCompanies, fiscalInvoices, fiscalServices, fiscalJobs, fiscalLogs, turmas, turmaAlunos, events } from "../../drizzle/schema";
 import { eq, desc, sql, and, gte, lt, lte, asc, ne, or, inArray, aliasedTable, ilike, isNull } from "drizzle-orm";
 import { notifyOwner, notifyUser } from "../_core/notification";
 import { handleDbError } from "../utils/error_handler";
@@ -369,6 +369,101 @@ export const dashboardRouters = {
         hideFinancialValues,
         widgets: DASHBOARD_WIDGETS,
       };
+    }),
+
+    /**
+     * Fase 3 (produtividade do dono): central de pendências do dia.
+     * - Pagamentos atrasados (admin vê a escola; professor vê os próprios)
+     * - Lista de espera em turmas
+     * - Eventos próximos com autorização de imagem/participação pendente
+     */
+    attentionToday: protectedProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return { overdueCount: 0, overdueTotal: 0, waitlistCount: 0, eventsPendingAuth: 0 };
+      const orgId = ctx.user.organizationId!;
+      const isAdmin = ctx.user.role === "admin" || ctx.user.openId === ENV.ownerOpenId;
+      const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+
+      const overdueWhere = isAdmin
+        ? and(
+            eq(paymentDues.organizationId, orgId),
+            sql`${paymentDues.dueDate} < ${today}`,
+            sql`${paymentDues.status} != 'pago'`
+          )
+        : and(
+            eq(paymentDues.organizationId, orgId),
+            eq(paymentDues.userId, ctx.user.id),
+            sql`${paymentDues.dueDate} < ${today}`,
+            sql`${paymentDues.status} != 'pago'`
+          );
+
+      const [overdueAgg] = await db.select({
+        count: sql<number>`CAST(COUNT(*) AS INT)`,
+        total: sql<number>`CAST(COALESCE(SUM(${paymentDues.amount}), 0) AS DOUBLE PRECISION)`,
+      }).from(paymentDues).where(overdueWhere);
+
+      let waitlistCount = 0;
+      if (isAdmin) {
+        const [espera] = await db.select({ count: sql<number>`CAST(COUNT(*) AS INT)` })
+          .from(turmaAlunos)
+          .where(and(eq(turmaAlunos.organizationId, orgId), eq(turmaAlunos.status, "espera")));
+        waitlistCount = Number(espera?.count) || 0;
+      }
+
+      const [eventsPending] = await db.select({ count: sql<number>`CAST(COUNT(*) AS INT)` })
+        .from(events)
+        .where(and(
+          eq(events.organizationId, orgId),
+          eq(events.active, true),
+          eq(events.requiresAuthorization, true),
+          gte(events.startsAt, new Date()),
+          ne(events.status, "realizado"),
+          ne(events.status, "cancelado"),
+          sql`(SELECT COUNT(*) FROM "event_participants" ep WHERE ep."eventId" = ${events.id}) > (SELECT COUNT(*) FROM "event_participants" ep2 WHERE ep2."eventId" = ${events.id} AND ep2."imageAuthorization" = true AND ep2."participationAuthorization" = true)`
+        ));
+
+      return {
+        overdueCount: Number(overdueAgg?.count) || 0,
+        overdueTotal: Number(overdueAgg?.total) || 0,
+        waitlistCount,
+        eventsPendingAuth: Number(eventsPending?.count) || 0,
+      };
+    }),
+
+    /**
+     * Fase 3: checklist "Escola pronta em 10 minutos" — calculado dos dados reais.
+     */
+    setupProgress: protectedProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return null;
+      const orgId = ctx.user.organizationId!;
+
+      const countRows = async (table: any, where: any) => {
+        const [row] = await db.select({ count: sql<number>`CAST(COUNT(*) AS INT)` }).from(table).where(where);
+        return Number(row?.count) || 0;
+      };
+
+      const [school] = await db.select({ schoolName: settings.schoolName }).from(settings)
+        .where(eq(settings.organizationId, orgId)).limit(1);
+
+      const [modalities, rooms, groups, teachers, pupils] = await Promise.all([
+        countRows(instruments, eq(instruments.organizationId, orgId)),
+        countRows(studioRooms, eq(studioRooms.organizationId, orgId)),
+        countRows(turmas, eq(turmas.organizationId, orgId)),
+        countRows(professores, eq(professores.organizationId, orgId)),
+        countRows(students, eq(students.organizationId, orgId)),
+      ]);
+
+      const steps = [
+        { key: "escola", label: "Dados da escola", hint: "Nome, logo e horários de funcionamento", done: !!school?.schoolName?.trim(), to: "/configuracoes" },
+        { key: "modalidades", label: "Modalidades de dança", hint: "Ballet, Jazz, Hip Hop, Sapateado...", done: modalities > 0, to: "/instrumentos" },
+        { key: "salas", label: "Salas de aula", hint: "Estúdios e salas usados nas aulas", done: rooms > 0, to: "/salas" },
+        { key: "turmas", label: "Turmas e horários", hint: "Monte a grade de turmas por dia e horário", done: groups > 0, to: "/turmas" },
+        { key: "professores", label: "Professores", hint: "Cadastre a equipe e as permissões", done: teachers > 0, to: "/professores" },
+        { key: "alunos", label: "Primeiros alunos", hint: "Cadastre um a um ou importe por CSV", done: pupils > 0, to: "/alunos" },
+      ];
+
+      return { steps, completed: steps.filter((s) => s.done).length, total: steps.length };
     }),
   }),
 

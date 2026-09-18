@@ -332,12 +332,6 @@ export function RepertoireSection() {
                     <Music size={17} />
                   </span>
                 </div>
-                {/* Badge Cifra */}
-                {(item.hasChord || item.hasCifraClubUrl) && (
-                  <span className="absolute top-1.5 right-1.5 text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-indigo-600/90 text-white flex items-center gap-0.5">
-                    <FileText size={8} /> Cifra
-                  </span>
-                )}
               </div>
               <div className="p-2.5">
                 <p className="text-[11px] font-black text-foreground truncate">{item.title}</p>
@@ -370,47 +364,14 @@ export function RepertoireSection() {
         description={playingItem?.description || "Executando pelo DancePro"}
       >
         <div className="space-y-3 pt-1">
-          {/* Toggle Música | Cifra */}
-          {(playingItem?.hasChord || playingItem?.hasCifraClubUrl) && (
-            <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-muted/40 border border-border/40">
-              <button
-                onClick={() => setShowChord(false)}
-                className={cn(
-                  "h-9 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 transition-all cursor-pointer",
-                  !showChord ? "bg-pink-600 text-white shadow-md shadow-pink-500/20" : "text-muted-foreground hover:bg-muted/60"
-                )}
-              >
-                <Music size={13} /> Música
-              </button>
-              <button
-                onClick={() => setShowChord(true)}
-                className={cn(
-                  "h-9 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 transition-all cursor-pointer",
-                  showChord ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20" : "text-muted-foreground hover:bg-muted/60"
-                )}
-              >
-                <FileText size={13} /> Cifra
-              </button>
-            </div>
-          )}
-
-          <div className={cn("gap-3", showChord && playingItem ? "grid lg:grid-cols-2" : "")}>
+          <div>
             {/* Player (capa antes do iframe — evita fundo branco/Erro 153 na abertura) */}
-            <div className={cn(showChord && playingItem ? "hidden lg:block" : "")}>
-              <VideoFacade
-                key={playingItem?.id ?? "player"}
-                videoId={playingItem?.videoId ?? null}
-                title={playingItem?.title || "Player de música"}
-                embedSrc={embedSrc || null}
-              />
-            </div>
-
-            {/* Cifra (só desktop mostra junto; mobile = tab) */}
-            {showChord && playingItem && (
-              <div>
-                <ChordViewer musicId={playingItem.id} />
-              </div>
-            )}
+            <VideoFacade
+              key={playingItem?.id ?? "player"}
+              videoId={playingItem?.videoId ?? null}
+              title={playingItem?.title || "Player de música"}
+              embedSrc={embedSrc || null}
+            />
           </div>
 
           {playingItem && !showChord && (

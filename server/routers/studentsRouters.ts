@@ -970,6 +970,70 @@ export const studentsRouters = {
         sql`LOWER(name) LIKE ${term} OR LOWER(email) LIKE ${term}`
       )).limit(8);
     }),
+    /**
+     * Fase 3 (produtividade): importação em lote de alunos a partir de CSV colado.
+     * Cria cadastros básicos (sem cobrança/portal) — responsável define professor
+     * e modalidade padrão. Respeita o limite do plano da escola.
+     */
+    importBatch: protectedProcedure.input(z.object({
+      professorId: z.number(),
+      instrumentId: z.number().nullable().optional(),
+      level: z.enum(["iniciante", "intermediario", "avancado"]).default("iniciante"),
+      rows: z.array(z.object({
+        name: z.string().trim().min(1).max(255),
+        email: z.string().trim().email("E-mail inválido").or(z.literal("")).optional().nullable(),
+        phone: z.string().trim().max(30).optional().nullable(),
+        birthDate: z.string().trim().max(10).optional().nullable(),
+      })).min(1).max(300),
+    })).mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+
+      const [professor] = await db.select({ id: users.id }).from(users)
+        .where(and(eq(users.id, input.professorId), eq(users.organizationId, orgId))).limit(1);
+      if (!professor) throw new TRPCError({ code: "NOT_FOUND", message: "Professor selecionado não pertence a esta escola." });
+
+      if (input.instrumentId != null) {
+        const [modality] = await db.select({ id: instruments.id }).from(instruments)
+          .where(and(eq(instruments.id, input.instrumentId), eq(instruments.organizationId, orgId))).limit(1);
+        if (!modality) throw new TRPCError({ code: "NOT_FOUND", message: "Modalidade selecionada não existe nesta escola." });
+      }
+
+      // Mesma regra de limite do cadastro individual
+      const planInfo = await getOrgPlanLimits(db, orgId);
+      const [{ count: activeCount }] = await db.select({ count: sql<number>`CAST(COUNT(*) AS INT)` })
+        .from(students)
+        .where(and(eq(students.organizationId, orgId), eq(students.status, "ativo")));
+      if (Number(activeCount) + input.rows.length > planInfo.maxStudents && !planInfo.allowExtraStudents) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `Limite de alunos do plano atingido (${planInfo.maxStudents}). Faça upgrade para importar mais alunos.`,
+        });
+      }
+
+      const valid = input.rows.filter((row) => row.name && row.name.trim().length >= 2);
+      if (valid.length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Nenhuma linha válida encontrada (informe ao menos o nome)." });
+      }
+
+      await db.insert(students).values(valid.map((row) => ({
+        organizationId: orgId,
+        userId: ctx.user.id,
+        professorId: input.professorId,
+        instrumentId: input.instrumentId ?? null,
+        name: row.name.trim(),
+        email: row.email?.trim() || undefined,
+        phone: row.phone?.trim() || undefined,
+        birthDate: row.birthDate?.trim() || undefined,
+        level: input.level,
+        status: "ativo" as const,
+        startDate: new Date().toISOString().slice(0, 10),
+      })));
+
+      await syncOrgAsaasSubscription(db, orgId).catch(() => {});
+      return { success: true, imported: valid.length, skipped: input.rows.length - valid.length };
+    }),
   }),
 
   instruments: router({

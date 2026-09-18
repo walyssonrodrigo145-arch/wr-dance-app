@@ -218,11 +218,6 @@ export function RepertoireTab({ studentId, studentName }: { studentId: number; s
                   </span>
                 </button>
                 <div className="absolute top-2 left-2 flex gap-1.5 flex-wrap">
-                  {(item.chordSheet || item.cifraclubUrl) && (
-                    <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-indigo-600/90 text-white flex items-center gap-1">
-                      <FileText size={9} /> Cifra
-                    </span>
-                  )}
                   {!item.viewedAt && (
                     <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-pink-600 text-white">Nova</span>
                   )}
@@ -346,67 +341,6 @@ export function RepertoireTab({ studentId, studentName }: { studentId: number; s
               className="w-full rounded-xl border border-border/60 bg-background p-3 text-xs font-medium outline-none focus:ring-2 focus:ring-pink-500/20 resize-none"
             />
           </div>
-          {/* ── Cifra (PRD Cifra — RN-007: só acordes, sem letra) ── */}
-          <div className="space-y-2.5 rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-3.5">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                <FileText size={12} className="text-indigo-500" /> Cifra (acordes e estrutura — sem letra)
-              </label>
-              <div className="flex items-center gap-1.5">
-                <input
-                  value={form.chordKey}
-                  onChange={(e) => setForm({ ...form, chordKey: e.target.value.slice(0, 4) })}
-                  placeholder="Tom (Ex: Em)"
-                  maxLength={4}
-                  className="w-24 h-8 rounded-lg border border-border/60 bg-background px-2 text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-500/20"
-                />
-              </div>
-            </div>
-
-            {/* Importação do Cifra Club */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <input
-                value={form.cifraclubUrl || ""}
-                onChange={(e) => setForm({ ...form, cifraclubUrl: e.target.value })}
-                placeholder="Link da cifra no Cifra Club (opcional)"
-                className="flex-1 min-w-[180px] h-8 rounded-lg border border-border/60 bg-background px-2.5 text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-500/20"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  if (!form.cifraclubUrl.trim()) {
-                    toast.error("Cole o link da cifra do Cifra Club.");
-                    return;
-                  }
-                  importMutation.mutate({ url: form.cifraclubUrl });
-                }}
-                disabled={importMutation.isPending}
-                className={cn(
-                  "h-8 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shrink-0",
-                  importMutation.isPending && "opacity-60 cursor-not-allowed"
-                )}
-              >
-                {importMutation.isPending ? <Loader2 size={11} className="animate-spin" /> : <Download size={11} />}
-                Importar
-              </button>
-            </div>
-
-            <textarea
-              value={form.chordSheet}
-              onChange={(e) => setForm({ ...form, chordSheet: e.target.value })}
-              rows={7}
-              maxLength={50000}
-              placeholder={"[Intro] Em   A   C   G\n\n[Refrão] G   D   Em   C"}
-              className="w-full rounded-xl border border-border/60 bg-background p-3 text-[11px] font-mono leading-relaxed outline-none focus:ring-2 focus:ring-indigo-500/20 resize-y"
-            />
-            <p className="text-[9px] text-muted-foreground leading-snug">
-              Cole acordes no formato clássico (sem letra). A importação extrai acordes, tom e diagramas — a letra nunca é armazenada.
-              {form.chordDiagrams.length > 0 && (
-                <span className="text-indigo-500 font-black"> {form.chordDiagrams.length} diagrama(s) prontos.</span>
-              )}
-            </p>
-          </div>
-
           {/* ── Mover para outro aluno (correção de destino) ── */}
           {editing && (
             <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-3.5 space-y-2">

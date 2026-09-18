@@ -26,6 +26,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.18",
+    date: "2026-09-18",
+    title: "Escola no ar em 10 minutos: checklist, importação de alunos e Atenção Hoje",
+    summary: "O painel agora guia a configuração da escola, importa alunos em massa por CSV e mostra em um só lugar o que precisa da sua atenção hoje.",
+    items: [
+      { type: "novo", title: "Checklist 'Escola pronta em 10 minutos'", description: "Card no painel com 6 passos calculados dos seus dados reais (dados da escola, modalidades, salas, turmas, professores e alunos). Cada passo abre direto a tela correspondente e o progresso é automático." },
+      { type: "novo", title: "Importar alunos por CSV", description: "Na tela de Alunos, o botão Importar CSV aceita arquivo ou texto colado (Nome; Telefone; E-mail; Nascimento — opcionais), com professor e modalidade padrão. Os alunos entram como ativos com mensalidade zerada para ajustar depois." },
+      { type: "novo", title: "Card 'Atenção hoje'", description: "Central de pendências do painel: pagamentos atrasados (com total em aberto), alunos na lista de espera e eventos próximos com autorização de imagem/participação pendente." },
+      { type: "melhoria", title: "Adeus cifras e metrônomo", description: "As telas de coreografias não mostram mais abas, campos e badges de cifra — só vídeo/trilha e marcação de aprendida — e o componente de metrônomo foi removido do sistema." },
+    ],
+  },
+  {
     version: "2026.09.17",
     date: "2026-09-17",
     title: "100% Dança: IA pedagógica, automações e identidade",
