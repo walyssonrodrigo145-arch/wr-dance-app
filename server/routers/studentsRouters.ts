@@ -1017,7 +1017,44 @@ export const studentsRouters = {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Nenhuma linha válida encontrada (informe ao menos o nome)." });
       }
 
-      await db.insert(students).values(valid.map((row) => ({
+      const normalizeDate = (value?: string | null) => {
+        const s = (value || "").trim();
+        return /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s)) ? s : undefined;
+      };
+
+      // E-mail é único por escola (students_email_org_idx): pula duplicados em vez
+      // de derrubar o lote inteiro com erro de constraint.
+      const emailsInBatch = Array.from(new Set(
+        valid.map((row) => (row.email || "").trim()).filter(Boolean)
+      ));
+      const existingEmails = new Set<string>();
+      if (emailsInBatch.length > 0) {
+        const found = await db.select({ email: students.email }).from(students)
+          .where(and(eq(students.organizationId, orgId), inArray(students.email, emailsInBatch)));
+        for (const row of found) if (row.email) existingEmails.add(row.email);
+      }
+
+      const seenEmails = new Set<string>();
+      const skippedNames: string[] = [];
+      const toImport = valid.filter((row) => {
+        const email = (row.email || "").trim();
+        if (!email) return true;
+        if (existingEmails.has(email) || seenEmails.has(email)) {
+          skippedNames.push(row.name.trim());
+          return false;
+        }
+        seenEmails.add(email);
+        return true;
+      });
+
+      if (toImport.length === 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Todos os alunos do arquivo já estão cadastrados com esses e-mails.",
+        });
+      }
+
+      await db.insert(students).values(toImport.map((row) => ({
         organizationId: orgId,
         userId: ctx.user.id,
         professorId: input.professorId,
@@ -1025,14 +1062,19 @@ export const studentsRouters = {
         name: row.name.trim(),
         email: row.email?.trim() || undefined,
         phone: row.phone?.trim() || undefined,
-        birthDate: row.birthDate?.trim() || undefined,
+        birthDate: normalizeDate(row.birthDate),
         level: input.level,
         status: "ativo" as const,
         startDate: new Date().toISOString().slice(0, 10),
       })));
 
       await syncOrgAsaasSubscription(db, orgId).catch(() => {});
-      return { success: true, imported: valid.length, skipped: input.rows.length - valid.length };
+      return {
+        success: true,
+        imported: toImport.length,
+        skipped: input.rows.length - toImport.length,
+        skippedNames: skippedNames.slice(0, 10),
+      };
     }),
   }),
 

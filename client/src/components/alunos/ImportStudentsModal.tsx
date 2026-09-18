@@ -58,6 +58,11 @@ function parseCsvText(text: string): { rows: ParsedRow[]; invalid: number } {
       birthDate = `${y}-${m}-${d}`;
     }
 
+    // Data inválida é descartada (não derruba o lote)
+    if (birthDate && !(/^\d{4}-\d{2}-\d{2}$/.test(birthDate) && !Number.isNaN(Date.parse(birthDate)))) {
+      birthDate = "";
+    }
+
     rows.push({
       name,
       phone: phone || undefined,
@@ -91,6 +96,9 @@ export function ImportStudentsModal({ open, onOpenChange }: Props) {
   const importMutation = trpc.students.importBatch.useMutation({
     onSuccess: (res) => {
       toast.success(`${res.imported} aluno${res.imported === 1 ? "" : "s"} importado${res.imported === 1 ? "" : "s"}${res.skipped > 0 ? ` • ${res.skipped} linha(s) ignorada(s)` : ""}`);
+      if (res.skippedNames && res.skippedNames.length > 0) {
+        toast.warning(`E-mail já cadastrado — não importados: ${res.skippedNames.slice(0, 5).join(", ")}${res.skippedNames.length > 5 ? "…" : ""}`, { duration: 8000 });
+      }
       utils.students.list.invalidate();
       setRaw("");
       setProfessorId("");
