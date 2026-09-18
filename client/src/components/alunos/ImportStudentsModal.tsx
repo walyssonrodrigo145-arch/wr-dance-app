@@ -183,6 +183,22 @@ type Props = {
   onOpenChange: (open: boolean) => void;
 };
 
+function RowIssues({ issues }: { issues: { errors: string[]; warnings: string[] } }) {
+  return (
+    <div className="space-y-0.5 min-w-0">
+      {issues.errors.map((e, i) => (
+        <p key={`e${i}`} className="text-[9px] font-bold leading-tight text-rose-500 break-words">{e}</p>
+      ))}
+      {issues.warnings.map((w, i) => (
+        <p key={`w${i}`} className="text-[9px] font-medium leading-tight text-amber-600 break-words">{w}</p>
+      ))}
+      {issues.errors.length === 0 && issues.warnings.length === 0 && (
+        <p className="text-[9px] font-bold text-emerald-600">Pronto</p>
+      )}
+    </div>
+  );
+}
+
 /** Importação de alunos por CSV — Fase 1: round-trip, prévia editável, template e relatório. */
 export function ImportStudentsModal({ open, onOpenChange }: Props) {
   const utils = trpc.useUtils();
@@ -407,7 +423,7 @@ export function ImportStudentsModal({ open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-3xl max-h-[92vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileUp size={18} className="text-primary" /> Importar alunos por CSV
@@ -565,57 +581,103 @@ export function ImportStudentsModal({ open, onOpenChange }: Props) {
                 </div>
 
                 <div className="rounded-xl border border-border/60 overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <div className="min-w-[760px]">
-                      <div className="grid grid-cols-[30px_1.2fr_1fr_1.3fr_0.8fr_1.1fr_34px] gap-1.5 px-2.5 py-2 bg-muted/40 text-[9px] font-black uppercase tracking-widest text-muted-foreground items-center">
-                        <span />
-                        <span>Nome</span>
-                        <span>Telefone</span>
-                        <span>E-mail</span>
-                        <span>Nascimento</span>
-                        <span>Status</span>
-                        <span />
-                      </div>
-                      <div className="max-h-[280px] overflow-y-auto divide-y divide-border/40">
-                        {pageRows.map((r) => {
-                          const issues = issuesByKey.get(r.key) || { errors: [], warnings: [] };
-                          return (
-                            <div key={r.key} className={`grid grid-cols-[30px_1.2fr_1fr_1.3fr_0.8fr_1.1fr_34px] gap-1.5 px-2.5 py-1.5 items-start ${!r.include ? "opacity-50" : ""}`}>
-                              <input
-                                type="checkbox"
-                                checked={r.include}
-                                onChange={() => toggleInclude(r.key)}
-                                className="mt-2 w-3.5 h-3.5 accent-primary cursor-pointer"
-                              />
-                              <input value={r.name} onChange={(e) => updateRow(r.key, { name: e.target.value })} className="h-8 rounded-lg border border-border/60 bg-background px-2 text-[11px] font-bold outline-none focus:ring-2 focus:ring-primary/20 min-w-0" />
-                              <input value={r.phone} onChange={(e) => updateRow(r.key, { phone: e.target.value })} className="h-8 rounded-lg border border-border/60 bg-background px-2 text-[11px] outline-none focus:ring-2 focus:ring-primary/20 min-w-0" />
-                              <input value={r.email} onChange={(e) => updateRow(r.key, { email: e.target.value })} className="h-8 rounded-lg border border-border/60 bg-background px-2 text-[11px] outline-none focus:ring-2 focus:ring-primary/20 min-w-0" />
-                              <input value={r.birthDate} onChange={(e) => updateRow(r.key, { birthDate: e.target.value })} placeholder="AAAA-MM-DD" className="h-8 rounded-lg border border-border/60 bg-background px-2 text-[11px] outline-none focus:ring-2 focus:ring-primary/20 min-w-0" />
-                              <div className="pt-1 space-y-0.5 min-w-0">
-                                {issues.errors.map((e, i) => (
-                                  <p key={`e${i}`} className="text-[9px] font-bold leading-tight text-rose-500 break-words">{e}</p>
-                                ))}
-                                {issues.warnings.map((w, i) => (
-                                  <p key={`w${i}`} className="text-[9px] font-medium leading-tight text-amber-600 break-words">{w}</p>
-                                ))}
-                                {issues.errors.length === 0 && issues.warnings.length === 0 && (
-                                  <p className="text-[9px] font-bold text-emerald-600">Pronto</p>
-                                )}
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => removeRow(r.key)}
-                                className="mt-1.5 w-7 h-7 rounded-lg text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 flex items-center justify-center transition-colors"
-                                title="Remover linha"
-                              >
-                                <Trash2 size={13} />
-                              </button>
+                  {/* Desktop: grade compacta */}
+                  <div className="hidden md:block">
+                    <div className="grid grid-cols-[32px_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,0.85fr)_minmax(0,1.15fr)_34px] gap-1.5 px-2.5 py-2 bg-muted/40 text-[9px] font-black uppercase tracking-widest text-muted-foreground items-center">
+                      <span />
+                      <span>Nome</span>
+                      <span>Telefone</span>
+                      <span>E-mail</span>
+                      <span>Nascimento</span>
+                      <span>Status</span>
+                      <span />
+                    </div>
+                    <div className="max-h-[280px] overflow-y-auto divide-y divide-border/40">
+                      {pageRows.map((r) => {
+                        const issues = issuesByKey.get(r.key) || { errors: [], warnings: [] };
+                        return (
+                          <div key={r.key} className={`grid grid-cols-[32px_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,0.85fr)_minmax(0,1.15fr)_34px] gap-1.5 px-2.5 py-1.5 items-start ${!r.include ? "opacity-50" : ""}`}>
+                            <input
+                              type="checkbox"
+                              checked={r.include}
+                              onChange={() => toggleInclude(r.key)}
+                              className="mt-2 w-3.5 h-3.5 accent-primary cursor-pointer"
+                            />
+                            <input value={r.name} onChange={(e) => updateRow(r.key, { name: e.target.value })} className="h-8 w-full rounded-lg border border-border/60 bg-background px-2 text-[11px] font-bold outline-none focus:ring-2 focus:ring-primary/20 min-w-0" />
+                            <input value={r.phone} onChange={(e) => updateRow(r.key, { phone: e.target.value })} className="h-8 w-full rounded-lg border border-border/60 bg-background px-2 text-[11px] outline-none focus:ring-2 focus:ring-primary/20 min-w-0" />
+                            <input value={r.email} onChange={(e) => updateRow(r.key, { email: e.target.value })} className="h-8 w-full rounded-lg border border-border/60 bg-background px-2 text-[11px] outline-none focus:ring-2 focus:ring-primary/20 min-w-0" />
+                            <input value={r.birthDate} onChange={(e) => updateRow(r.key, { birthDate: e.target.value })} placeholder="AAAA-MM-DD" className="h-8 w-full rounded-lg border border-border/60 bg-background px-2 text-[11px] outline-none focus:ring-2 focus:ring-primary/20 min-w-0" />
+                            <div className="pt-1">
+                              <RowIssues issues={issues} />
                             </div>
-                          );
-                        })}
-                      </div>
+                            <button
+                              type="button"
+                              onClick={() => removeRow(r.key)}
+                              className="mt-1.5 w-7 h-7 rounded-lg text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 flex items-center justify-center transition-colors"
+                              title="Remover linha"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
+
+                  {/* Mobile: cartões empilhados */}
+                  <div className="md:hidden max-h-[340px] overflow-y-auto divide-y divide-border/40">
+                    {pageRows.map((r) => {
+                      const issues = issuesByKey.get(r.key) || { errors: [], warnings: [] };
+                      return (
+                        <div key={r.key} className={`p-3 space-y-2 ${!r.include ? "opacity-50" : ""}`}>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={r.include}
+                              onChange={() => toggleInclude(r.key)}
+                              className="w-4 h-4 accent-primary cursor-pointer shrink-0"
+                            />
+                            <input
+                              value={r.name}
+                              onChange={(e) => updateRow(r.key, { name: e.target.value })}
+                              placeholder="Nome"
+                              className="h-9 flex-1 min-w-0 rounded-lg border border-border/60 bg-background px-2.5 text-xs font-bold outline-none focus:ring-2 focus:ring-primary/20"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeRow(r.key)}
+                              className="w-8 h-8 rounded-lg text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 flex items-center justify-center transition-colors shrink-0"
+                              title="Remover linha"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              value={r.phone}
+                              onChange={(e) => updateRow(r.key, { phone: e.target.value })}
+                              placeholder="Telefone"
+                              className="h-9 w-full min-w-0 rounded-lg border border-border/60 bg-background px-2.5 text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                            />
+                            <input
+                              value={r.birthDate}
+                              onChange={(e) => updateRow(r.key, { birthDate: e.target.value })}
+                              placeholder="Nascimento"
+                              className="h-9 w-full min-w-0 rounded-lg border border-border/60 bg-background px-2.5 text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                            />
+                          </div>
+                          <input
+                            value={r.email}
+                            onChange={(e) => updateRow(r.key, { email: e.target.value })}
+                            placeholder="E-mail"
+                            className="h-9 w-full min-w-0 rounded-lg border border-border/60 bg-background px-2.5 text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                          />
+                          <RowIssues issues={issues} />
+                        </div>
+                      );
+                    })}
+                  </div>
+
                   {totalPages > 1 && (
                     <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 bg-muted/30 border-t border-border/40">
                       <button
@@ -641,12 +703,14 @@ export function ImportStudentsModal({ open, onOpenChange }: Props) {
               </div>
             )}
 
-            <div className="flex items-center justify-between gap-2 pt-1 flex-wrap">
-              <p className="text-[10px] text-muted-foreground leading-snug flex items-start gap-1.5 max-w-md">
+            <div className="space-y-3 pt-1">
+              <p className="text-[10px] text-muted-foreground leading-snug flex items-start gap-1.5">
                 <FileText size={12} className="mt-0.5 shrink-0" />
-                Alunos entram como <strong>ativos</strong> com mensalidade zerada — ajuste valores e cobranças depois na edição de cada aluno.
+                <span>
+                  Alunos entram como <strong>ativos</strong> com mensalidade zerada — ajuste valores e cobranças depois na edição de cada aluno.
+                </span>
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} className="h-10 rounded-xl px-4 text-xs font-bold">
                   Cancelar
                 </Button>

@@ -26,6 +26,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.18.2",
+    date: "2026-09-18",
+    title: "Importação de alunos: prévia responsiva no celular",
+    summary: "A prévia da importação foi ajustada para telas pequenas: cartões empilhados no celular, grade compacta no computador — sem mais tabela cortada.",
+    items: [
+      { type: "correcao", title: "Modal de importação sem corte lateral", description: "A prévia não estoura mais a largura do modal: no celular cada aluno vira um cartão com nome, telefone, nascimento e e-mail; no desktop permanece a grade compacta." },
+      { type: "melhoria", title: "Rodapé da prévia reorganizado", description: "O aviso sobre mensalidade zerada e os botões Cancelar/Importar agora ficam empilhados, sem texto espremido." },
+    ],
+  },
+  {
     version: "2026.09.18.1",
     date: "2026-09-18",
     title: "Importação de alunos turbinada: prévia, modelo e relatório",
