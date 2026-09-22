@@ -26,6 +26,20 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.18.4",
+    date: "2026-09-18",
+    title: "Blindagem pré-lançamento: permissões, isolamento entre escolas e financeiro",
+    summary: "Auditoria completa antes do lançamento: fechamos acessos indevidos no servidor, reforçamos o isolamento entre escolas e corrigimos efeitos da baixa de mensalidade.",
+    items: [
+      { type: "correcao", title: "Permissões validadas no servidor", description: "CRM, folha de pagamento, notas fiscais, integrações (pagamento, WhatsApp, IA), chatbot, base de conhecimento da IA e contratos agora exigem administrador no servidor — antes a proteção existia só no menu." },
+      { type: "correcao", title: "Isolamento entre escolas reforçado", description: "NFS-e, cálculo de fatura, comprovantes enviados, contratos e dados do portal do aluno passam a filtrar pela escola do usuário — nenhuma escola vê dado de outra." },
+      { type: "correcao", title: "Baixa de mensalidade pela edição agora completa", description: "Dar baixa editando a mensalidade cancela o link de pagamento ainda aberto (Asaas/MP/InfinitePay), cancela lembretes de cobrança e dispara a NFS-e automática — igual à baixa normal." },
+      { type: "correcao", title: "Comprovante por IA não aceita valor menor", description: "O portal só confirma o pagamento quando o valor do comprovante cobre a mensalidade, e nunca rebaixa uma fatura já paga." },
+      { type: "correcao", title: "Telas de CRM e Analytics só para quem pode", description: "A tela do CRM (admin) e o painel de Analytics (super admin) não abrem mais para outros perfis, mesmo por URL direta." },
+      { type: "correcao", title: "Importação de alunos com permissão e cadastro protegidos", description: "Criar e importar alunos exige admin ou professor com permissão de editar alunos; dados fiscais e vínculos validados por escola." },
+    ],
+  },
+  {
     version: "2026.09.18.3",
     date: "2026-09-18",
     title: "Importação de alunos sem travar no professor",

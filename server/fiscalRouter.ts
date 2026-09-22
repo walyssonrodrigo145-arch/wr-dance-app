@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { protectedProcedure, professorProcedure, router } from "./_core/trpc";
+import { adminProcedure, professorProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
 import {
   fiscalCompanies,
@@ -17,7 +17,7 @@ import { FiscalService } from "./services/fiscal/FiscalService";
 export const fiscalRouter = router({
   // ─── EMPRESA / CONFIGURAÇÃO FISCAL ───────────────────────────────────────────
   company: router({
-    get: protectedProcedure.query(async ({ ctx }) => {
+    get: adminProcedure.query(async ({ ctx }) => {
       const orgId = ctx.user.organizationId;
       if (!orgId) throw new TRPCError({ code: "UNAUTHORIZED" });
 
@@ -33,7 +33,7 @@ export const fiscalRouter = router({
       return company || null;
     }),
 
-    save: protectedProcedure
+    save: adminProcedure
       .input(
         z.object({
           cnpj: z.string().min(14, "CNPJ inválido"),
@@ -99,7 +99,7 @@ export const fiscalRouter = router({
 
   // ─── SERVIÇOS FISCAIS ───────────────────────────────────────────────────────
   services: router({
-    list: protectedProcedure.query(async ({ ctx }) => {
+    list: adminProcedure.query(async ({ ctx }) => {
       const orgId = ctx.user.organizationId;
       if (!orgId) throw new TRPCError({ code: "UNAUTHORIZED" });
 
@@ -113,7 +113,7 @@ export const fiscalRouter = router({
         .orderBy(desc(fiscalServices.id));
     }),
 
-    create: protectedProcedure
+    create: adminProcedure
       .input(
         z.object({
           nome: z.string().min(2, "Nome obrigatório"),
@@ -145,7 +145,7 @@ export const fiscalRouter = router({
         return created;
       }),
 
-    update: protectedProcedure
+    update: adminProcedure
       .input(
         z.object({
           id: z.number(),
@@ -177,7 +177,7 @@ export const fiscalRouter = router({
         return updated;
       }),
 
-    delete: protectedProcedure
+    delete: adminProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const orgId = ctx.user.organizationId;
@@ -196,7 +196,7 @@ export const fiscalRouter = router({
 
   // ─── NOTAS FISCAIS & DASHBOARD ──────────────────────────────────────────────
   invoices: router({
-    getStats: protectedProcedure.query(async ({ ctx }) => {
+    getStats: adminProcedure.query(async ({ ctx }) => {
       const orgId = ctx.user.organizationId;
       if (!orgId) throw new TRPCError({ code: "UNAUTHORIZED" });
 
@@ -245,7 +245,7 @@ export const fiscalRouter = router({
       };
     }),
 
-    list: protectedProcedure
+    list: adminProcedure
       .input(
         z.object({
           search: z.string().optional(),
@@ -312,7 +312,7 @@ export const fiscalRouter = router({
         };
       }),
 
-    getById: protectedProcedure
+    getById: adminProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
         const orgId = ctx.user.organizationId;
@@ -338,7 +338,7 @@ export const fiscalRouter = router({
         return { invoice, logs };
       }),
 
-    emitForPayment: protectedProcedure
+    emitForPayment: adminProcedure
       .input(
         z.object({
           paymentId: z.number(),
@@ -368,7 +368,7 @@ export const fiscalRouter = router({
         }
       }),
 
-    emitManual: protectedProcedure
+    emitManual: adminProcedure
       .input(
         z.object({
           studentId: z.number().optional(),
@@ -434,11 +434,20 @@ export const fiscalRouter = router({
         return invoice;
       }),
 
-    retry: protectedProcedure
+    retry: adminProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const orgId = ctx.user.organizationId;
         if (!orgId) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+        // Isolamento multi-tenant: nunca reprocessar nota de outra escola
+        const db = await getDb();
+        if (db) {
+          const [owns] = await db.select({ id: fiscalInvoices.id }).from(fiscalInvoices)
+            .where(and(eq(fiscalInvoices.id, input.id), eq(fiscalInvoices.organizationId, orgId)))
+            .limit(1);
+          if (!owns) throw new TRPCError({ code: "NOT_FOUND", message: "Nota fiscal não encontrada." });
+        }
 
         try {
           const updated = await FiscalService.processInvoiceEmission(input.id);
@@ -448,7 +457,7 @@ export const fiscalRouter = router({
         }
       }),
 
-    cancel: protectedProcedure
+    cancel: adminProcedure
       .input(
         z.object({
           id: z.number(),
@@ -458,6 +467,15 @@ export const fiscalRouter = router({
       .mutation(async ({ ctx, input }) => {
         const orgId = ctx.user.organizationId;
         if (!orgId) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+        // Isolamento multi-tenant: nunca cancelar nota de outra escola
+        const db = await getDb();
+        if (db) {
+          const [owns] = await db.select({ id: fiscalInvoices.id }).from(fiscalInvoices)
+            .where(and(eq(fiscalInvoices.id, input.id), eq(fiscalInvoices.organizationId, orgId)))
+            .limit(1);
+          if (!owns) throw new TRPCError({ code: "NOT_FOUND", message: "Nota fiscal não encontrada." });
+        }
 
         try {
           const res = await FiscalService.cancelInvoice(
@@ -475,7 +493,7 @@ export const fiscalRouter = router({
 
   // ─── DADOS FISCAIS DO ALUNO ─────────────────────────────────────────────────
   student: router({
-    getFiscalData: protectedProcedure
+    getFiscalData: adminProcedure
       .input(z.object({ studentId: z.number() }))
       .query(async ({ ctx, input }) => {
         const orgId = ctx.user.organizationId;
@@ -511,7 +529,7 @@ export const fiscalRouter = router({
         return student;
       }),
 
-    saveFiscalData: protectedProcedure
+    saveFiscalData: adminProcedure
       .input(
         z.object({
           studentId: z.number(),

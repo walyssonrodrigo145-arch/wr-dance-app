@@ -6,6 +6,7 @@ import { eq, and, gte, lte, desc, isNotNull, ne, sql, or } from "drizzle-orm";
 import crypto from "crypto";
 import { createAsaasCustomer, createAsaasCharge, getAsaasPixQrCode, getAsaasChargeStatus, getAsaasCharge } from "./utils/asaas";
 import { createMPPreference, verifyMPPayment } from "./utils/mercadopago";
+import { assertCanManageStudents } from "./routers/helpers";
 import { createInfinitePayLink, checkInfinitePayPayment, brlToCents, resolveInfinitePayApiKey } from "./utils/infinitepay";
 import { createPaymentShortLink } from "./utils/shortlinks";
 import { decryptSecret } from "./utils/integrationCrypto";
@@ -28,6 +29,7 @@ export const enrollmentRouter = router({
       const db = await getDb();
       if (!db) throw new Error("Database unavailable");
       const orgId = ctx.user.organizationId!;
+      await assertCanManageStudents(db, ctx);
 
       // Se não foi passado um monthlyFee, mantém undefined (o frontend mostrará o default da escola)
       const resolvedFee = input.monthlyFee;
@@ -57,7 +59,7 @@ export const enrollmentRouter = router({
       // Se solicitado autoSendWhatsapp e o link tem leadId associado com telefone
       if (input.autoSendWhatsapp && input.leadId) {
         try {
-          const [lead] = await db.select().from(crmLeads).where(eq(crmLeads.id, input.leadId)).limit(1);
+          const [lead] = await db.select().from(crmLeads).where(and(eq(crmLeads.id, input.leadId), eq(crmLeads.organizationId, orgId))).limit(1);
           if (lead?.phone) {
             // Busca configurações do bot do WhatsApp da escola
             const allSettings = await db.select().from(settings).where(eq(settings.organizationId, orgId));

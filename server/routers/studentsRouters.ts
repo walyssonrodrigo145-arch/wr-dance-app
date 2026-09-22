@@ -491,6 +491,7 @@ export const studentsRouters = {
         if (!db) throw new Error("Banco de dados não disponível");
         
         const orgId = ctx.user.organizationId!;
+        await assertCanImportStudents(db, ctx);
 
         // --- Verificação de limite de plano ---
         const planInfo = await getOrgPlanLimits(db, orgId);

@@ -3,7 +3,7 @@ import { debugLog } from "../_core/logger";
 import crypto from "crypto";
 import { TRPCError } from "@trpc/server";
 import { eq, and, sql, isNotNull } from "drizzle-orm";
-import { organizations, students, contracts, schoolIntegrations, settings } from "../../drizzle/schema";
+import { organizations, students, contracts, schoolIntegrations, settings, professores } from "../../drizzle/schema";
 import { ENV } from "../_core/env";
 
 // ─── Regras de venda da Loja (Configurações → Loja) ──────────────────────────
@@ -179,6 +179,24 @@ export function safeEqualStr(a: string, b: string): boolean {
 export function isReservedSuperAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
   return ENV.superAdminEmails.includes(email.trim().toLowerCase());
+}
+
+/**
+ * Guard de permissão para gestão de alunos (server-side).
+ * Admin/dono sempre pode; professor precisa da permissão `alunos_editar`
+ * (professores.permissions, com ou sem prefixo "/").
+ */
+export async function assertCanManageStudents(db: any, ctx: any) {
+  if (ctx.user.role === "admin" || ctx.user.openId === ENV.ownerOpenId) return;
+  const orgId = ctx.user.organizationId!;
+  const [prof] = await db.select({ permissions: professores.permissions }).from(professores)
+    .where(and(eq(professores.organizationId, orgId), eq(professores.userId, ctx.user.id)))
+    .limit(1);
+  const raw = Array.isArray(prof?.permissions) ? (prof!.permissions as string[]) : [];
+  const allowed = raw.some((p) => String(p).replace(/^\//, "") === "alunos_editar");
+  if (!allowed) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Você não tem permissão para gerenciar alunos." });
+  }
 }
 
 // AUDIT-04 FIX: validação de CNPJ com dígitos verificadores (aceita formatado ou só dígitos)

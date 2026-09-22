@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, adminProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "./db";
 import { crmLeads, crmActivities, crmFollowUps, crmSettings, students, users } from "../drizzle/schema";
@@ -7,7 +7,7 @@ import { eq, and, desc, asc, gte, lte, sql } from "drizzle-orm";
 
 export const crmRouter = router({
   // ── Listagem Geral de Leads com Filtros ──────────────────────────────────
-  listLeads: protectedProcedure
+  listLeads: adminProcedure
     .input(
       z.object({
         search: z.string().optional(),
@@ -73,7 +73,7 @@ export const crmRouter = router({
     }),
 
   // ── Detalhes do Lead + Timeline + Follow-ups ─────────────────────────────
-  getLeadDetails: protectedProcedure
+  getLeadDetails: adminProcedure
     .input(z.object({ leadId: z.number() }))
     .query(async ({ ctx, input }) => {
       const db = await getDb();
@@ -105,7 +105,7 @@ export const crmRouter = router({
     }),
 
   // ── Cadastro de Lead ─────────────────────────────────────────────────────
-  createLead: protectedProcedure
+  createLead: adminProcedure
     .input(
       z.object({
         name: z.string().min(1, "Nome é obrigatório"),
@@ -188,7 +188,7 @@ export const crmRouter = router({
     }),
 
   // ── Atualização do Lead ──────────────────────────────────────────────────
-  updateLead: protectedProcedure
+  updateLead: adminProcedure
     .input(
       z.object({
         leadId: z.number(),
@@ -256,7 +256,7 @@ export const crmRouter = router({
     }),
 
   // ── Mover Estágio (Kanban) ───────────────────────────────────────────────
-  moveStage: protectedProcedure
+  moveStage: adminProcedure
     .input(
       z.object({
         leadId: z.number(),
@@ -304,7 +304,7 @@ export const crmRouter = router({
       return updated;
     }),
 
-  moveLeadStage: protectedProcedure
+  moveLeadStage: adminProcedure
     .input(
       z.object({
         id: z.number().optional(),
@@ -331,7 +331,7 @@ export const crmRouter = router({
       return updated;
     }),
 
-  getGoals: protectedProcedure.query(async ({ ctx }) => {
+  getGoals: adminProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) return null;
     const orgId = ctx.user.organizationId;
@@ -359,7 +359,7 @@ export const crmRouter = router({
     return goal;
   }),
 
-  saveGoal: protectedProcedure
+  saveGoal: adminProcedure
     .input(z.object({
       targetNewStudents: z.number(),
       targetDemos: z.number(),
@@ -393,7 +393,7 @@ export const crmRouter = router({
       }
     }),
 
-  listActivities: protectedProcedure.query(async ({ ctx }) => {
+  listActivities: adminProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) return [];
     const orgId = ctx.user.organizationId;
@@ -404,7 +404,7 @@ export const crmRouter = router({
   }),
 
   // ── Marcar Lead como Perdido ─────────────────────────────────────────────
-  markLost: protectedProcedure
+  markLost: adminProcedure
     .input(
       z.object({
         leadId: z.number(),
@@ -447,7 +447,7 @@ export const crmRouter = router({
     }),
 
   // ── Converter Lead em Aluno ──────────────────────────────────────────────
-  convertToStudent: protectedProcedure
+  convertToStudent: adminProcedure
     .input(
       z.object({
         leadId: z.number(),
@@ -480,6 +480,7 @@ export const crmRouter = router({
       const [student] = await db
         .insert(students)
         .values({
+          organizationId: orgId,
           userId: ctx.user.id,
           professorId: lead.preferredTeacherId || ctx.user.id,
           name: lead.name,
@@ -520,7 +521,7 @@ export const crmRouter = router({
     }),
 
   // ── Excluir Lead ─────────────────────────────────────────────────────────
-  deleteLead: protectedProcedure
+  deleteLead: adminProcedure
     .input(z.object({ leadId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -538,7 +539,7 @@ export const crmRouter = router({
     }),
 
   // ── Gestão de Follow-ups e Tarefas ───────────────────────────────────────
-  listFollowUps: protectedProcedure
+  listFollowUps: adminProcedure
     .input(
       z.object({
         filter: z.enum(["atrasados", "hoje", "proximos", "todos"]).default("todos"),
@@ -581,7 +582,7 @@ export const crmRouter = router({
       });
     }),
 
-  createFollowUp: protectedProcedure
+  createFollowUp: adminProcedure
     .input(
       z.object({
         leadId: z.number(),
@@ -650,7 +651,7 @@ export const crmRouter = router({
       return created;
     }),
 
-  completeFollowUp: protectedProcedure
+  completeFollowUp: adminProcedure
     .input(z.object({ followUpId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -687,7 +688,7 @@ export const crmRouter = router({
     }),
 
   // ── Adicionar Interação Manual na Timeline ────────────────────────────────
-  addActivity: protectedProcedure
+  addActivity: adminProcedure
     .input(
       z.object({
         leadId: z.number(),
@@ -737,7 +738,7 @@ export const crmRouter = router({
     }),
 
   // ── Métricas e Dashboard ─────────────────────────────────────────────────
-  getDashboardMetrics: protectedProcedure
+  getDashboardMetrics: adminProcedure
     .input(
       z.object({
         period: z.enum(["hoje", "7d", "30d", "mes_atual", "mes_anterior", "todos"]).default("30d"),
@@ -842,7 +843,7 @@ export const crmRouter = router({
     }),
 
   // ── Relatórios Completos ────────────────────────────────────────────────
-  getReportsData: protectedProcedure.query(async ({ ctx }) => {
+  getReportsData: adminProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -922,7 +923,7 @@ export const crmRouter = router({
   }),
 
   // ── Configurações Personalizadas (Origens, Motivos de Perda, Tags) ──────
-  getSettings: protectedProcedure.query(async ({ ctx }) => {
+  getSettings: adminProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -953,7 +954,7 @@ export const crmRouter = router({
     };
   }),
 
-  updateSettings: protectedProcedure
+  updateSettings: adminProcedure
     .input(
       z.object({
         customOrigins: z.array(z.string()),

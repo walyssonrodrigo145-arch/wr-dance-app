@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, protectedProcedure, adminProcedure } from "./_core/trpc";
 import { getDb } from "./db";
 import { schoolKnowledgeBase, settings } from "../drizzle/schema";
 import { and, eq } from "drizzle-orm";
@@ -97,7 +97,7 @@ export const schoolAiRouter = router({
   }),
 
   // 2. Criar ou Atualizar tópico
-  upsertTopic: protectedProcedure
+  upsertTopic: adminProcedure
     .input(
       z.object({
         id: z.number().optional(),
@@ -148,7 +148,7 @@ export const schoolAiRouter = router({
     }),
 
   // 3. Excluir tópico
-  deleteTopic: protectedProcedure
+  deleteTopic: adminProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -168,7 +168,7 @@ export const schoolAiRouter = router({
     }),
 
   // 4. Ativar / Desativar tópico
-  toggleTopic: protectedProcedure
+  toggleTopic: adminProcedure
     .input(z.object({ id: z.number(), isActive: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();

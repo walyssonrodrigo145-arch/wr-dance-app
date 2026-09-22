@@ -120,6 +120,10 @@ function Router() {
         </Suspense>
       );
     }
+    // AUDITORIA: CRM é exclusivo de administradores da escola
+    if ((user as any)?.role !== "admin") {
+      return <Redirect to="/dashboard" />;
+    }
     return (
       <Suspense fallback={<PageLoader />}>
         <LeadsApp />
@@ -142,6 +146,10 @@ function Router() {
       );
     }
     // Renderiza EXCLUSIVAMENTE o Dashboard de Analytics (sem barra lateral da escola ou do aluno)
+    // AUDITORIA: painel de analytics é exclusivo de super admin
+    if (!(user as any)?.isSuperAdmin) {
+      return <Redirect to="/dashboard" />;
+    }
     return (
       <Suspense fallback={<PageLoader />}>
         <AnalyticsDashboard />

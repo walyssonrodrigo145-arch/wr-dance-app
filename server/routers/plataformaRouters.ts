@@ -4,7 +4,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "../_core/cookies";
 import { systemRouter } from "../_core/systemRouter";
 import { fcmRouter } from "../fcmRouter";
-import { publicProcedure, protectedProcedure, professorProcedure, studentProcedure, router } from "../_core/trpc";
+import { publicProcedure, protectedProcedure, professorProcedure, studentProcedure, adminProcedure, router } from "../_core/trpc";
 import { slotAdvanceRouter } from "../slotAdvanceRouter";
 import {
   getDashboardStats,
@@ -77,7 +77,7 @@ export const plataformaRouters = {
       return { success: true };
     }),
 
-    updateSchool: protectedProcedure.input(z.object({
+    updateSchool: adminProcedure.input(z.object({
       schoolName: z.string().optional(),
       schoolCnpj: z.string().optional(),
       schoolAddress: z.string().optional(),
@@ -122,7 +122,7 @@ export const plataformaRouters = {
       return { success: true };
     }),
 
-    updateNotifications: protectedProcedure.input(z.object({
+    updateNotifications: adminProcedure.input(z.object({
       notifyLessonReminder: z.boolean().optional(),
       notifyPaymentDue: z.boolean().optional(),
       notifyStudentAbsence: z.boolean().optional(),
@@ -142,7 +142,7 @@ export const plataformaRouters = {
       return { success: true };
     }),
 
-    toggleAutoAdvanceSlots: protectedProcedure.input(z.object({
+    toggleAutoAdvanceSlots: adminProcedure.input(z.object({
       enabled: z.boolean(),
     })).mutation(async ({ ctx, input }) => {
       await upsertSettings(ctx.user.organizationId!, ctx.user.id, {
@@ -151,7 +151,7 @@ export const plataformaRouters = {
       return { success: true, enabled: input.enabled };
     }),
 
-    updateAutoAdvanceTemplate: protectedProcedure.input(z.object({
+    updateAutoAdvanceTemplate: adminProcedure.input(z.object({
       template: z.string(),
     })).mutation(async ({ ctx, input }) => {
       await upsertSettings(ctx.user.organizationId!, ctx.user.id, {
@@ -160,7 +160,7 @@ export const plataformaRouters = {
       return { success: true };
     }),
 
-    updateIA: protectedProcedure.input(z.object({
+    updateIA: adminProcedure.input(z.object({
       aiProvider: z.string().optional(),
       geminiApiKey: z.string().optional(),
       geminiModel: z.string().optional(),
@@ -189,7 +189,7 @@ export const plataformaRouters = {
       return { success: true };
     }),
 
-    testAiConnection: protectedProcedure.input(z.object({
+    testAiConnection: adminProcedure.input(z.object({
       aiProvider: z.enum(["gemini", "groq", "opencode"]),
       apiKey: z.string().max(1000).optional(),
       model: z.string().max(255).optional(),
@@ -501,7 +501,7 @@ export const plataformaRouters = {
       };
     }),
 
-    toggleAutomation: protectedProcedure.input(z.object({
+    toggleAutomation: adminProcedure.input(z.object({
       enabled: z.boolean(),
     })).mutation(async ({ ctx, input }) => {
       await upsertSettings(ctx.user.organizationId!, ctx.user.id, {
@@ -510,7 +510,7 @@ export const plataformaRouters = {
       return { success: true, enabled: input.enabled };
     }),
 
-    toggleChatbot: protectedProcedure.input(z.object({
+    toggleChatbot: adminProcedure.input(z.object({
       enabled: z.boolean(),
     })).mutation(async ({ ctx, input }) => {
       await upsertSettings(ctx.user.organizationId!, ctx.user.id, {
@@ -519,7 +519,7 @@ export const plataformaRouters = {
       return { success: true, enabled: input.enabled };
     }),
 
-    updateWhatsAppBot: protectedProcedure.input(z.object({
+    updateWhatsAppBot: adminProcedure.input(z.object({
       whatsappBotUrl: z.string().optional(),
       whatsappBotToken: z.string().optional(),
       whatsappAutoSend: z.boolean().optional(),
@@ -534,7 +534,7 @@ export const plataformaRouters = {
       return { success: true };
     }),
 
-    updateAsaasIntegration: protectedProcedure.input(z.object({
+    updateAsaasIntegration: adminProcedure.input(z.object({
       asaasApiKey: z.string().optional(),
       asaasEnabled: z.boolean().optional(),
       paymentGateway: z.enum(["asaas", "mercadopago", "infinitepay"]).optional(),
@@ -567,7 +567,7 @@ export const plataformaRouters = {
       return { success: true };
     }),
 
-    updateFinancialSettings: protectedProcedure.input(z.object({
+    updateFinancialSettings: adminProcedure.input(z.object({
       lateFeeEnabled: z.boolean().optional(),
       lateFeeType: z.enum(["fixed", "percentage"]).optional(),
       lateFeeValue: z.number().optional(),
@@ -716,7 +716,7 @@ export const plataformaRouters = {
         extraStudentPrice: Number(p.extraStudentPrice ?? 1.49),
       }));
     }),
-    checkout: protectedProcedure
+    checkout: adminProcedure
       .input(z.object({
         planType: z.enum(["MONTHLY", "YEARLY"])
       }))
@@ -831,7 +831,7 @@ export const plataformaRouters = {
         value: pendingPayment.value
       };
     }),
-    syncSubscription: protectedProcedure.mutation(async ({ ctx }) => {
+    syncSubscription: adminProcedure.mutation(async ({ ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
       const orgId = ctx.user.organizationId!;
@@ -896,7 +896,7 @@ export const plataformaRouters = {
         trialEndsAt: org.trialEndsAt,
       };
     }),
-    changePlan: protectedProcedure.input(z.object({ planId: z.string(), planType: z.enum(["MONTHLY", "YEARLY"]) })).mutation(async ({ ctx, input }) => {
+    changePlan: adminProcedure.input(z.object({ planId: z.string(), planType: z.enum(["MONTHLY", "YEARLY"]) })).mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB indisponível" });
       const orgId = ctx.user.organizationId!;
@@ -1034,7 +1034,7 @@ export const plataformaRouters = {
       await db.update(organizations).set({ planId: input.planId }).where(eq(organizations.id, orgId));
       return { success: true };
     }),
-    cancelSubscription: protectedProcedure.mutation(async ({ ctx }) => {
+    cancelSubscription: adminProcedure.mutation(async ({ ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB indisponível" });
       const orgId = ctx.user.organizationId!;
@@ -1052,7 +1052,7 @@ export const plataformaRouters = {
 
       return { success: true };
     }),
-    reactivateSubscription: protectedProcedure
+    reactivateSubscription: adminProcedure
       .input(z.object({
         planId: z.string().optional(),
         planType: z.enum(["MONTHLY", "YEARLY"]).optional().default("MONTHLY"),

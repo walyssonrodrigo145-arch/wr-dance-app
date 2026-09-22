@@ -5,7 +5,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "../_core/cookies";
 import { systemRouter } from "../_core/systemRouter";
 import { fcmRouter } from "../fcmRouter";
-import { publicProcedure, protectedProcedure, professorProcedure, studentProcedure, router } from "../_core/trpc";
+import { publicProcedure, protectedProcedure, professorProcedure, studentProcedure, adminProcedure, router } from "../_core/trpc";
 import { slotAdvanceRouter } from "../slotAdvanceRouter";
 import {
   getDashboardStats,
@@ -64,6 +64,14 @@ export const financeiroRouters = {
         origin: z.enum(["Financeiro", "WhatsApp", "Área do Aluno", "API", "PIX", "System"]).optional(),
       }))
       .query(async ({ ctx, input }) => {
+        // Isolamento multi-tenant: só calcula fatura da própria escola
+        const db = await getDb();
+        if (db) {
+          const [owns] = await db.select({ id: paymentDues.id }).from(paymentDues)
+            .where(and(eq(paymentDues.id, input.invoiceId), eq(paymentDues.organizationId, ctx.user.organizationId!)))
+            .limit(1);
+          if (!owns) throw new TRPCError({ code: "NOT_FOUND", message: "Mensalidade não encontrada." });
+        }
         return await BillingEngine.calculateInvoice(input.invoiceId, {
           origin: input.origin ?? "Financeiro",
           userId: ctx.user.id,
@@ -447,9 +455,57 @@ export const financeiroRouters = {
           }
           if (data.amount !== undefined) updateData.amount = data.amount.toFixed(2);
 
+          const becomingPaid = data.status === "pago" && currentPayment.status !== "pago";
+
           await db.update(paymentDues)
             .set(updateData)
             .where(updateWhere);
+
+          // AUDITORIA: baixa via edição aplica os MESMOS efeitos da baixa oficial
+          // (cancela links de gateway ainda pagáveis, lembretes e dispara NFS-e automática).
+          if (becomingPaid) {
+            if (currentPayment.asaasId) {
+              try {
+                const { deleteAsaasCharge } = await import("../utils/asaas");
+                const [s] = await db.select({ asaasApiKey: settings.asaasApiKey }).from(settings)
+                  .where(eq(settings.userId, ctx.user.id)).limit(1);
+                await deleteAsaasCharge(currentPayment.asaasId, s?.asaasApiKey ? decryptSecret(s.asaasApiKey) : undefined);
+              } catch (e) {
+                console.error(`[paymentDues.update] Falha ao cancelar cobrança Asaas ${currentPayment.asaasId}:`, e);
+              }
+              await db.update(paymentDues)
+                .set({ asaasId: null, asaasPaymentLink: null, asaasBillingType: null })
+                .where(and(eq(paymentDues.id, id), eq(paymentDues.organizationId, orgId)));
+            }
+            if (currentPayment.mpPaymentId || currentPayment.mpPaymentLink) {
+              await db.update(paymentDues)
+                .set({ mpPaymentId: null, mpPaymentLink: null })
+                .where(and(eq(paymentDues.id, id), eq(paymentDues.organizationId, orgId)));
+            }
+            if (currentPayment.infinitepayPaymentLink || currentPayment.infinitepaySlug || currentPayment.infinitepayPaymentId) {
+              await db.update(paymentDues)
+                .set({ infinitepayPaymentLink: null, infinitepaySlug: null, infinitepayPaymentId: null })
+                .where(and(eq(paymentDues.id, id), eq(paymentDues.organizationId, orgId)));
+            }
+            await db.update(reminders)
+              .set({ status: "cancelado", cancelledAt: new Date(), updatedAt: new Date() })
+              .where(and(eq(reminders.paymentDueId, id), eq(reminders.organizationId, orgId), eq(reminders.status, "pendente")));
+            (async () => {
+              try {
+                const [fComp] = await db.select({ autoEmit: fiscalCompanies.autoEmitOnPayment })
+                  .from(fiscalCompanies).where(eq(fiscalCompanies.organizationId, orgId)).limit(1);
+                if (fComp && fComp.autoEmit) {
+                  await FiscalService.createInvoiceForPayment(orgId, id, {
+                    userId: ctx.user.id,
+                    userName: ctx.user.name || "Sistema",
+                    autoQueue: true,
+                  });
+                }
+              } catch (fErr: any) {
+                console.warn(`[AutoNFS-e] Não foi possível enfileirar NFS-e para pagamento #${id}:`, fErr.message);
+              }
+            })().catch(() => {});
+          }
 
           // Sincronizar vencimentos futuros se solicitado
           if (updateFutureDues && data.dueDate) {
@@ -882,7 +938,7 @@ export const financeiroRouters = {
 
         // Fetch payment due
         const [due] = await db.select().from(paymentDues)
-          .where(and(eq(paymentDues.id, input.paymentDueId), eq(paymentDues.userId, professorId)))
+          .where(and(eq(paymentDues.id, input.paymentDueId), eq(paymentDues.userId, professorId), eq(paymentDues.organizationId, orgId)))
           .limit(1);
 
         if (!due) throw new TRPCError({ code: "NOT_FOUND", message: "Mensalidade não encontrada" });
@@ -963,7 +1019,7 @@ export const financeiroRouters = {
             asaasBillingType: input.billingType,
             updatedAt: new Date(),
           })
-          .where(eq(paymentDues.id, input.paymentDueId));
+          .where(and(eq(paymentDues.id, input.paymentDueId), eq(paymentDues.organizationId, orgId)));
 
         return {
           asaasId: charge.id,
@@ -1055,9 +1111,10 @@ export const financeiroRouters = {
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+        const orgId = ctx.user.organizationId!;
 
         const [due] = await db.select().from(paymentDues)
-          .where(and(eq(paymentDues.id, input.paymentDueId), eq(paymentDues.userId, ctx.user.id)))
+          .where(and(eq(paymentDues.id, input.paymentDueId), eq(paymentDues.userId, ctx.user.id), eq(paymentDues.organizationId, orgId)))
           .limit(1);
 
         if (!due) throw new TRPCError({ code: "NOT_FOUND", message: "Mensalidade não encontrada" });
@@ -1471,7 +1528,7 @@ export const financeiroRouters = {
   }),
 
   professorPayments: router({
-    list: protectedProcedure
+    list: adminProcedure
       .input(z.object({
         month: z.number().min(1).max(12),
         year: z.number().min(2020).max(2100),
@@ -1544,7 +1601,7 @@ export const financeiroRouters = {
         }));
       }),
 
-    createManual: protectedProcedure
+    createManual: adminProcedure
       .input(z.object({
         professorId: z.number(),
         month: z.number().min(1).max(12),
@@ -1590,7 +1647,7 @@ export const financeiroRouters = {
         return newPayment;
       }),
 
-    calculate: protectedProcedure
+    calculate: adminProcedure
       .input(z.object({
         professorId: z.number(),
         month: z.number().min(1).max(12),
@@ -1623,7 +1680,7 @@ export const financeiroRouters = {
           return handleDbError(error, "calcular pagamento do professor");
         }
       }),
-    calculateAll: protectedProcedure
+    calculateAll: adminProcedure
       .input(z.object({
         month: z.number().min(1).max(12),
         year: z.number().min(2020).max(2100),
@@ -1651,7 +1708,7 @@ export const financeiroRouters = {
           return handleDbError(error, "calcular pagamentos de todos os professores");
         }
       }),
-    approve: protectedProcedure
+    approve: adminProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         try {
@@ -1690,7 +1747,7 @@ export const financeiroRouters = {
         }
       }),
 
-    markPaid: protectedProcedure
+    markPaid: adminProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         try {
@@ -1813,7 +1870,7 @@ export const financeiroRouters = {
         };
       }),
 
-    updateAdjustments: protectedProcedure
+    updateAdjustments: adminProcedure
       .input(z.object({
         paymentId: z.number(),
         adjustments: z.string(), // JSON string
@@ -1862,7 +1919,7 @@ export const financeiroRouters = {
   // Mostra quanto há na conta onde o checkout recebe. A InfinitePay não expõe
   // API pública de saldo (apenas conciliação de pagamentos).
   gatewayBalances: router({
-    get: protectedProcedure.query(async ({ ctx }) => {
+    get: adminProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       const orgId = ctx.user.organizationId!;
       const checkedAt = new Date().toISOString();

@@ -339,7 +339,7 @@ export const portalRouters = {
       
       let studentId = ctx.user.studentId;
       if (!studentId) {
-        const [found] = await db.select({ id: students.id }).from(students).where(eq(students.studentUserId, ctx.user.id)).limit(1);
+        const [found] = await db.select({ id: students.id }).from(students).where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!))).limit(1);
         if (found) studentId = found.id;
       }
       if (!studentId) throw new Error("Acesso não autorizado");
@@ -379,7 +379,7 @@ export const portalRouters = {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
       
-      const studentId = ctx.user.studentId || (await db.select({ id: students.id }).from(students).where(eq(students.studentUserId, ctx.user.id)).limit(1).then(res => res[0]?.id));
+      const studentId = ctx.user.studentId || (await db.select({ id: students.id }).from(students).where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!))).limit(1).then(res => res[0]?.id));
       if (!studentId) throw new Error("Acesso não autorizado");
 
       const orgId = ctx.user.organizationId!;
@@ -438,7 +438,7 @@ export const portalRouters = {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
       
-      const studentId = ctx.user.studentId || (await db.select({ id: students.id }).from(students).where(eq(students.studentUserId, ctx.user.id)).limit(1).then(res => res[0]?.id));
+      const studentId = ctx.user.studentId || (await db.select({ id: students.id }).from(students).where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!))).limit(1).then(res => res[0]?.id));
       if (!studentId) throw new Error("Acesso não autorizado");
 
       const orgId = ctx.user.organizationId!;
@@ -449,7 +449,7 @@ export const portalRouters = {
       if (!db) throw new Error("Database not available");
       const orgId = ctx.user.organizationId!;
       
-      let studentId = ctx.user.studentId || (await db.select({ id: students.id }).from(students).where(eq(students.studentUserId, ctx.user.id)).limit(1).then(res => res[0]?.id));
+      let studentId = ctx.user.studentId || (await db.select({ id: students.id }).from(students).where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!))).limit(1).then(res => res[0]?.id));
       if (!studentId) throw new Error("Acesso não autorizado");
 
       await db.update(studentFiles)
@@ -470,7 +470,7 @@ export const portalRouters = {
       if (!db) throw new Error("Database not available");
       const orgId = ctx.user.organizationId!;
 
-      let studentId = ctx.user.studentId || (await db.select({ id: students.id }).from(students).where(eq(students.studentUserId, ctx.user.id)).limit(1).then(res => res[0]?.id));
+      let studentId = ctx.user.studentId || (await db.select({ id: students.id }).from(students).where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!))).limit(1).then(res => res[0]?.id));
       if (!studentId) throw new TRPCError({ code: "UNAUTHORIZED", message: "Acesso não autorizado" });
 
       const [file] = await db.select({ id: studentFiles.id, fileUrl: studentFiles.fileUrl, fileName: studentFiles.fileName })
@@ -515,7 +515,7 @@ export const portalRouters = {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
       
-      const studentId = ctx.user.studentId || (await db.select({ id: students.id }).from(students).where(eq(students.studentUserId, ctx.user.id)).limit(1).then(res => res[0]?.id));
+      const studentId = ctx.user.studentId || (await db.select({ id: students.id }).from(students).where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!))).limit(1).then(res => res[0]?.id));
       if (!studentId) throw new Error("Acesso não autorizado");
 
       const orgId = ctx.user.organizationId!;
@@ -525,7 +525,7 @@ export const portalRouters = {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
       
-      const studentId = ctx.user.studentId || (await db.select({ id: students.id }).from(students).where(eq(students.studentUserId, ctx.user.id)).limit(1).then(res => res[0]?.id));
+      const studentId = ctx.user.studentId || (await db.select({ id: students.id }).from(students).where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!))).limit(1).then(res => res[0]?.id));
       if (!studentId) throw new Error("Acesso não autorizado");
 
       const orgId = ctx.user.organizationId!;
@@ -546,7 +546,7 @@ export const portalRouters = {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
       
-      const studentId = ctx.user.studentId || (await db.select({ id: students.id }).from(students).where(eq(students.studentUserId, ctx.user.id)).limit(1).then(res => res[0]?.id));
+      const studentId = ctx.user.studentId || (await db.select({ id: students.id }).from(students).where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!))).limit(1).then(res => res[0]?.id));
       if (!studentId) throw new Error("Acesso não autorizado");
 
       const orgId = ctx.user.organizationId!;
@@ -559,7 +559,7 @@ export const portalRouters = {
        let studentId = ctx.user.studentId;
        let [student] = studentId ? await db.select({ permissions: students.permissions }).from(students).where(eq(students.id, studentId)).limit(1) : [null];
        if (!student) {
-         [student] = await db.select({ permissions: students.permissions }).from(students).where(eq(students.studentUserId, ctx.user.id)).limit(1);
+         [student] = await db.select({ permissions: students.permissions }).from(students).where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!))).limit(1);
        }
 
        if (student?.permissions) {
@@ -595,7 +595,7 @@ export const portalRouters = {
        let studentId = ctx.user.studentId;
        let [student] = studentId ? await db.select({ permissions: students.permissions }).from(students).where(eq(students.id, studentId)).limit(1) : [null];
        if (!student) {
-         [student] = await db.select({ permissions: students.permissions }).from(students).where(eq(students.studentUserId, ctx.user.id)).limit(1);
+         [student] = await db.select({ permissions: students.permissions }).from(students).where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!))).limit(1);
        }
 
        if (student?.permissions) {
@@ -662,7 +662,7 @@ export const portalRouters = {
           permissions: students.permissions,
           organizationId: students.organizationId,
           avatar: students.avatar,
-        }).from(students).where(eq(students.studentUserId, ctx.user.id)).limit(1);
+        }).from(students).where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!))).limit(1);
       }
       
       if (!student) throw new Error("Dados do aluno não encontrados.");
@@ -774,7 +774,7 @@ export const portalRouters = {
         // Validar permissão do aluno para essa mensalidade
         let studentId = ctx.user.studentId;
         if (!studentId) {
-          const [found] = await db.select({ id: students.id }).from(students).where(eq(students.studentUserId, ctx.user.id)).limit(1);
+          const [found] = await db.select({ id: students.id }).from(students).where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!))).limit(1);
           if (found) studentId = found.id;
         }
         if (!studentId) throw new TRPCError({ code: "UNAUTHORIZED", message: "Acesso não autorizado" });
@@ -877,7 +877,7 @@ export const portalRouters = {
       
       let studentId = ctx.user.studentId;
       if (!studentId) {
-        const [found] = await db.select({ id: students.id, permissions: students.permissions }).from(students).where(eq(students.studentUserId, ctx.user.id)).limit(1);
+        const [found] = await db.select({ id: students.id, permissions: students.permissions }).from(students).where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!))).limit(1);
         if (found) {
           if (found.permissions) {
             const perms = JSON.parse(found.permissions);
@@ -936,7 +936,7 @@ export const portalRouters = {
 
         let studentId = ctx.user.studentId;
         if (!studentId) {
-          const [found] = await db.select({ id: students.id }).from(students).where(eq(students.studentUserId, ctx.user.id)).limit(1);
+          const [found] = await db.select({ id: students.id }).from(students).where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!))).limit(1);
           if (found) studentId = found.id;
         }
         if (!studentId) throw new Error("Acesso não autorizado");
@@ -969,7 +969,7 @@ export const portalRouters = {
 
         let studentId = ctx.user.studentId;
         if (!studentId) {
-          const [found] = await db.select({ id: students.id }).from(students).where(eq(students.studentUserId, ctx.user.id)).limit(1);
+          const [found] = await db.select({ id: students.id }).from(students).where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!))).limit(1);
           if (found) studentId = found.id;
         }
         if (!studentId) throw new Error("Acesso não autorizado");
@@ -1203,7 +1203,7 @@ export const portalRouters = {
         
         let studentId = ctx.user.studentId;
         if (!studentId) {
-          const [found] = await db.select({ id: students.id }).from(students).where(eq(students.studentUserId, ctx.user.id)).limit(1);
+          const [found] = await db.select({ id: students.id }).from(students).where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!))).limit(1);
           if (found) studentId = found.id;
         }
         if (!studentId) throw new Error("Acesso não autorizado");
@@ -1362,7 +1362,7 @@ export const portalRouters = {
 
         let studentId = ctx.user.studentId;
         if (!studentId) {
-          const [found] = await db.select({ id: students.id }).from(students).where(eq(students.studentUserId, ctx.user.id)).limit(1);
+          const [found] = await db.select({ id: students.id }).from(students).where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!))).limit(1);
           if (found) studentId = found.id;
         }
         if (!studentId) throw new Error("Acesso não autorizado");
@@ -1463,7 +1463,18 @@ Instruções de análise:
             };
           }
 
-          // Confirma o pagamento no banco de dados
+          // AUDITORIA: nunca dar baixa com comprovante de valor menor que a mensalidade
+          const dueAmount = Number(payment.amount) || 0;
+          const paidAmount = Number(analysis.amountPaid);
+          if (!Number.isFinite(paidAmount) || paidAmount + 0.01 < dueAmount) {
+            return {
+              success: false,
+              verified: false,
+              reason: "O valor do comprovante é menor que o valor da mensalidade. Envie o comprovante correto ou fale com a escola.",
+            };
+          }
+
+          // Confirma o pagamento no banco de dados (idempotente: não rebaixa fatura paga)
           await db.update(paymentDues)
             .set({ 
               status: 'pago',
@@ -1471,7 +1482,7 @@ Instruções de análise:
               receiptUrl: receiptUrl,
               updatedAt: new Date()
             })
-            .where(eq(paymentDues.id, payment.id));
+            .where(and(eq(paymentDues.id, payment.id), ne(paymentDues.status, 'pago')));
 
           const valor = Number(payment.amount).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
           await notifyUser(student.professorId, {
@@ -1499,7 +1510,7 @@ Instruções de análise:
         
         let studentId = ctx.user.studentId;
         if (!studentId) {
-          const [found] = await db.select({ id: students.id }).from(students).where(eq(students.studentUserId, ctx.user.id)).limit(1);
+          const [found] = await db.select({ id: students.id }).from(students).where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!))).limit(1);
           if (found) studentId = found.id;
         }
         if (!studentId) throw new Error("Acesso não autorizado");
@@ -1537,7 +1548,7 @@ Instruções de análise:
 
       let studentId = ctx.user.studentId;
       if (!studentId) {
-        const [found] = await db.select({ id: students.id }).from(students).where(eq(students.studentUserId, ctx.user.id)).limit(1);
+        const [found] = await db.select({ id: students.id }).from(students).where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!))).limit(1);
         if (found) studentId = found.id;
       }
       if (!studentId) throw new Error("Perfil de aluno não encontrado.");

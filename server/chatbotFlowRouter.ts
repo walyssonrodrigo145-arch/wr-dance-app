@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, protectedProcedure, adminProcedure } from "./_core/trpc";
 import { getDb } from "./db";
 import { chatbotFlows, settings, students, lessons, paymentDues } from "../drizzle/schema";
 import { and, eq } from "drizzle-orm";
@@ -265,7 +265,7 @@ export const chatbotFlowRouter = router({
   }),
 
   // 2. Salvar / Atualizar fluxo
-  saveFlow: protectedProcedure
+  saveFlow: adminProcedure
     .input(ChatbotFlowSchema)
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -323,7 +323,7 @@ export const chatbotFlowRouter = router({
     }),
 
   // 3. Restaurar padrão do sistema
-  resetDefaultFlow: protectedProcedure
+  resetDefaultFlow: adminProcedure
     .input(z.object({ flowType: z.enum(["aluno", "lead"]) }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();

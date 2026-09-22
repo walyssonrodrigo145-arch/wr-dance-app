@@ -1177,6 +1177,24 @@ async function startServer() {
       if (!user) {
         return res.status(401).json({ error: "Unauthorized" });
       }
+      // AUDITORIA: isolamento por escola — caminhos com org embutida só servem para a própria org.
+      const uploadPath = decodeURIComponent(req.path || "").replace(/^\/+/, "");
+      const orgPatterns = [
+        /^receipts\/org_(\d+)\//,
+        /^receipts\/exp_(\d+)_/,
+        /^challenges\/org_(\d+)\//,
+        /^support\/org_(\d+)\//,
+        /^music-library\/(\d+)\//,
+      ];
+      const isSuperAdmin =
+        (Boolean(ENV.ownerOpenId) && user.openId === ENV.ownerOpenId) ||
+        (Boolean(user.email) && ENV.superAdminEmails.includes((user.email || "").toLowerCase().trim()));
+      for (const re of orgPatterns) {
+        const m = uploadPath.match(re);
+        if (m && Number(m[1]) !== user.organizationId && !isSuperAdmin) {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+      }
     } catch {
       return res.status(401).json({ error: "Unauthorized" });
     }
