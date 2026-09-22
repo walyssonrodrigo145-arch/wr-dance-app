@@ -26,7 +26,7 @@ import { runTenantMigrations } from "./migrate_tenants";
 import { getDb } from "../db";
 import { settings, paymentDues, organizations, students, shortLinks, costumeSales } from "../../drizzle/schema";
 import { ENV } from './env';
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, ne, sql } from "drizzle-orm";
 import { setupEvolutionWebhook, setupAllEvolutionWebhooks } from "../utils/whatsapp";
 import { notifyUser } from "./notification";
 import { sdk } from "./sdk";
@@ -299,9 +299,31 @@ async function startServer() {
       
       const paymentData = await response.json();
       if (paymentData.status === "approved") {
+        // AUDITORIA (DP-021): idempotência por evento + validação de referência e valor
+        const { registerWebhookEventOnce } = await import("../routers/helpers");
+        const dedupMp = await registerWebhookEventOnce(db, "mercadopago", String(paymentId), "payment.approved", due.organizationId ?? undefined, { dueId: due.id });
+        if (dedupMp.isDuplicate) return res.status(200).send("Duplicate event ignored");
+
+        const mpRef = String(paymentData?.external_reference || "");
+        if (mpRef && mpRef !== String(due.id)) {
+          console.warn(`[MP Webhook] external_reference divergente (${mpRef} ≠ ${due.id}) — evento ignorado`);
+          return res.status(400).send("Reference mismatch");
+        }
+        const dueAmountMp = Number(due.amount) || 0;
+        const paidAmountMp = Number(paymentData?.transaction_amount);
+        const divergenceNoteMp = Number.isFinite(paidAmountMp) && paidAmountMp + 0.01 < dueAmountMp
+          ? `Pagamento MP abaixo do valor (${paidAmountMp.toFixed(2)} de ${dueAmountMp.toFixed(2)}) em ${new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })}`
+          : null;
+        if (divergenceNoteMp) console.warn(`[MP Webhook] ${divergenceNoteMp} — due ${due.id}`);
+
         await db.update(paymentDues)
-          .set({ status: "pago", paidAt: new Date(), updatedAt: new Date() })
-          .where(and(eq(paymentDues.id, due.id), eq(paymentDues.organizationId, due.organizationId!)));
+          .set({
+            status: "pago",
+            paidAt: new Date(),
+            updatedAt: new Date(),
+            ...(divergenceNoteMp ? { notes: [due.notes, divergenceNoteMp].filter(Boolean).join(" • ") } : {}),
+          })
+          .where(and(eq(paymentDues.id, due.id), eq(paymentDues.organizationId, due.organizationId!), ne(paymentDues.status, "pago")));
         debugLog(`[Mercado Pago Webhook] Mensalidade marcada como paga. org=${due.organizationId}`);
 
         const { sendWhatsAppMessage } = await import("../utils/whatsapp");
@@ -704,6 +726,7 @@ async function startServer() {
             organizationId: paymentDues.organizationId,
             userId: paymentDues.userId,
             amount: paymentDues.amount,
+            notes: paymentDues.notes,
             studentName: students.name,
             studentPhone: students.phone,
           })
@@ -728,6 +751,12 @@ async function startServer() {
             .limit(1);
 
           if (storeSale) {
+            // AUDITORIA (DP-021): sinaliza venda paga com valor divergente
+            const saleValueAs = Number(payment?.value);
+            const saleTotalAs = Number(storeSale.totalPrice) || 0;
+            if (Number.isFinite(saleValueAs) && saleValueAs + 0.01 < saleTotalAs) {
+              console.warn(`[Asaas Webhook] Venda #${storeSale.id} paga abaixo do valor (${saleValueAs.toFixed(2)} de ${saleTotalAs.toFixed(2)})`);
+            }
             await db.update(costumeSales)
               .set({ status: "pago", paidAt: new Date(), updatedAt: new Date() })
               .where(and(eq(costumeSales.id, storeSale.id), eq(costumeSales.organizationId, storeSale.organizationId)));
@@ -752,11 +781,30 @@ async function startServer() {
           return res.status(200).json({ ok: true });
         }
 
+        // AUDITORIA (DP-021): idempotência por evento + validação de valor do pagamento
+        const { registerWebhookEventOnce: registerAsaasEvent } = await import("../routers/helpers");
+        const dedupAsaas = await registerAsaasEvent(db, "asaas", `${payment.id}:${event}`, event, paymentDetails.organizationId ?? undefined, { dueId: paymentDetails.id });
+        if (dedupAsaas.isDuplicate) {
+          debugLog(`[Asaas Webhook] Evento já processado: ${event} ${payment.id}`);
+          return res.status(200).json({ ok: true });
+        }
+        const dueAmountAs = Number(paymentDetails.amount) || 0;
+        const paidAmountAs = Number(payment?.value);
+        const divergenceNoteAs = Number.isFinite(paidAmountAs) && paidAmountAs + 0.01 < dueAmountAs
+          ? `Pagamento Asaas abaixo do valor (${paidAmountAs.toFixed(2)} de ${dueAmountAs.toFixed(2)}) em ${new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })}`
+          : null;
+        if (divergenceNoteAs) console.warn(`[Asaas Webhook] ${divergenceNoteAs} — due ${paymentDetails.id}`);
+
         // Atualiza apenas o registro encontrado (usando o ID interno — nunca só o asaasId genérico)
         await db
           .update(paymentDues)
-          .set({ status: "pago", paidAt: new Date(), updatedAt: new Date() })
-          .where(and(eq(paymentDues.id, paymentDetails.id), eq(paymentDues.organizationId, paymentDetails.organizationId!)));
+          .set({
+            status: "pago",
+            paidAt: new Date(),
+            updatedAt: new Date(),
+            ...(divergenceNoteAs ? { notes: [paymentDetails.notes, divergenceNoteAs].filter(Boolean).join(" • ") } : {}),
+          })
+          .where(and(eq(paymentDues.id, paymentDetails.id), eq(paymentDues.organizationId, paymentDetails.organizationId!), ne(paymentDues.status, "pago")));
         debugLog(`[Asaas Webhook] Mensalidade marcada como PAGA (${payment.id}) — org ${paymentDetails.organizationId}`);
 
         // NOTA: NÃO inserir em analyticsRevenue aqui — esta é uma mensalidade escolar (aluno→escola),
@@ -849,7 +897,7 @@ async function startServer() {
           } else {
             await db
               .update(paymentDues)
-              .set({ status: "pendente", asaasId: null, asaasPaymentLink: null, asaasBillingType: null, updatedAt: new Date() })
+              .set({ status: "pendente", paidAt: null, asaasId: null, asaasPaymentLink: null, asaasBillingType: null, updatedAt: new Date() })
               .where(and(eq(paymentDues.id, due.id), eq(paymentDues.organizationId, due.organizationId!)));
             debugLog(`[Asaas Webhook] Cobrança removida/estornada (${payment.id}) — org ${due.organizationId}`);
           }

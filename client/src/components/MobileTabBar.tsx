@@ -2,12 +2,11 @@ import { Link, useLocation } from "wouter";
 import { LayoutDashboard, Users, Calendar, DollarSign, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { DEFAULT_PROFESSOR_PERMISSIONS } from "@/lib/professorPermissions";
 
 interface MobileTabBarProps {
   onMenuClick: () => void;
 }
-
-const DEFAULT_PROFESSOR_PERMISSIONS = ["/aulas", "/progresso", "/recepcao-qr", "/ia", "/lembretes", "/relatorios"];
 
 export function MobileTabBar({ onMenuClick }: MobileTabBarProps) {
   const [location] = useLocation();

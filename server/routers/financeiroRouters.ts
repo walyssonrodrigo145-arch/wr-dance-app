@@ -273,6 +273,7 @@ export const financeiroRouters = {
           }
 
           await db.insert(paymentDues).values(paymentData);
+          BillingEngine.clearCache(); // AUDITORIA (DP-025): cache do cálculo não pode ficar velho
           return { success: true };
         } catch (error) {
           return handleDbError(error, "gerar a cobrança");
@@ -479,6 +480,7 @@ export const financeiroRouters = {
           await db.update(paymentDues)
             .set(updateData)
             .where(updateWhere);
+          BillingEngine.clearCache(); // AUDITORIA (DP-025): edição de fatura invalida o cálculo em cache
 
           // AUDITORIA: baixa via edição aplica os MESMOS efeitos da baixa oficial
           // (cancela links de gateway ainda pagáveis, lembretes e dispara NFS-e automática).
@@ -688,6 +690,7 @@ export const financeiroRouters = {
             ));
 
           await db.delete(paymentDues).where(whereClause);
+          BillingEngine.clearCache(); // AUDITORIA (DP-025)
           return { success: true };
         } catch (error) {
           return handleDbError(error, "remover a mensalidade");
@@ -756,31 +759,70 @@ export const financeiroRouters = {
         if (!db) throw new Error("Database not available");
 
         const orgId = ctx.user.organizationId!;
-        const [student] = await db.select({ billingPeriodicity: students.billingPeriodicity })
+        const isAdminGen = ctx.user.role === 'admin' || ctx.user.openId === ENV.ownerOpenId;
+        const [student] = await db.select({ billingPeriodicity: students.billingPeriodicity, status: students.status, professorId: students.professorId })
           .from(students)
           .where(and(eq(students.id, input.studentId), eq(students.organizationId, orgId)))
           .limit(1);
 
-        const periodicity = student?.billingPeriodicity || "mensal";
+        if (!student) throw new TRPCError({ code: "NOT_FOUND", message: "Aluno não encontrado." });
+        // AUDITORIA (DP-023): não-admin só gera para os próprios alunos
+        if (!isAdminGen && student.professorId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Você só pode gerar mensalidades dos seus alunos." });
+        }
+        // AUDITORIA (DP-023): nunca cobrar aluno inativo/pausado
+        if (student.status !== "ativo") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Este aluno não está ativo — reative o aluno antes de gerar mensalidades." });
+        }
+
+        const periodicity = student.billingPeriodicity || "mensal";
 
         const rows: any[] = [];
         for (const d of buildDueDateSeries(input.startMonth, input.startYear, input.monthsCount, input.dueDay, periodicity)) {
           const y = d.year;
           const month = d.month;
 
-          // Verificar duplicidade (mesmo aluno, mesmo mês/ano)
+          const isFirstMonth = month === input.startMonth && y === input.startYear;
+          const extra = isFirstMonth && input.firstMonthExtraAmount ? input.firstMonthExtraAmount : 0;
+
+          // Verificar duplicidade (mesmo aluno, mesmo mês/ano) — escopo por escola, não por usuário
           const existing = await db.select({ id: paymentDues.id }).from(paymentDues)
             .where(and(
               eq(paymentDues.organizationId, orgId),
               eq(paymentDues.studentId, input.studentId),
               eq(paymentDues.month, month),
               eq(paymentDues.year, y),
-              eq(paymentDues.userId, ctx.user.id),
             )).limit(1);
-          if (existing.length > 0) continue; // pular duplicados
+          if (existing.length > 0) {
+            // Base já existe: lança apenas a taxa da 1ª mensalidade, se ainda não lançada
+            if (isFirstMonth && extra > 0) {
+              const marker = `[Taxa] ${input.firstMonthExtraNotes || "Taxa de matrícula"}`;
+              const [extraDup] = await db.select({ id: paymentDues.id }).from(paymentDues)
+                .where(and(
+                  eq(paymentDues.organizationId, orgId),
+                  eq(paymentDues.studentId, input.studentId),
+                  eq(paymentDues.month, month),
+                  eq(paymentDues.year, y),
+                  sql`${paymentDues.notes} LIKE '[Taxa]%'`,
+                )).limit(1);
+              if (!extraDup) {
+                rows.push({
+                  organizationId: orgId,
+                  userId: ctx.user.id,
+                  studentId: input.studentId,
+                  amount: extra.toFixed(2),
+                  dueDate: d.dueDateISO,
+                  month,
+                  year: y,
+                  status: 'pendente' as const,
+                  notes: marker,
+                  billingPeriodicity: periodicity,
+                });
+              }
+            }
+            continue; // pular duplicados
+          }
 
-          const isFirstMonth = month === input.startMonth && y === input.startYear;
-          const extra = isFirstMonth && input.firstMonthExtraAmount ? input.firstMonthExtraAmount : 0;
           const totalAmount = input.amount + extra;
           const notes = isFirstMonth && extra > 0 && input.firstMonthExtraNotes
             ? [input.notes, input.firstMonthExtraNotes].filter(Boolean).join(" • ")
@@ -835,7 +877,6 @@ export const financeiroRouters = {
           year: paymentDues.year,
         }).from(paymentDues).where(and(
           eq(paymentDues.organizationId, orgId),
-          eq(paymentDues.userId, ctx.user.id),
         ));
         const existingSet = new Set(
           existingPayments.map(p => `${p.studentId}_${p.month}_${p.year}`)

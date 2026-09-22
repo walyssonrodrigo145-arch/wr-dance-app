@@ -14,8 +14,6 @@ import {
   UploadCloud,
   File,
   Download,
-  Filter,
-  LayoutGrid,
   Trash2,
   Activity,
   Play,
@@ -316,10 +314,6 @@ export function BibliotecaMusical({ studentId }: { studentId: number }) {
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                 />
-             </div>
-             <div className="flex gap-2">
-                <Button variant="ghost" size="icon" className="h-12 w-12 rounded-2xl border border-border bg-card text-muted-foreground"><Filter size={18} /></Button>
-                <Button variant="ghost" size="icon" className="h-12 w-12 rounded-2xl border border-border bg-card text-muted-foreground"><LayoutGrid size={18} /></Button>
              </div>
           </div>
 

@@ -423,6 +423,18 @@ export const comunicacaoRouters = {
             ? (due.infinitepayPaymentLink ?? null)
             : (due.asaasPaymentLink ?? null);
 
+        // AUDITORIA (DP-029): o link deve cobrar o valor ATUAL da fatura
+        // (juros/multa/desconto do BillingEngine), não o valor bruto antigo.
+        if (!paymentLink) {
+          try {
+            const { BillingEngine } = await import('../services/BillingEngine');
+            const persisted = await BillingEngine.persistPaymentAmount(due.id, new Date());
+            if (persisted) due.amount = persisted.paid.toFixed(2);
+          } catch (e) {
+            console.warn(`[generateLinks] Falha ao calcular valor atual da fatura ${due.id}:`, e);
+          }
+        }
+
         if (!paymentLink) {
           if (paymentGateway === "infinitepay" && userSettings.infinitepayHandle && (userSettings.infinitepayEnabled === 1 || userSettings.infinitepayEnabled === undefined || userSettings.infinitepayEnabled === null)) {
             try {

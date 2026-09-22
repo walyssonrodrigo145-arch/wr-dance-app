@@ -1141,9 +1141,6 @@ const Relatorios: React.FC = () => {
               <DropdownMenuItem onClick={() => handleExport('csv', false)} className="font-semibold text-xs cursor-pointer">
                 CSV
               </DropdownMenuItem>
-              <DropdownMenuItem disabled className="font-semibold text-xs text-muted-foreground cursor-not-allowed">
-                PDF (em breve)
-              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

@@ -791,6 +791,15 @@ export const portalRouters = {
 
         if (!student) throw new TRPCError({ code: "NOT_FOUND", message: "Aluno não encontrado" });
 
+        // AUDITORIA (DP-029): o link deve cobrar o valor ATUAL da fatura (juros/desconto)
+        try {
+          const { BillingEngine } = await import('../services/BillingEngine');
+          const persisted = await BillingEngine.persistPaymentAmount(due.id, new Date());
+          if (persisted) due.amount = persisted.paid.toFixed(2);
+        } catch (e) {
+          console.warn(`[portal.generatePaymentLink] Falha ao calcular valor atual da fatura ${due.id}:`, e);
+        }
+
         // ── InfinitePay: link de checkout hospedado on-the-fly ──
         if (settingsData.paymentGateway === 'infinitepay') {
           if (settingsData.infinitepayEnabled !== 1 || !settingsData.infinitepayHandle) {

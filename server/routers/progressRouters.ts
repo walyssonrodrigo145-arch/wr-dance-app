@@ -1117,7 +1117,7 @@ ${lessonsText}`;
           title: "Semana Gabaritada! 🎸",
           message: `O aluno ${ctx.user.name} concluiu os 5 dias de treino do plano de estudos!`,
           type: "success",
-          actionUrl: `/alunos/${ctx.user.studentId}`,
+          actionUrl: `/alunos/${ctx.user.studentId}/editar`,
         });
 
         // Envia notificação PUSH para o aparelho do professor (Sem await para não travar a resposta)
@@ -1133,7 +1133,7 @@ ${lessonsText}`;
           title: "Treino Concluído! 🎸",
           message: `O aluno ${ctx.user.name} concluiu o treino do dia!`,
           type: "success",
-          actionUrl: `/alunos/${ctx.user.studentId}`,
+          actionUrl: `/alunos/${ctx.user.studentId}/editar`,
         });
 
         notifyUser(plan.teacherId, {

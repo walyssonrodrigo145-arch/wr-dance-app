@@ -298,8 +298,19 @@ export class BillingEngine {
     const db = await getDb();
     if (!db) return null;
 
+    const [current] = await db
+      .select({ amount: paymentDues.amount, notes: paymentDues.notes })
+      .from(paymentDues)
+      .where(eq(paymentDues.id, invoiceId))
+      .limit(1);
+
     const calc = await this.calculateInvoice(invoiceId, { targetDate });
-    const paid = Math.round(calc.updatedAmount * 100) / 100;
+    let paid = Math.round(calc.updatedAmount * 100) / 100;
+    // AUDITORIA (DP-025): fatura com "Valor cheio aplicado" (bolsa em atraso) não pode
+    // ser sobrescrita para baixo ao gerar link/baixa — senão a escola subcobra para sempre.
+    if ((current?.notes || "").includes("Valor cheio aplicado") && Number(current?.amount || 0) > paid) {
+      paid = Math.round(Number(current!.amount) * 100) / 100;
+    }
     const original = Math.round(calc.originalAmount * 100) / 100;
 
     await db
@@ -439,14 +450,15 @@ export async function applyScholarshipLateFullValue(): Promise<ScholarshipLateRe
     if (todayStr <= limiteStr) continue;
 
     if (row.asaasId || row.mpPaymentId) {
-      // ── Fatura já emitida em gateway: COMPLEMENTO da diferença (dedup) ──
+      // ── Fatura já emitida em gateway: COMPLEMENTO da diferença (dedup POR FATURA de origem) ──
+      // AUDITORIA (DP-025): dedup antigo por aluno+mês+ano impedia complemento de uma 2ª fatura.
       const [dup] = await db.select({ id: paymentDues.id }).from(paymentDues)
         .where(_and(
           _eq(paymentDues.organizationId, row.organizationId),
           _eq(paymentDues.studentId, row.studentId),
           _eq(paymentDues.month, row.month),
           _eq(paymentDues.year, row.year),
-          _sql`${paymentDues.notes} LIKE 'Complemento valor cheio%'`,
+          _sql`${paymentDues.notes} LIKE ${"%ref #" + row.id + "%"}`,
         ))
         .limit(1);
       if (dup) continue;
@@ -459,7 +471,7 @@ export async function applyScholarshipLateFullValue(): Promise<ScholarshipLateRe
         month: row.month,
         year: row.year,
         status: 'pendente' as const,
-        notes: `Complemento valor cheio — Plano ${plan.nome} (atraso após dia ${limiteDia})`,
+        notes: `Complemento valor cheio — Plano ${plan.nome} (ref #${row.id}, atraso após dia ${limiteDia})`,
         billingPeriodicity: 'mensal',
       });
       result.complements++;

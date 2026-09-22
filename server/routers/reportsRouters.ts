@@ -18,7 +18,7 @@ import {
   updateUserProfile,
   getExperimentalStats,
 } from "../db";
-import { organizations, users, students, lessons, instruments, reminders, reminderTemplates, paymentDues, asaasCustomers, settings, studentGoals, studentTimeline, studentFiles, announcements, chatMessages, rescheduleRequests, studentEvolution, aiConversations, aiMessages, aiDocuments, expenses, dailyStudyPlans, notifications, professores, professorPayments, attendanceTokens, attendanceLogs, contracts, fileComments, studioRooms, schoolIntegrations, contractTemplates, contractEvents, crmLeads, crmGoals, crmActivities, fiscalCompanies, fiscalInvoices, fiscalServices, fiscalJobs, fiscalLogs } from "../../drizzle/schema";
+import { organizations, users, students, lessons, instruments, reminders, reminderTemplates, paymentDues, asaasCustomers, settings, studentGoals, studentTimeline, studentFiles, announcements, chatMessages, rescheduleRequests, studentEvolution, aiConversations, aiMessages, aiDocuments, expenses, dailyStudyPlans, notifications, professores, professorPayments, attendanceTokens, attendanceLogs, contracts, fileComments, studioRooms, schoolIntegrations, contractTemplates, contractEvents, crmLeads, crmGoals, crmActivities, fiscalCompanies, fiscalInvoices, fiscalServices, fiscalJobs, fiscalLogs, turmas, teacherPaymentRules, teacherPaymentRuleConditions, teacherPaymentRuleCourses } from "../../drizzle/schema";
 import { eq, desc, sql, and, gte, lt, lte, asc, ne, or, inArray, aliasedTable, ilike, isNull } from "drizzle-orm";
 import { notifyOwner, notifyUser } from "../_core/notification";
 import { handleDbError } from "../utils/error_handler";
@@ -154,21 +154,44 @@ export const reportsRouters = {
         const orgId = ctx.user.organizationId!;
         const userId = (ctx.user.role === 'admin' || ctx.user.openId === ENV.ownerOpenId) ? undefined : ctx.user.id;
 
-        const activeStudents = await db.select({ monthlyFee: students.monthlyFee }).from(students)
+        const activeStudents = await db.select({ monthlyFee: students.monthlyFee, billingPeriodicity: students.billingPeriodicity }).from(students)
           .where(and(
             eq(students.organizationId, orgId),
             userId ? eq(students.professorId, userId) : undefined,
             eq(students.status, 'ativo')
           ));
-        const receitaBase = activeStudents.reduce((acc, s) => acc + Number(s.monthlyFee || 0), 0);
+        // AUDITORIA (DP-027): normaliza planos não mensais para base MENSAL
+        const periodicityMonths: Record<string, number> = {
+          mensal: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12,
+        };
+        const receitaBase = activeStudents.reduce((acc, s) => {
+          const months = periodicityMonths[String(s.billingPeriodicity || "mensal")] || 1;
+          return acc + Number(s.monthlyFee || 0) / months;
+        }, 0);
 
-        const recurringExpenses = await db.select({ amount: expenses.amount }).from(expenses)
+        const recurringExpenses = await db.select({
+          amount: expenses.amount,
+          description: expenses.description,
+          date: expenses.date,
+        }).from(expenses)
           .where(and(
             eq(expenses.organizationId, orgId),
             userId ? eq(expenses.userId, userId) : undefined,
             eq(expenses.recurrence, 'mensal')
           ));
-        const despesaBase = recurringExpenses.reduce((acc, e) => acc + Number(e.amount || 0), 0);
+        // AUDITORIA (DP-027): recorrentes geram uma linha por mês — soma apenas a mais
+        // recente de cada descrição para não multiplicar a despesa por 6 na projeção.
+        const latestByDescription = new Map<string, { amount: number; date: string }>();
+        for (const e of recurringExpenses) {
+          const key = String(e.description || "");
+          const dateStr = String(e.date || "");
+          const prev = latestByDescription.get(key);
+          if (!prev || dateStr > prev.date) {
+            latestByDescription.set(key, { amount: Number(e.amount || 0), date: dateStr });
+          }
+        }
+        let despesaBase = 0;
+        latestByDescription.forEach((v) => { despesaBase += v.amount; });
 
         const MONTHS_PT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
         const projection = [];
@@ -637,6 +660,25 @@ export const reportsRouters = {
             .where(and(eq(students.organizationId, orgId), eq(students.professorId, prof.userId)));
           await tx.delete(reminders).where(and(eq(reminders.organizationId, orgId), eq(reminders.userId, prof.userId)));
           await tx.delete(settings).where(eq(settings.userId, prof.userId));
+
+          // AUDITORIA (DP-022): limpar folha, regras de remuneração e reatribuir turmas/aulas
+          // antes de apagar o professor — evita histórico órfão e joins quebrados.
+          await tx.delete(professorPayments).where(and(eq(professorPayments.organizationId, orgId), eq(professorPayments.professorId, prof.id)));
+          const ruleRows = await tx.select({ id: teacherPaymentRules.id }).from(teacherPaymentRules)
+            .where(and(eq(teacherPaymentRules.organizationId, orgId), eq(teacherPaymentRules.teacherId, prof.id)));
+          if (ruleRows.length > 0) {
+            const ruleIds = ruleRows.map((r: any) => r.id);
+            await tx.delete(teacherPaymentRuleConditions).where(inArray(teacherPaymentRuleConditions.ruleId, ruleIds));
+            await tx.delete(teacherPaymentRuleCourses).where(inArray(teacherPaymentRuleCourses.ruleId, ruleIds));
+            await tx.delete(teacherPaymentRules).where(inArray(teacherPaymentRules.id, ruleIds));
+          }
+          await tx.update(turmas).set({ professorId: orgOwnerSubstitute })
+            .where(and(eq(turmas.organizationId, orgId), eq(turmas.professorId, prof.userId)));
+          await tx.update(lessons).set({ userId: orgOwnerSubstitute })
+            .where(and(eq(lessons.organizationId, orgId), eq(lessons.userId, prof.userId)));
+          await tx.update(attendanceLogs).set({ userId: orgOwnerSubstitute })
+            .where(and(eq(attendanceLogs.organizationId, orgId), eq(attendanceLogs.userId, prof.userId)));
+
           await tx.delete(professores).where(eq(professores.id, input.id));
           await tx.delete(users).where(eq(users.id, prof.userId));
         });

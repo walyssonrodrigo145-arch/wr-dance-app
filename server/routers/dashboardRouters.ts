@@ -97,14 +97,16 @@ export const dashboardRouters = {
           lte(lessons.scheduledAt, endOfDay)
         ));
       
+      // AUDITORIA (DP-026): check-ins reais vêm de attendance_logs (leitura de QR),
+      // não de "aula marcada como concluída".
       const checkinsRes = await db.select({ count: sql<number>`count(*)` })
-        .from(lessons)
+        .from(attendanceLogs)
+        .innerJoin(lessons, eq(attendanceLogs.lessonId, lessons.id))
         .where(and(
-          eq(lessons.organizationId, orgId),
+          eq(attendanceLogs.organizationId, orgId),
           baseLessonCondition,
-          eq(lessons.status, 'concluida'),
-          gte(lessons.scheduledAt, startOfDay),
-          lte(lessons.scheduledAt, endOfDay)
+          gte(attendanceLogs.scannedAt, startOfDay),
+          lte(attendanceLogs.scannedAt, endOfDay)
         ));
 
       const experimentaisRes = await db.select({ count: sql<number>`count(*)` })

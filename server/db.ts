@@ -1569,11 +1569,12 @@ export async function getDashboardStats(organizationId: number, userId?: number)
   const lessonOrgFilter = eq(lessons.organizationId, organizationId);
   const lessonUserFilter = userId ? eq(lessons.userId, userId) : undefined;
 
-  const currentMonth = now.getMonth() + 1;
-  const currentYear = now.getFullYear();
-  
   const paymentOrgFilter = eq(paymentDues.organizationId, organizationId);
-  const paymentUserFilter = userId ? eq(paymentDues.userId, userId) : undefined;
+  // AUDITORIA (DP-026): visão do professor deve seguir os ALUNOS dele (students.professorId),
+  // não quem criou a fatura (paymentDues.userId) — alinha com o restante do dashboard.
+  const paymentUserFilter = userId
+    ? inArray(paymentDues.studentId, db.select({ id: students.id }).from(students).where(and(orgFilter, userFilter)))
+    : undefined;
 
   const [
     [totalStudents],
@@ -1611,7 +1612,9 @@ export async function getDashboardStats(organizationId: number, userId?: number)
       .where(and(
         lessonOrgFilter,
         lessonUserFilter, 
-        sql`status != 'agendada'`,
+        // AUDITORIA (DP-026): base da taxa de conclusão = aulas realizáveis
+        // (concluída/falta); canceladas e remarcadas não penalizam mais o indicador.
+        sql`status IN ('concluida','falta')`,
         gte(lessons.scheduledAt, startOfMonth),
         lte(lessons.scheduledAt, endOfMonth)
       )),
@@ -1621,9 +1624,11 @@ export async function getDashboardStats(organizationId: number, userId?: number)
       .where(and(
         paymentOrgFilter,
         paymentUserFilter,
-        eq(paymentDues.month, currentMonth),
-        eq(paymentDues.year, currentYear),
-        eq(paymentDues.status, 'pago')
+        // AUDITORIA (DP-026): "Receita do Mês" agora é CAIXA (recebido no mês),
+        // consistente com "Recebido Hoje" — antes usava competência e divergia.
+        eq(paymentDues.status, 'pago'),
+        gte(paymentDues.paidAt, startOfMonth),
+        lte(paymentDues.paidAt, endOfMonth)
       ))
   ]);
 
@@ -1673,7 +1678,8 @@ export async function getMonthlyStats(organizationId: number, userId?: number, l
           .where(and(
             eq(students.organizationId, organizationId),
             userId ? eq(students.professorId, userId) : undefined,
-            eq(students.status, 'ativo'),
+            // AUDITORIA (DP-026): contagem histórica — alunos existentes ATÉ o fim do mês
+            // (antes só quem ainda está ativo hoje, o que distorcia meses passados).
             lt(students.createdAt, startOfNextMonth)
           )),
         db.select({ count: sql<number>`CAST(count(*) AS INT)` })
@@ -1689,10 +1695,13 @@ export async function getMonthlyStats(organizationId: number, userId?: number, l
           .from(paymentDues)
           .where(and(
             eq(paymentDues.organizationId, organizationId),
-            userId ? eq(paymentDues.userId, userId) : undefined,
-            eq(paymentDues.month, m),
-            eq(paymentDues.year, y),
-            eq(paymentDues.status, 'pago')
+            userId
+              ? inArray(paymentDues.studentId, db.select({ id: students.id }).from(students).where(and(eq(students.organizationId, organizationId), eq(students.professorId, userId))))
+              : undefined,
+            // AUDITORIA (DP-026): receita do gráfico também por caixa (paidAt)
+            eq(paymentDues.status, 'pago'),
+            gte(paymentDues.paidAt, startOfMonth),
+            lte(paymentDues.paidAt, endOfMonth)
           ))
       ]);
       

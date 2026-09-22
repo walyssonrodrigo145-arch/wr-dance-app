@@ -3,7 +3,7 @@
 // e professorPayments.calculateAll. Agora usa o TeacherPaymentEngine (mesmo
 // motor do Simulador). Sem regra configurada: cai no modelo LEGADO (paymentType
 // fixo/porcentagem do cadastro) com warning — nunca calcula errado em silêncio.
-import { and, eq, gte, inArray, lt, or } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lt, or } from "drizzle-orm";
 import { lessons, professorPayments, students, paymentDues, teacherPaymentRules, teacherPaymentRuleConditions, teacherPaymentRuleCourses } from "../../drizzle/schema";
 import { computeTeacherPayment, pickRuleForMonth, type RuleLike, type ConditionLike, type CourseRuleLike, type LessonLike } from "./TeacherPaymentEngine";
 
@@ -36,14 +36,30 @@ export async function calculateAndSaveProfessorPayment(
       eq(teacherPaymentRules.teacherId, prof.id),
       eq(teacherPaymentRules.active, true)
     ));
-  const rule = pickRuleForMonth(ruleRows as RuleLike[], month, year);
   const warnings: string[] = [];
 
-  if (!rule) {
+  let effectiveRule = pickRuleForMonth(ruleRows as RuleLike[], month, year);
+  if (!effectiveRule) {
+    // AUDITORIA (DP-024): sem regra própria vigente, aplica a regra PADRÃO da escola
+    // (teacherId null / isSchoolDefault) antes de cair no modelo legado.
+    const defaultRows: any[] = await db
+      .select()
+      .from(teacherPaymentRules)
+      .where(and(
+        eq(teacherPaymentRules.organizationId, orgId),
+        eq(teacherPaymentRules.active, true),
+        or(eq(teacherPaymentRules.isSchoolDefault, true), isNull(teacherPaymentRules.teacherId)),
+      ));
+    effectiveRule = pickRuleForMonth(defaultRows as RuleLike[], month, year);
+    if (effectiveRule) warnings.push("Sem regra própria vigente — aplicada a regra PADRÃO da escola.");
+  }
+
+  if (!effectiveRule) {
     // LEGADO: sem regra → comportamento atual (paymentType do cadastro)
     warnings.push("Esta professora ainda não possui uma regra de remuneração configurada. Cálculo feito pelo modelo legado (cadastro).");
     return await legacyCalculation(db, orgId, prof, month, year, startDate, endDate, warnings);
   }
+  const rule = effectiveRule;
 
   // Condições + regras por instrumento da versão vigente
   const conditions: ConditionLike[] = await db
@@ -156,12 +172,25 @@ export async function calculateAndSaveProfessorPayment(
         warnings: ["Folha já fechada — cálculo não foi alterado retroativamente."],
       };
     }
+    // AUDITORIA (DP-024): preservar ajustes/descontos manuais ao recalcular a folha
+    let adjustmentsArr: any[] = [];
+    try { adjustmentsArr = existing.adjustments ? JSON.parse(existing.adjustments) : []; } catch { adjustmentsArr = []; }
+    const adjSum = adjustmentsArr.reduce((s: number, a: any) => s + Number(a.value || 0), 0);
+    const adjPos = adjustmentsArr.filter((a: any) => Number(a.value) > 0).reduce((s: number, a: any) => s + Number(a.value), 0);
+    const adjNeg = Math.abs(adjustmentsArr.filter((a: any) => Number(a.value) < 0).reduce((s: number, a: any) => s + Number(a.value), 0));
+    const hasAdjustments = adjustmentsArr.length > 0;
+    const finalCredits = hasAdjustments ? total + adjPos : total;
+    const finalDebits = hasAdjustments ? adjNeg : Number(existing.totalDebits || 0);
+    const finalAmount = hasAdjustments ? total + adjSum : total;
+    if (hasAdjustments) warnings.push("Ajustes manuais desta folha foram preservados no recálculo.");
+
     await db.update(professorPayments)
       .set({
         totalClasses,
         totalMinutes,
-        totalCredits: total.toFixed(2),
-        totalAmount: total.toFixed(2),
+        totalCredits: finalCredits.toFixed(2),
+        totalDebits: finalDebits.toFixed(2),
+        totalAmount: finalAmount.toFixed(2),
         ruleSnapshot: snapshot,
         calculationMemory: memoryJson,
         status: "aberto",
@@ -169,6 +198,7 @@ export async function calculateAndSaveProfessorPayment(
       })
       .where(eq(professorPayments.id, existing.id));
     paymentId = existing.id;
+    return { paymentId, professorId: prof.id, totalClasses, totalMinutes, totalCredits: finalCredits, totalAmount: finalAmount, warnings };
   } else {
     const [newPayment] = await db.insert(professorPayments).values({
       organizationId: orgId,

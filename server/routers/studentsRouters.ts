@@ -19,7 +19,7 @@ import {
   updateUserProfile,
   getExperimentalStats,
 } from "../db";
-import { organizations, users, students, lessons, instruments, reminders, reminderTemplates, paymentDues, asaasCustomers, settings, studentGoals, studentTimeline, studentFiles, announcements, chatMessages, rescheduleRequests, schoolPlans, studentEvolution, aiConversations, aiMessages, aiDocuments, expenses, dailyStudyPlans, notifications, professores, professorPayments, attendanceTokens, attendanceLogs, contracts, fileComments, studioRooms, schoolIntegrations, contractTemplates, contractEvents, crmLeads, crmGoals, crmActivities, fiscalCompanies, fiscalInvoices, fiscalServices, fiscalJobs, fiscalLogs } from "../../drizzle/schema";
+import { organizations, users, students, lessons, instruments, reminders, reminderTemplates, paymentDues, asaasCustomers, settings, studentGoals, studentTimeline, studentFiles, announcements, chatMessages, rescheduleRequests, schoolPlans, studentEvolution, aiConversations, aiMessages, aiDocuments, expenses, dailyStudyPlans, notifications, professores, professorPayments, attendanceTokens, attendanceLogs, contracts, fileComments, studioRooms, schoolIntegrations, contractTemplates, contractEvents, crmLeads, crmGoals, crmActivities, fiscalCompanies, fiscalInvoices, fiscalServices, fiscalJobs, fiscalLogs, turmaAlunos, eventParticipants, studentEnrollments, extraLessonRequests, challengeResponses, studentPedagogicalMemory, rankingParticipants, rankingScores, studentAchievements, professorEvaluations, studentHealthRecords, npsResponses } from "../../drizzle/schema";
 import { eq, desc, sql, and, gte, lt, lte, asc, ne, or, inArray, aliasedTable, ilike, isNull } from "drizzle-orm";
 import { notifyOwner, notifyUser } from "../_core/notification";
 import { handleDbError } from "../utils/error_handler";
@@ -939,6 +939,21 @@ export const studentsRouters = {
           }
           const { slotOffers } = await import("../../drizzle/schema");
           await tx.delete(slotOffers).where(and(eq(slotOffers.organizationId, orgId), eq(slotOffers.acceptedByStudentId, input.id)));
+
+          // AUDITORIA (DP-022): limpar TODOS os vínculos satélites do aluno antes de apagá-lo
+          // (turmas, eventos, matrículas, ranking, avaliações, saúde e NPS) — evita "aluno fantasma".
+          await tx.delete(turmaAlunos).where(and(eq(turmaAlunos.organizationId, orgId), eq(turmaAlunos.studentId, input.id)));
+          await tx.delete(eventParticipants).where(and(eq(eventParticipants.organizationId, orgId), eq(eventParticipants.studentId, input.id)));
+          await tx.delete(studentEnrollments).where(and(eq(studentEnrollments.organizationId, orgId), eq(studentEnrollments.studentId, input.id)));
+          await tx.delete(extraLessonRequests).where(and(eq(extraLessonRequests.organizationId, orgId), eq(extraLessonRequests.studentId, input.id)));
+          await tx.delete(challengeResponses).where(and(eq(challengeResponses.organizationId, orgId), eq(challengeResponses.studentId, input.id)));
+          await tx.delete(studentPedagogicalMemory).where(and(eq(studentPedagogicalMemory.organizationId, orgId), eq(studentPedagogicalMemory.studentId, input.id)));
+          await tx.delete(rankingParticipants).where(and(eq(rankingParticipants.organizationId, orgId), eq(rankingParticipants.studentId, input.id)));
+          await tx.delete(rankingScores).where(and(eq(rankingScores.organizationId, orgId), eq(rankingScores.studentId, input.id)));
+          await tx.delete(studentAchievements).where(and(eq(studentAchievements.organizationId, orgId), eq(studentAchievements.studentId, input.id)));
+          await tx.delete(professorEvaluations).where(and(eq(professorEvaluations.organizationId, orgId), eq(professorEvaluations.studentId, input.id)));
+          await tx.delete(studentHealthRecords).where(and(eq(studentHealthRecords.organizationId, orgId), eq(studentHealthRecords.studentId, input.id)));
+          await tx.delete(npsResponses).where(and(eq(npsResponses.organizationId, orgId), eq(npsResponses.studentId, input.id)));
 
           await tx.delete(asaasCustomers).where(and(eq(asaasCustomers.studentId, input.id), eq(asaasCustomers.organizationId, orgId)));
           await tx.delete(paymentDues).where(and(eq(paymentDues.studentId, input.id), eq(paymentDues.organizationId, orgId)));

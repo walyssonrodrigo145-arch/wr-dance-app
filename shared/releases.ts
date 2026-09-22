@@ -26,6 +26,24 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.18.5",
+    date: "2026-09-18",
+    title: "Financeiro e integridade blindados: folha, bolsas, webhooks e exclusões",
+    summary: "Segunda onda da auditoria pré-lançamento: corrigimos os itens residuais de folha, bolsa, webhooks, exclusões e consistência de indicadores.",
+    items: [
+      { type: "correcao", title: "Webhooks conferem valor e origem do pagamento", description: "Asaas e Mercado Pago agora validam referência e valor recebido (sinalizam pagamento abaixo do valor) e ignoram eventos repetidos. Estorno limpa a data de pagamento." },
+      { type: "correcao", title: "Excluir cadastro não deixa mais pontas soltas", description: "Excluir aluno limpa turmas, eventos, rankings, avaliações, saúde e NPS; excluir professor limpa folha/regras e reatribui turmas e aulas — sem registros órfãos." },
+      { type: "correcao", title: "Mensalidades sem cobrança indevida", description: "Aluno inativo não gera mensalidade, duplicidade é checada por escola inteira e a taxa de matrícula é lançada mesmo quando o mês já existe." },
+      { type: "correcao", title: "Folha de professores mais fiel", description: "Sem regra própria, aplica a regra PADRÃO da escola; recalcular não apaga mais bônus/descontos manuais." },
+      { type: "correcao", title: "Bolsa em atraso não subcobra mais", description: "O complemento de 'valor cheio' é controlado por fatura de origem e o valor já corrigido não é sobrescrito ao gerar link/baixa; o cache do cálculo é invalidado a cada edição." },
+      { type: "correcao", title: "Indicadores consistentes", description: "Receita do mês = recebido no mês (igual ao 'Recebido Hoje'), check-ins contam leituras reais de QR e o histórico de alunos por mês não distorce meses passados." },
+      { type: "correcao", title: "Projeção de 6 meses sem inflar", description: "Despesas recorrentes contam uma vez (não uma por mês gerado) e planos anuais/semestrais entram na receita mensal proporcionalizados." },
+      { type: "novo", title: "Matrícula online aparece no Financeiro", description: "A 1ª mensalidade + taxa pagas no ato da matrícula online agora viram lançamento pago no Financeiro, entrando nos relatórios e no caixa." },
+      { type: "correcao", title: "Links de cobrança com valor atualizado", description: "Cobranças geradas em lote e pelo portal do aluno passam a cobrar o valor atual (com juros/multa/desconto) em vez do valor antigo." },
+      { type: "melhoria", title: "Limpeza de atalhos e textos", description: "Notas Fiscais ganharam item no menu, notificações de treino abrem a ficha certa do aluno, e botões/atalhos sem função foram removidos." },
+    ],
+  },
+  {
     version: "2026.09.18.4",
     date: "2026-09-18",
     title: "Blindagem pré-lançamento: permissões, isolamento entre escolas e financeiro",

@@ -45,6 +45,7 @@ import {
   Gauge,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DEFAULT_PROFESSOR_PERMISSIONS } from "@/lib/professorPermissions";
 import { SUPPORT_WHATSAPP_URL } from "@/lib/support";
 import { useAuth } from "@/hooks/useAuth";
 import { useWhatsNew } from "@/components/novidades/WhatsNewProvider";
@@ -103,7 +104,6 @@ export function AppSidebar({ collapsed, onToggle, onNavigate }: AppSidebarProps)
   // `auth.me` devolve permissions como rotas normalizadas (ex.: "/aulas").
   // Sem permissões cadastradas, aplica o conjunto padrão de professor.
   const rawPermissions = (user as any)?.permissions as string[] | undefined;
-  const DEFAULT_PROFESSOR_PERMISSIONS = ["/aulas", "/coreografias", "/progresso", "/recepcao-qr", "/ia", "/lembretes", "/relatorios"];
   const permissionAliases: Record<string, string> = { "/recepcao": "/recepcao-qr" };
   const ALWAYS_VISIBLE = ["/novidades", "/tutoriais"];
   const professorPermissions =
@@ -165,6 +165,7 @@ export function AppSidebar({ collapsed, onToggle, onNavigate }: AppSidebarProps)
       items: [
         { label: "Finanças", href: "/financeiro", icon: DollarSign },
         { label: "Folha de Pagamento", href: "/folha", icon: FileText, activeStyle: "bg-[#062E1E] text-white border-l-4 border-emerald-500 shadow-lg shadow-emerald-950/50" },
+        { label: "Notas Fiscais", href: "/notas-fiscais", icon: Receipt },
         { label: "Contratos", href: "/contratos", icon: FileSignature },
       ],
     },

@@ -26,7 +26,6 @@ const RankingsPage = lazy(() => import("./pages/Rankings"));
 const LandingPage = lazy(() => import("./pages/LandingPage"));
 const Checkout = lazy(() => import("./pages/Checkout"));
 const Cadastro = lazy(() => import("./pages/Cadastro"));
-const NotFound = lazy(() => import("./pages/NotFound"));
 const NovoAluno = lazy(() => import("./pages/NovoAluno"));
 const Comunicados = lazy(() => import("./pages/Comunicados"));
 const MarketingDashboard = lazy(() => import("@/pages/marketing/MarketingDashboard"));

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
-import { enrollmentLinks, crmLeads, instruments, professores, users, lessons, students, settings, studioRooms, organizations, schoolIntegrations, contractTemplates, schoolPlans, studentEnrollments } from "../drizzle/schema";
+import { enrollmentLinks, crmLeads, instruments, professores, users, lessons, students, settings, studioRooms, organizations, schoolIntegrations, contractTemplates, schoolPlans, studentEnrollments, paymentDues } from "../drizzle/schema";
 import { eq, and, gte, lte, desc, isNotNull, ne, sql, or } from "drizzle-orm";
 import crypto from "crypto";
 import { createAsaasCustomer, createAsaasCharge, getAsaasPixQrCode, getAsaasChargeStatus, getAsaasCharge } from "./utils/asaas";
@@ -1052,6 +1052,41 @@ export const enrollmentRouter = router({
         startMonth: nowBrt.getMonth() + 1,
         startYear: nowBrt.getFullYear(),
       });
+
+      // AUDITORIA (DP-028): registra a 1ª mensalidade + taxas pagas no ato no Financeiro
+      // (antes eram recebidas pelo gateway mas não apareciam em relatórios/indicadores).
+      const firstMonthFee = billable.reduce((sum: number, c: any) => sum + Number(c.monthlyFee || 0), 0);
+      const enrollmentFees = billable.reduce((sum: number, c: any) => sum + Number(c.enrollmentFee || 0), 0);
+      const paidAtEnrollment = firstMonthFee + enrollmentFees;
+      if (paidAtEnrollment > 0) {
+        const firstMonth = nowBrt.getMonth() + 1;
+        const firstYear = nowBrt.getFullYear();
+        const [existingFirst] = await db.select({ id: paymentDues.id }).from(paymentDues)
+          .where(and(
+            eq(paymentDues.organizationId, orgId),
+            eq(paymentDues.studentId, newStudent.id),
+            eq(paymentDues.month, firstMonth),
+            eq(paymentDues.year, firstYear),
+          )).limit(1);
+        if (!existingFirst) {
+          const dueDayVal = input.dueDay || nowBrt.getDate();
+          const lastDayFirst = new Date(firstYear, firstMonth, 0).getDate();
+          const dayFirst = Math.min(dueDayVal, lastDayFirst);
+          await db.insert(paymentDues).values({
+            organizationId: orgId,
+            userId: firstTeacher,
+            studentId: newStudent.id,
+            amount: paidAtEnrollment.toFixed(2),
+            dueDate: `${firstYear}-${String(firstMonth).padStart(2, "0")}-${String(dayFirst).padStart(2, "0")}`,
+            month: firstMonth,
+            year: firstYear,
+            status: "pago",
+            paidAt: new Date(),
+            billingPeriodicity: "mensal",
+            notes: `Matrícula online — 1ª mensalidade${enrollmentFees > 0 ? " + taxa de matrícula" : ""} paga no ato`,
+          });
+        }
+      }
 
       // Atualiza o Lead no CRM para "matriculado"
       if (link.leadId) {

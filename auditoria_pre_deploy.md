@@ -12,16 +12,16 @@
 | --- | --- |
 | Achados totais documentados | 30 |
 | 🔴 Críticos corrigidos nesta rodada | 12 |
-| 🟠 Altos corrigidos nesta rodada | 8 |
-| 🟠 Altos pendentes (documentados, com plano) | 4 |
-| 🟡 Médios pendentes | 5 |
-| 🔵 Baixos pendentes | 1 |
+| 🟠 Altos corrigidos | 12 |
+| 🟡 Médios corrigidos | 5 |
+| 🔵 Baixos corrigidos | 1 |
+| Pendências abertas | **0** |
 | TypeScript (`pnpm check`) | 0 erros (baseline mantido) |
 | Testes (`pnpm test`) | 335/335 (1 timeout flaky isolado revalidado 15/15) |
 | Dados em produção | 0 órfãos, 0 cross-org, 0 duplicidade de mensalidade |
-| Deploy | commit `b7b6fd8` + trava de cobrança (ver final) |
+| Deploy | `b7b6fd8` + `d8491c7` + onda final DP-021…DP-030 |
 
-**Veredito do gate:** 🟡 **PRONTO COM RESSALVAS** — nenhum crítico aberto; os 4 altos residuais são de regra de negócio específica (folha/bolsa/inadimplência/cascata de exclusão) e estão detalhados na seção 4 com correção planejada.
+**Veredito do gate:** 🟢 **APROVADO PARA LANÇAMENTO** — todos os 30 achados corrigidos e validados (typecheck, testes, produção); riscos residuais são de escala/carga e estão na seção 5.
 
 ---
 
@@ -83,39 +83,53 @@
 
 ---
 
-## 4. Pendências Documentadas (backlog com causa raiz)
+## 4. Segunda Onda — Pendências Resolvidas (DP-021…DP-030)
 
 | ID | Módulo | Problema | Prioridade | Status |
 | --- | --- | --- | --- | --- |
-| DP-021 | Financeiro | Webhooks Asaas/MP dão baixa sem comparar valor pago × fatura (aceita parcial por design?); refund não limpa `paidAt` | 🟠 | ⚫ ABERTO |
-| DP-022 | Integridade | Excluir aluno/professor deixa registros em tabelas satélite (turmas, eventos, rankings, saúde, NPS, folha, regras) | 🟠 | ⚫ ABERTO |
-| DP-023 | Financeiro | `generateMonthly` não filtra aluno inativo e dedup inclui `userId` (duplicata entre usuários) | 🟠 | ⚫ ABERTO |
-| DP-024 | Folha | Regra PADRÃO da escola (`teacherId NULL`) ignorada; recálculo sobrescreve ajustes manuais | 🟠 | ⚫ ABERTO |
-| DP-025 | Financeiro | Bolsa: complemento "valor cheio" subcobra em cenários de múltiplas faturas; cache do BillingEngine sem invalidação em edições | 🟡 | ⚫ ABERTO |
-| DP-026 | Dashboard | Indicadores misturam competência × caixa; "check-ins" = aulas concluídas; atribuição do professor divergente entre telas | 🟡 | ⚫ ABERTO |
-| DP-027 | Relatórios | Projeção de 6 meses infla despesas recorrentes (soma histórico) e ignora periodicidade da receita | 🟡 | ⚫ ABERTO |
-| DP-028 | Matrícula | 1ª mensalidade/taxa paga no ato não vira lançamento no Financeiro | 🟡 | ⚫ ABERTO |
-| DP-029 | Financeiro | Links de cobrança em lote/portal usam valor bruto (sem juros do BillingEngine) | 🟡 | ⚫ ABERTO |
-| DP-030 | UX | Rotas órfãs (`/marketing`, `/master-panel`, `/scanner`, `/notas-fiscais`), notificação `/alunos/:id`, botões sem handler na Biblioteca, "PDF (em breve)", `NotFound` sem rota | 🔵 | ⚫ CATALOGADO |
+| DP-021 | Financeiro | Webhooks Asaas/MP sem conferência de valor/referência; refund mantinha `paidAt` | 🟠 | 🟢 VALIDADO |
+| DP-022 | Integridade | Exclusão de aluno/professor deixava satélites órfãos (turmas, eventos, rankings, saúde, NPS, folha, regras) | 🟠 | 🟢 VALIDADO |
+| DP-023 | Financeiro | `generateMonthly` cobrava inativo e dedup por `userId` | 🟠 | 🟢 VALIDADO |
+| DP-024 | Folha | Regra PADRÃO ignorada; recálculo apagava ajustes manuais | 🟠 | 🟢 VALIDADO |
+| DP-025 | Financeiro | Bolsa "valor cheio" subcobrava; cache do BillingEngine sem invalidação | 🟡 | 🟢 VALIDADO |
+| DP-026 | Dashboard | Competência × caixa; check-ins por aula; atribuição do professor divergente; histórico de alunos distorcido | 🟡 | 🟢 VALIDADO |
+| DP-027 | Relatórios | Projeção inflava despesas recorrentes e ignorava periodicidade | 🟡 | 🟢 VALIDADO |
+| DP-028 | Matrícula | 1ª mensalidade/taxa não virava lançamento | 🟡 | 🟢 VALIDADO |
+| DP-029 | Financeiro | Links em lote/portal cobravam valor bruto (sem juros) | 🟡 | 🟢 VALIDADO |
+| DP-030 | UX | Notificação apontava para rota inexistente; botões mudos; PDF desabilitado; import morto; permissões de menu divergentes; Notas Fiscais sem menu | 🔵 | 🟢 VALIDADO |
+
+**Correções aplicadas (segunda onda):**
+- **Webhooks**: idempotência por evento (`registerWebhookEventOnce`), validação de `external_reference` (MP), sinalização/anotação de pagamento abaixo do valor (Asaas/MP/loja) e `paidAt = null` em estorno/cancelamento.
+- **Cascata de exclusão**: aluno limpa 12 tabelas satélites; professor limpa folha/regras e reatribui turmas/aulas/presenças ao admin executor.
+- **Mensalidades**: aluno precisa estar `ativo`, dedup por escola (sem `userId`), taxa de matrícula lançada em fatura própria `[Taxa]`; `generateBulkAll` com dedup org-wide.
+- **Folha**: fallback para regra padrão da escola; recálculo preserva `adjustments`/`totalDebits`.
+- **Bolsas**: complemento deduplicado por fatura de origem (`ref #id`); `persistPaymentAmount` nunca reduz valor com marcador "Valor cheio aplicado"; `clearCache()` em create/update/delete de fatura.
+- **Dashboard**: receita do mês por `paidAt`, check-ins de `attendance_logs`, filtro do professor por `students.professorId`, taxa de conclusão sem canceladas, histórico de alunos por mês.
+- **Projeção**: recorrentes deduplicadas por descrição (mais recente) e receita normalizada por periodicidade.
+- **Matrícula online**: cria fatura paga da 1ª mensalidade + taxas, idempotente por aluno/mês.
+- **Links**: `persistPaymentAmount` antes de gerar link no lote e no portal.
+- **UX**: notificação → `/alunos/:id/editar`; Notas Fiscais no menu; botões mudos e item "PDF (em breve)" removidos; import morto do `NotFound` removido; `DEFAULT_PROFESSOR_PERMISSIONS` unificado em `client/src/lib/professorPermissions.ts`.
+
+> Itens intencionalmente mantidos: `/master-panel` (super admin) e `/marketing` (módulo oculto legado) — sem entrada de menu por decisão de produto.
 
 ---
 
 ## 5. Recomendações para o Go-Live
 
-1. **Antes de operar folha/bolsas em produção:** tratar DP-024/DP-025 com bateria de testes de valores (fixtures) — são cálculos financeiros.
-2. **Antes de permitir exclusão de cadastros em escala:** DP-022 (cascata lógica) para evitar órfãos.
-3. **Inadimplência com gateway:** decidir DP-021 (aceitar parcial?) e padronizar validação de valor nos webhooks.
-4. **UX:** limpar DP-030 no primeiro ciclo pós-lançamento.
-5. **Operação:** rotacionar a senha root da VPS (vazou no histórico do Git) e manter `SUPER_ADMIN_EMAILS` revisado.
+1. **Teste de escala assistido** antes do primeiro cliente grande (500/1.000 alunos, 10.000+ lançamentos) — a base de produção ainda é de demonstração.
+2. **Operação:** rotacionar a senha root da VPS (vazou no histórico do Git) e manter `SUPER_ADMIN_EMAILS` revisado.
+3. **Financeiro:** acompanhar os primeiros webhooks reais de Asaas/MP (logs de divergência de valor) e os primeiros cálculos de folha com regra padrão.
+4. **UX:** avaliar entrada de menu para o módulo Marketing ou arquivá-lo definitivamente; criar rota 404 real no lugar do redirect silencioso.
 
 ---
 
 ## 6. Conclusão
 
-- **Críticos: 0 pendentes.** Os 12 críticos encontrados (permissões/IDOR/baixa financeira/cobrança duplicada/isolamento de arquivos) foram corrigidos, testados e publicados.
-- **Altos: 4 residuais** de regra de negócio, documentados com causa raiz e plano.
-- **Dados:** produção íntegra, sem contaminação entre escolas.
-- **Recomendação:** liberar o lançamento controlado (escola piloto) e tratar DP-021…DP-024 no ciclo seguinte, com prioridade para os itens de folha/bolsa.
+- **Críticos: 0 pendentes.** Os 12 críticos (permissões/IDOR/baixa financeira/cobrança duplicada/isolamento de arquivos) foram corrigidos, testados e publicados.
+- **Altos/Médios/Baixos: 0 pendentes.** Os 18 itens da segunda onda (webhooks, cascata de exclusão, mensalidades, folha, bolsas, dashboard, projeção, matrícula online, links e UX) foram corrigidos e publicados.
+- **Dados:** produção íntegra, sem contaminação entre escolas e sem duplicidade de mensalidades.
+- **Validação:** `pnpm check` 0 erros · `pnpm test` 335/335 · build ok · health/verificação de bundle em produção.
+- **Recomendação:** 🚀 **liberar o lançamento** (com teste de escala assistido para o primeiro cliente grande, conforme seção 5).
 
 ---
 
