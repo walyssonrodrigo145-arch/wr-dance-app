@@ -56,6 +56,25 @@ import { schoolAiRouter } from "../schoolAiRouter";
 import { fiscalRouter } from "../fiscalRouter";
 import { FiscalService } from "../services/fiscal/FiscalService";
 import { loginAttempts, safeEqualStr, isReservedSuperAdminEmail, getOrgPlanLimits, syncOrgAsaasSubscription, reconcileOrgAsaasCharges, runCreateAssinafyContract, getTodayBR, markOverdueRows, buildDueDateSeries } from "./helpers";
+/**
+ * AUDITORIA (pré-lançamento): trava anti-duplicação de cobrança por mensalidade.
+ * Janela curta (15s) que absorve duplo clique / duas abas sem impedir novas
+ * tentativas legítimas depois de uma falha. Não substitui índice único, mas
+ * elimina a corrida mais comum (mesmo processo).
+ */
+const gatewayChargeAttempts = new Map<number, number>();
+function acquireGatewayChargeLock(paymentDueId: number) {
+  const now = Date.now();
+  const last = gatewayChargeAttempts.get(paymentDueId) || 0;
+  if (now - last < 15000) {
+    throw new TRPCError({ code: "CONFLICT", message: "Esta cobrança já está sendo gerada. Aguarde alguns segundos e tente novamente." });
+  }
+  gatewayChargeAttempts.set(paymentDueId, now);
+  if (gatewayChargeAttempts.size > 500) {
+    gatewayChargeAttempts.forEach((v, k) => { if (now - v > 60000) gatewayChargeAttempts.delete(k); });
+  }
+}
+
 export const financeiroRouters = {
   billingEngine: router({
     calculateInvoice: protectedProcedure
@@ -926,6 +945,7 @@ export const financeiroRouters = {
 
         const orgId = ctx.user.organizationId!;
         const professorId = ctx.user.id;
+        acquireGatewayChargeLock(input.paymentDueId);
 
         // Security Lock
         const { createAsaasCustomer, createAsaasCharge, getAsaasPixQrCode } = await import('../utils/asaas');
@@ -1039,6 +1059,7 @@ export const financeiroRouters = {
 
         const orgId = ctx.user.organizationId!;
         const professorId = ctx.user.id;
+        acquireGatewayChargeLock(input.paymentDueId);
 
         const { createMPPreference } = await import('../utils/mercadopago');
         const [settingsData] = await db.select({ 
@@ -1163,6 +1184,7 @@ export const financeiroRouters = {
 
         const orgId = ctx.user.organizationId!;
         const professorId = ctx.user.id;
+        acquireGatewayChargeLock(input.paymentDueId);
 
         const { createInfinitePayLink, buildInfinitePayWebhookUrl, brlToCents, resolveInfinitePayApiKey } = await import('../utils/infinitepay');
         const { createPaymentShortLink } = await import('../utils/shortlinks');

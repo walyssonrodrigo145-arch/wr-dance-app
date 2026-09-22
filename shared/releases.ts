@@ -37,6 +37,7 @@ export const RELEASES: Release[] = [
       { type: "correcao", title: "Comprovante por IA não aceita valor menor", description: "O portal só confirma o pagamento quando o valor do comprovante cobre a mensalidade, e nunca rebaixa uma fatura já paga." },
       { type: "correcao", title: "Telas de CRM e Analytics só para quem pode", description: "A tela do CRM (admin) e o painel de Analytics (super admin) não abrem mais para outros perfis, mesmo por URL direta." },
       { type: "correcao", title: "Importação de alunos com permissão e cadastro protegidos", description: "Criar e importar alunos exige admin ou professor com permissão de editar alunos; dados fiscais e vínculos validados por escola." },
+      { type: "correcao", title: "Sem cobrança duplicada por duplo clique", description: "Gerar PIX/boleto/cartão duas vezes na mesma mensalidade (clique duplo ou duas abas) agora é bloqueado com aviso para aguardar — evita dois links de pagamento ativos para a mesma fatura." },
     ],
   },
   {
