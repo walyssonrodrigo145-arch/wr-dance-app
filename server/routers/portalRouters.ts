@@ -18,7 +18,7 @@ import {
   updateUserProfile,
   getExperimentalStats,
 } from "../db";
-import { organizations, users, students, lessons, instruments, reminders, reminderTemplates, paymentDues, asaasCustomers, settings, studentGoals, studentTimeline, studentFiles, announcements, chatMessages, rescheduleRequests, extraLessonRequests, studentEvolution, aiConversations, aiMessages, aiDocuments, expenses, dailyStudyPlans, notifications, professores, professorPayments, attendanceTokens, attendanceLogs, contracts, fileComments, studioRooms, schoolIntegrations, contractTemplates, contractEvents, crmLeads, crmGoals, crmActivities, fiscalCompanies, fiscalInvoices, fiscalServices, fiscalJobs, fiscalLogs } from "../../drizzle/schema";
+import { organizations, users, students, lessons, instruments, reminders, reminderTemplates, paymentDues, asaasCustomers, settings, studentGoals, studentTimeline, studentFiles, announcements, chatMessages, rescheduleRequests, extraLessonRequests, studentEvolution, aiConversations, aiMessages, aiDocuments, expenses, dailyStudyPlans, notifications, professores, professorPayments, attendanceTokens, attendanceLogs, contracts, fileComments, studioRooms, schoolIntegrations, contractTemplates, contractEvents, crmLeads, crmGoals, crmActivities, fiscalCompanies, fiscalInvoices, fiscalServices, fiscalJobs, fiscalLogs, turmaAlunos } from "../../drizzle/schema";
 import { eq, desc, sql, and, gte, lt, lte, asc, ne, or, inArray, aliasedTable, ilike, isNull } from "drizzle-orm";
 import { notifyOwner, notifyUser } from "../_core/notification";
 import { handleDbError } from "../utils/error_handler";
@@ -388,6 +388,11 @@ export const portalRouters = {
       const profData = aliasedTable(professores, "less_prof_data");
       const creatorData = aliasedTable(professores, "less_creator_data");
 
+      // Fluxo de dança: o aluno também enxerga as sessões das turmas em que está matriculado
+      const turmaRowsLess = await db.select({ turmaId: turmaAlunos.turmaId }).from(turmaAlunos)
+        .where(and(eq(turmaAlunos.organizationId, orgId), eq(turmaAlunos.studentId, studentId), eq(turmaAlunos.status, "ativa")));
+      const turmaIds = turmaRowsLess.map((r: any) => r.turmaId);
+
       const lessonRows = await db.select({
         id: lessons.id,
         organizationId: lessons.organizationId,
@@ -417,7 +422,12 @@ export const portalRouters = {
         .leftJoin(creatorUsers, eq(lessons.userId, creatorUsers.id))
         .leftJoin(profData, eq(students.professorId, profData.userId))
         .leftJoin(creatorData, eq(lessons.userId, creatorData.userId))
-        .where(and(eq(lessons.studentId, studentId), eq(lessons.organizationId, orgId)))
+        .where(and(
+          eq(lessons.organizationId, orgId),
+          turmaIds.length > 0
+            ? or(eq(lessons.studentId, studentId), inArray(lessons.turmaId, turmaIds))
+            : eq(lessons.studentId, studentId),
+        ))
         .orderBy(desc(lessons.scheduledAt))
         .limit(50);
 
@@ -909,6 +919,11 @@ export const portalRouters = {
       const profData = aliasedTable(professores, "sched_prof_data");
       const creatorData = aliasedTable(professores, "sched_creator_data");
 
+      // Fluxo de dança: agenda do aluno inclui as sessões das turmas dele
+      const turmaRowsSched = await db.select({ turmaId: turmaAlunos.turmaId }).from(turmaAlunos)
+        .where(and(eq(turmaAlunos.organizationId, orgId), eq(turmaAlunos.studentId, studentId), eq(turmaAlunos.status, "ativa")));
+      const turmaIds = turmaRowsSched.map((r: any) => r.turmaId);
+
       return db.select({
         id: lessons.id,
         title: lessons.title,
@@ -929,7 +944,12 @@ export const portalRouters = {
         .leftJoin(creatorUsers, eq(lessons.userId, creatorUsers.id))
         .leftJoin(profData, eq(students.professorId, profData.userId))
         .leftJoin(creatorData, eq(lessons.userId, creatorData.userId))
-        .where(and(eq(lessons.studentId, studentId), eq(lessons.organizationId, orgId)))
+        .where(and(
+          eq(lessons.organizationId, orgId),
+          turmaIds.length > 0
+            ? or(eq(lessons.studentId, studentId), inArray(lessons.turmaId, turmaIds))
+            : eq(lessons.studentId, studentId),
+        ))
         .orderBy(asc(lessons.scheduledAt))
         .limit(100);
     }),

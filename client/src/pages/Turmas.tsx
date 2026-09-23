@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import {
   Users, Plus, Search, Pencil, Trash2, Loader2, DoorOpen, Clock, X,
-  UserPlus, ArrowUpCircle, Star, GraduationCap,
+  UserPlus, ArrowUpCircle, Star, GraduationCap, CalendarPlus, ClipboardCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { GerarAulasModal } from "@/components/turmas/GerarAulasModal";
+import { TurmaAttendanceModal } from "@/components/turmas/TurmaAttendanceModal";
 
 const WEEKDAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
@@ -500,6 +502,8 @@ export default function Turmas() {
   const [editing, setEditing] = useState<TurmaRow | null>(null);
   const [detailsId, setDetailsId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<TurmaRow | null>(null);
+  const [gradeTurma, setGradeTurma] = useState<TurmaRow | null>(null);
+  const [chamadaTurma, setChamadaTurma] = useState<TurmaRow | null>(null);
 
   const { data: stats } = trpc.turmas.stats.useQuery();
   const { data: turmasList = [], isLoading } = trpc.turmas.list.useQuery({
@@ -641,6 +645,12 @@ export default function Turmas() {
                   <Button size="sm" variant="outline" className="flex-1" onClick={() => setDetailsId(turma.id)}>
                     <Users size={14} className="mr-1.5" /> Matrículas
                   </Button>
+                  <Button size="icon" variant="outline" onClick={() => setGradeTurma(turma)} title="Gerar aulas da grade">
+                    <CalendarPlus size={15} />
+                  </Button>
+                  <Button size="icon" variant="outline" onClick={() => setChamadaTurma(turma)} title="Fazer chamada de hoje">
+                    <ClipboardCheck size={15} />
+                  </Button>
                   <Button size="icon" variant="ghost" onClick={() => { setEditing(turma); setModalOpen(true); }} title="Editar">
                     <Pencil size={15} />
                   </Button>
@@ -659,6 +669,20 @@ export default function Turmas() {
       )}
 
       <TurmaDetalhes turmaId={detailsId} onClose={() => setDetailsId(null)} />
+
+      <GerarAulasModal
+        turmaId={gradeTurma?.id ?? null}
+        turmaName={gradeTurma?.name}
+        open={gradeTurma !== null}
+        onOpenChange={(o) => { if (!o) setGradeTurma(null); }}
+      />
+
+      <TurmaAttendanceModal
+        turmaId={chamadaTurma?.id ?? null}
+        turmaName={chamadaTurma?.name}
+        open={chamadaTurma !== null}
+        onOpenChange={(o) => { if (!o) setChamadaTurma(null); }}
+      />
 
       <AlertDialog open={deleting !== null} onOpenChange={(value) => { if (!value) setDeleting(null); }}>
         <AlertDialogContent>

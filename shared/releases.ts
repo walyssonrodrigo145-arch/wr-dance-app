@@ -26,6 +26,19 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.18.6",
+    date: "2026-09-18",
+    title: "Fluxo de dança: a grade da turma vira agenda (Fase 1)",
+    summary: "A turma agora gera as aulas do período com 1 clique — mesmo sem alunos — e a chamada sai direto da lista de matriculados.",
+    items: [
+      { type: "novo", title: "Gerar aulas da turma pela grade", description: "No card da turma, o botão de calendário gera as aulas do período (1, 3, 6 ou 12 meses) a partir dos dias e horário da grade. A prévia mostra quantas serão criadas, quantas já existem e conflitos de sala/professor antes de confirmar." },
+      { type: "novo", title: "Chamada da turma", description: "O botão de chamada abre a aula do dia com os alunos matriculados na turma: marque Presente, Ausente ou Justificado (ou 'Todos presentes') e salve — a presença fica registrada por aluno." },
+      { type: "novo", title: "Cancelar aulas futuras", description: "Ao mudar a grade ou encerrar um período, é possível cancelar as aulas futuras ainda agendadas da turma, preservando o histórico do que já aconteceu." },
+      { type: "melhoria", title: "Aluno vê as aulas das suas turmas no portal", description: "A agenda e o histórico do portal do aluno passam a incluir as sessões das turmas em que ele está matriculado, além das aulas particulares." },
+      { type: "melhoria", title: "Professor vê as aulas das suas turmas no painel", description: "As próximas aulas do professor agora incluem as sessões de turma que ele conduz." },
+    ],
+  },
+  {
     version: "2026.09.18.5",
     date: "2026-09-18",
     title: "Financeiro e integridade blindados: folha, bolsas, webhooks e exclusões",

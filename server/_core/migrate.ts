@@ -723,6 +723,26 @@ export async function runAutoMigrations() {
       { table: 'turma_alunos', sql: `CREATE INDEX IF NOT EXISTS "turma_alunos_student_idx" ON "turma_alunos" ("studentId")` },
       { table: 'turma_alunos', sql: `CREATE INDEX IF NOT EXISTS "turma_alunos_org_idx" ON "turma_alunos" ("organizationId", "status")` },
 
+      // ═══ FLUXO DE DANÇA: a grade da turma gera as aulas + presença por aluno ═══
+      { table: 'lessons', sql: `ALTER TABLE "lessons" ADD COLUMN IF NOT EXISTS "turmaId" integer` },
+      { table: 'lessons', sql: `CREATE INDEX IF NOT EXISTS "lessons_turma_idx" ON "lessons" ("turmaId", "scheduledAt")` },
+      { table: 'turmas', sql: `ALTER TABLE "turmas" ADD COLUMN IF NOT EXISTS "generatedUntil" date` },
+      { table: 'lesson_attendance', sql: `CREATE TABLE IF NOT EXISTS "lesson_attendance" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "organizationId" integer NOT NULL,
+        "lessonId" integer NOT NULL,
+        "studentId" integer NOT NULL,
+        "status" varchar(20) DEFAULT 'presente' NOT NULL,
+        "markedByUserId" integer,
+        "markedAt" timestamp DEFAULT now() NOT NULL,
+        "notes" text,
+        "createdAt" timestamp DEFAULT now() NOT NULL,
+        "updatedAt" timestamp DEFAULT now() NOT NULL
+      );` },
+      { table: 'lesson_attendance', sql: `CREATE UNIQUE INDEX IF NOT EXISTS "lesson_attendance_unique" ON "lesson_attendance" ("lessonId", "studentId")` },
+      { table: 'lesson_attendance', sql: `CREATE INDEX IF NOT EXISTS "lesson_attendance_lesson_idx" ON "lesson_attendance" ("lessonId")` },
+      { table: 'lesson_attendance', sql: `CREATE INDEX IF NOT EXISTS "lesson_attendance_student_idx" ON "lesson_attendance" ("studentId")` },
+
       // ═══ SAÚDE / CONDICIONAMENTO FÍSICO (DancePro) ═══
       { table: 'student_health_records', sql: `CREATE TABLE IF NOT EXISTS "student_health_records" (
         "id" serial PRIMARY KEY NOT NULL,

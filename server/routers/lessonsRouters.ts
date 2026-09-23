@@ -35,6 +35,7 @@ import { nanoid } from "nanoid";
 import { sdk } from "../_core/sdk";
 import { sendVerificationEmail, sendSimpleEmail } from "../_core/email";
 import { ENV } from "../_core/env";
+import { getTurmaAttendance, saveTurmaAttendance } from "../services/TurmaScheduleService";
 import { storagePut } from "../storage";
 import { superAdminRouter } from "../superAdminRouter";
 import { pairingActiveSessions } from "../automationJob";
@@ -299,8 +300,9 @@ export const lessonsRouters = {
           eq(lessons.status, 'agendada'), 
           professorStudentIds
             ? (professorStudentIds.length > 0
-                ? inArray(lessons.studentId, professorStudentIds)
-                : sql`false`
+                // Fluxo de dança: inclui as sessões das turmas do professor (sem aluno)
+                ? or(inArray(lessons.studentId, professorStudentIds), eq(lessons.userId, ctx.user.id))
+                : eq(lessons.userId, ctx.user.id)
               )
             : (isUserAdmin ? undefined : eq(lessons.userId, ctx.user.id)),
           gte(lessons.scheduledAt, new Date()),
@@ -1909,6 +1911,46 @@ export const lessonsRouters = {
       const orgId = ctx.user.organizationId!;
       await db.delete(extraLessonRequests).where(and(eq(extraLessonRequests.id, input.id), eq(extraLessonRequests.organizationId, orgId)));
       return { success: true };
+    }),
+  }),
+
+  // ─── Fluxo de dança: chamada por turma (sessões geradas pela grade) ────────
+  turmaAttendance: router({
+    get: protectedProcedure.input(z.object({ lessonId: z.number() })).query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+      const data = await getTurmaAttendance(db, orgId, input.lessonId);
+      if (!data) throw new TRPCError({ code: "NOT_FOUND", message: "Aula de turma não encontrada" });
+      const isAdmin = ctx.user.role === "admin" || ctx.user.openId === ENV.ownerOpenId;
+      if (!isAdmin && data.turma.professorId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Você não é o professor desta turma." });
+      }
+      return data;
+    }),
+
+    save: protectedProcedure.input(z.object({
+      lessonId: z.number(),
+      entries: z.array(z.object({
+        studentId: z.number(),
+        status: z.enum(["presente", "ausente", "justificado"]),
+      })).min(1).max(200),
+    })).mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+      const data = await getTurmaAttendance(db, orgId, input.lessonId);
+      if (!data) throw new TRPCError({ code: "NOT_FOUND", message: "Aula de turma não encontrada" });
+      const isAdmin = ctx.user.role === "admin" || ctx.user.openId === ENV.ownerOpenId;
+      if (!isAdmin && data.turma.professorId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Você não é o professor desta turma." });
+      }
+      try {
+        const res = await saveTurmaAttendance(db, orgId, input.lessonId, input.entries, ctx.user.id);
+        return { success: true, ...res };
+      } catch (err: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: err.message || "Não foi possível salvar a chamada." });
+      }
     }),
   }),
 

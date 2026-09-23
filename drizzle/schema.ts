@@ -207,6 +207,9 @@ export const lessons = pgTable("lessons", {
   rating: integer("rating"),
   instrumentId: integer("instrumentId"),
   studioRoomId: integer("studioRoomId"),
+  // Fluxo de dança: aula gerada pela GRADE da turma (sessão). studentId fica nulo
+  // e a presença por aluno vive em lesson_attendance.
+  turmaId: integer("turmaId"),
   recurringGroupId: varchar("recurringGroupId", { length: 100 }),
   // Tipo de recorrência da série (AgendarModal): "semanal" | "quinzenal" | "mensal30" | "mensal_fixo".
   // null = aula avulsa/única. Usado para destacar na agenda aulas que NÃO são semanais.
@@ -2802,6 +2805,8 @@ export const turmas = pgTable("turmas", {
   // ativa | pausada | encerrada
   status: varchar("status", { length: 30 }).default("ativa").notNull(),
   notes: text("notes"),
+  // Fim do período já gerado pela grade (evita regenerar/duplicar aulas).
+  generatedUntil: date("generatedUntil"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdateFn(() => new Date()).notNull(),
 }, (table) => [
@@ -2811,6 +2816,29 @@ export const turmas = pgTable("turmas", {
 
 export type Turma = typeof turmas.$inferSelect;
 export type InsertTurma = typeof turmas.$inferInsert;
+
+// ─── Presença por aluno em sessão de turma (fluxo de dança) ─────────────────
+// A grade gera a AULA (sessão, sem aluno). A presença é registrada aqui, por
+// aluno da turma, na chamada (professor no celular ou recepção no desktop).
+export const lessonAttendance = pgTable("lesson_attendance", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").notNull(),
+  lessonId: integer("lessonId").notNull(),
+  studentId: integer("studentId").notNull(),
+  status: varchar("status", { length: 20 }).default("presente").notNull(), // presente | ausente | justificado
+  markedByUserId: integer("markedByUserId"),
+  markedAt: timestamp("markedAt").defaultNow().notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdateFn(() => new Date()).notNull(),
+}, (table) => [
+  uniqueIndex("lesson_attendance_unique").on(table.lessonId, table.studentId),
+  index("lesson_attendance_lesson_idx").on(table.lessonId),
+  index("lesson_attendance_student_idx").on(table.studentId),
+]);
+
+export type LessonAttendance = typeof lessonAttendance.$inferSelect;
+export type InsertLessonAttendance = typeof lessonAttendance.$inferInsert;
 
 /** Matrícula em turma: ativa (vaga) ou espera (fila com posição). */
 export const turmaAlunos = pgTable("turma_alunos", {

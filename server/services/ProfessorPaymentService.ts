@@ -3,7 +3,7 @@
 // e professorPayments.calculateAll. Agora usa o TeacherPaymentEngine (mesmo
 // motor do Simulador). Sem regra configurada: cai no modelo LEGADO (paymentType
 // fixo/porcentagem do cadastro) com warning — nunca calcula errado em silêncio.
-import { and, eq, gte, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { lessons, professorPayments, students, paymentDues, teacherPaymentRules, teacherPaymentRuleConditions, teacherPaymentRuleCourses } from "../../drizzle/schema";
 import { computeTeacherPayment, pickRuleForMonth, type RuleLike, type ConditionLike, type CourseRuleLike, type LessonLike } from "./TeacherPaymentEngine";
 
@@ -102,6 +102,9 @@ export async function calculateAndSaveProfessorPayment(
       lessonCondition,
       gte(lessons.scheduledAt, startDate),
       lt(lessons.scheduledAt, endDate),
+      // Fluxo de dança: sessões de turma (geradas pela grade, sem aluno) não entram
+      // na folha enquanto a remuneração por turma não for modelada — evita pagamento indevido.
+      sql`${lessons.turmaId} IS NULL`,
     ));
 
   const studentById = new Map(profStudents.map((s) => [s.id, s]));
@@ -243,6 +246,8 @@ async function legacyCalculation(db: any, orgId: number, prof: any, month: numbe
     eq(lessons.status, "concluida"),
     gte(lessons.scheduledAt, startDate),
     lt(lessons.scheduledAt, endDate),
+    // Fluxo de dança: sessões de turma ficam fora do modelo legado (ver comentário acima).
+    sql`${lessons.turmaId} IS NULL`,
   ));
 
   const totalClasses = completedLessons.length;

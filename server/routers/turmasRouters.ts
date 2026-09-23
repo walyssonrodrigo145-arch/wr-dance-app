@@ -3,11 +3,12 @@
 // vaga (cancelamento/remoção), o primeiro da lista de espera sobe automaticamente.
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { and, asc, eq, ilike, sql } from "drizzle-orm";
+import { and, asc, eq, gte, ilike, lte, sql } from "drizzle-orm";
 import { protectedProcedure, studentProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { instruments, studentEnrollments, students, studioRooms, turmaAlunos, turmas, users } from "../../drizzle/schema";
+import { instruments, lessons, studentEnrollments, students, studioRooms, turmaAlunos, turmas, users } from "../../drizzle/schema";
 import { ENV } from "../_core/env";
+import { previewTurmaLessons, generateTurmaLessons, cancelFutureTurmaLessons, todayBR, addMonthsISO } from "../services/TurmaScheduleService";
 
 const TURMA_STATUS = ["ativa", "pausada", "encerrada"] as const;
 const LEVELS = ["iniciante", "intermediario", "avancado", "todas"] as const;
@@ -763,6 +764,93 @@ export const turmasRouters = {
           sql`${turmas.status} <> 'encerrada'`,
         ))
         .orderBy(asc(turmas.name));
+    }),
+
+    // ─── Fluxo de dança: a GRADE vira agenda ────────────────────────────────
+    /** Prévia da geração de aulas da grade (não grava nada). */
+    previewLessons: protectedProcedure.input(z.object({
+      id: z.number(),
+      months: z.number().int().min(1).max(12).default(3),
+    })).query(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+      const [turma] = await db.select().from(turmas)
+        .where(and(eq(turmas.id, input.id), eq(turmas.organizationId, orgId))).limit(1);
+      if (!turma) throw new TRPCError({ code: "NOT_FOUND", message: "Turma não encontrada" });
+      const fromISO = todayBR();
+      const preview = await previewTurmaLessons(db, turma as any, fromISO, addMonthsISO(fromISO, input.months));
+      return {
+        fromISO,
+        toISO: addMonthsISO(fromISO, input.months),
+        toCreate: preview.toCreate,
+        existing: preview.existing,
+        conflicts: preview.conflicts,
+        firstDates: preview.plans.filter((p) => !p.exists).slice(0, 8).map((p) => p.dateISO),
+        conflictDates: preview.plans.filter((p) => p.conflict).map((p) => `${p.dateISO} (${p.conflict === "sala" ? "sala" : "professor"})`).slice(0, 10),
+      };
+    }),
+
+    /** Gera as aulas da turma no período escolhido (sessões mesmo sem alunos). */
+    generateLessons: protectedProcedure.input(z.object({
+      id: z.number(),
+      months: z.number().int().min(1).max(12).default(3),
+    })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+      const [turma] = await db.select().from(turmas)
+        .where(and(eq(turmas.id, input.id), eq(turmas.organizationId, orgId))).limit(1);
+      if (!turma) throw new TRPCError({ code: "NOT_FOUND", message: "Turma não encontrada" });
+      if (turma.status === "encerrada") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Turma encerrada não gera aulas." });
+      }
+      try {
+        const fromISO = todayBR();
+        const res = await generateTurmaLessons(db, turma as any, fromISO, addMonthsISO(fromISO, input.months));
+        return { success: true, ...res };
+      } catch (err: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: err.message || "Não foi possível gerar as aulas." });
+      }
+    }),
+
+    /** Cancela as aulas futuras agendadas da turma (histórico preservado). */
+    cancelFutureLessons: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+      const [turma] = await db.select({ id: turmas.id }).from(turmas)
+        .where(and(eq(turmas.id, input.id), eq(turmas.organizationId, orgId))).limit(1);
+      if (!turma) throw new TRPCError({ code: "NOT_FOUND", message: "Turma não encontrada" });
+      const res = await cancelFutureTurmaLessons(db, orgId, input.id);
+      return { success: true, ...res };
+    }),
+
+    /** Sessão de HOJE da turma (para abrir a chamada direto do card). */
+    todayLesson: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+      const [turma] = await db.select().from(turmas)
+        .where(and(eq(turmas.id, input.id), eq(turmas.organizationId, orgId))).limit(1);
+      if (!turma) throw new TRPCError({ code: "NOT_FOUND", message: "Turma não encontrada" });
+      const today = todayBR();
+      const [lesson] = await db.select({
+        id: lessons.id,
+        title: lessons.title,
+        scheduledAt: lessons.scheduledAt,
+        status: lessons.status,
+      }).from(lessons).where(and(
+        eq(lessons.organizationId, orgId),
+        eq(lessons.turmaId, turma.id),
+        gte(lessons.scheduledAt, new Date(`${today}T00:00:00.000-03:00`)),
+        lte(lessons.scheduledAt, new Date(`${today}T23:59:59.999-03:00`)),
+      )).limit(1);
+      return { lesson: lesson ?? null };
     }),
   }),
 };
