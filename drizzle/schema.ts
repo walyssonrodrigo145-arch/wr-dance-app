@@ -2327,7 +2327,8 @@ export type InsertRepositionReason = typeof repositionReasons.$inferInsert;
 export const lessonRepositions = pgTable("lesson_repositions", {
   id: serial("id").primaryKey(),
   organizationId: integer("organizationId").notNull(),
-  // Aula original que gerou o crédito (unique = nunca 2 créditos para a mesma aula)
+  // Aula original que gerou o crédito (unique com studentId = nunca 2 créditos
+  // para o mesmo aluno na mesma aula — sessões de turma têm N alunos)
   lessonId: integer("lessonId").notNull(),
   studentId: integer("studentId").notNull(),
   // Professor efetivo do aluno (students.professorId) no momento da geração
@@ -2349,7 +2350,7 @@ export const lessonRepositions = pgTable("lesson_repositions", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdateFn(() => new Date()).notNull(),
 }, (table) => [
-  uniqueIndex("lesson_repositions_lesson_unique").on(table.lessonId),
+  uniqueIndex("lesson_repositions_lesson_student_unique").on(table.lessonId, table.studentId),
   index("lesson_repositions_org_idx").on(table.organizationId),
   index("lesson_repositions_student_idx").on(table.studentId),
   index("lesson_repositions_status_idx").on(table.status),

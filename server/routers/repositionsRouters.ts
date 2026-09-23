@@ -20,6 +20,7 @@ import {
   reminders,
   notifications,
   contracts,
+  turmaAlunos,
 } from "../../drizzle/schema";
 import { ENV } from "../_core/env";
 import { handleDbError } from "../utils/error_handler";
@@ -407,6 +408,8 @@ export const repositionsRouters = {
           lessonId: z.number(),
           reasonId: z.number(),
           notes: z.string().max(1000).optional(),
+          // Fluxo de dança: sessão de turma não tem aluno na aula — informe o aluno da turma.
+          studentId: z.number().optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
@@ -425,6 +428,7 @@ export const repositionsRouters = {
               scheduledAt: lessons.scheduledAt,
               duration: lessons.duration,
               studentId: lessons.studentId,
+              turmaId: lessons.turmaId,
               studentName: students.name,
               studentUserId: students.studentUserId,
               studentProfessorId: students.professorId,
@@ -443,18 +447,54 @@ export const repositionsRouters = {
           if (!lesson) {
             throw new TRPCError({ code: "FORBIDDEN", message: "Aula não encontrada ou você não tem permissão." });
           }
-          if (!lesson.studentId) {
+
+          // Sessão de turma (sem aluno): exige e valida o aluno da turma
+          const isTurmaSession = Boolean(lesson.turmaId) && !lesson.studentId;
+          let effectiveStudentId: number | null = lesson.studentId;
+          let studentInfo = {
+            name: lesson.studentName as string | null,
+            userId: lesson.studentUserId as number | null,
+            professorId: lesson.studentProfessorId as number | null,
+          };
+
+          if (isTurmaSession) {
+            if (!input.studentId) {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "Informe o aluno da turma para gerar o crédito de reposição." });
+            }
+            const [enrollment] = await db.select({ studentId: turmaAlunos.studentId }).from(turmaAlunos)
+              .where(and(
+                eq(turmaAlunos.organizationId, orgId),
+                eq(turmaAlunos.turmaId, lesson.turmaId!),
+                eq(turmaAlunos.studentId, input.studentId),
+                eq(turmaAlunos.status, "ativa"),
+              )).limit(1);
+            if (!enrollment) {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "Este aluno não está matriculado na turma desta aula." });
+            }
+            const [stu] = await db.select({
+              name: students.name,
+              studentUserId: students.studentUserId,
+              professorId: students.professorId,
+            }).from(students)
+              .where(and(eq(students.id, input.studentId), eq(students.organizationId, orgId))).limit(1);
+            if (!stu) throw new TRPCError({ code: "NOT_FOUND", message: "Aluno não encontrado." });
+            effectiveStudentId = input.studentId;
+            studentInfo = { name: stu.name, userId: stu.studentUserId, professorId: stu.professorId };
+          } else if (!lesson.studentId) {
             throw new TRPCError({ code: "BAD_REQUEST", message: "Aulas experimentais não geram reposição." });
           }
 
-          // 2. Uma aula = no máximo um crédito (regra anti-duplicação)
-          if (lesson.status === "a_repor") {
+          // 2. Um crédito por aula (e, em turma, por aluno) — regra anti-duplicação
+          if (!isTurmaSession && lesson.status === "a_repor") {
             throw new TRPCError({ code: "CONFLICT", message: "Esta aula já está marcada como Aula a Repor." });
           }
           const [existing] = await db
             .select({ id: lessonRepositions.id })
             .from(lessonRepositions)
-            .where(eq(lessonRepositions.lessonId, lesson.id))
+            .where(and(
+              eq(lessonRepositions.lessonId, lesson.id),
+              eq(lessonRepositions.studentId, effectiveStudentId!),
+            ))
             .limit(1);
           if (existing) {
             throw new TRPCError({ code: "CONFLICT", message: "Já existe um crédito de reposição para esta aula." });
@@ -483,8 +523,8 @@ export const repositionsRouters = {
             .values({
               organizationId: orgId,
               lessonId: lesson.id,
-              studentId: lesson.studentId,
-              professorId: lesson.studentProfessorId ?? null,
+              studentId: effectiveStudentId!,
+              professorId: studentInfo.professorId ?? null,
               reasonId: reason.id,
               notes: input.notes?.trim() || null,
               status: initial.status,
@@ -494,10 +534,13 @@ export const repositionsRouters = {
             .returning({ id: lessonRepositions.id });
 
           // 5. Marca a aula original como "Aula a Repor" e cancela lembretes pendentes
-          await db
-            .update(lessons)
-            .set({ status: "a_repor", updatedAt: now })
-            .where(and(eq(lessons.id, lesson.id), eq(lessons.organizationId, orgId)));
+          // (em sessão de turma a aula segue normal para os demais alunos — só o crédito nasce)
+          if (!isTurmaSession) {
+            await db
+              .update(lessons)
+              .set({ status: "a_repor", updatedAt: now })
+              .where(and(eq(lessons.id, lesson.id), eq(lessons.organizationId, orgId)));
+          }
           await db
             .update(reminders)
             .set({ status: "cancelado", cancelledAt: now, updatedAt: now })
@@ -513,7 +556,7 @@ export const repositionsRouters = {
 
           await notifyParticipants({
             organizationId: orgId,
-            studentUserId: lesson.studentUserId ?? null,
+            studentUserId: studentInfo.userId ?? null,
             professorUserId: null,
             title: "🔁 Aula convertida em reposição",
             content:

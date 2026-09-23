@@ -3,12 +3,13 @@
 // vaga (cancelamento/remoção), o primeiro da lista de espera sobe automaticamente.
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { and, asc, eq, gte, ilike, lte, sql } from "drizzle-orm";
+import { and, asc, eq, gte, ilike, inArray, lte, ne, sql } from "drizzle-orm";
 import { protectedProcedure, studentProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { instruments, lessons, studentEnrollments, students, studioRooms, turmaAlunos, turmas, users } from "../../drizzle/schema";
+import { instruments, lessons, paymentDues, schoolPlans, studentEnrollments, students, studioRooms, turmaAlunos, turmas, users } from "../../drizzle/schema";
 import { ENV } from "../_core/env";
 import { previewTurmaLessons, generateTurmaLessons, cancelFutureTurmaLessons, todayBR, addMonthsISO } from "../services/TurmaScheduleService";
+import { buildDueDateSeries } from "./helpers";
 
 const TURMA_STATUS = ["ativa", "pausada", "encerrada"] as const;
 const LEVELS = ["iniciante", "intermediario", "avancado", "todas"] as const;
@@ -704,6 +705,145 @@ export const turmasRouters = {
       return { success: true, waitlisted: !temVaga, turmaName: turma.name };
     }),
 
+    /** Todas as turmas do aluno (ativas ou em espera) — cadastro multi-turma. */
+    studentTurmas: protectedProcedure.input(z.object({ studentId: z.number() })).query(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) return [];
+      const orgId = ctx.user.organizationId!;
+      return db.select({
+        id: turmaAlunos.id,
+        turmaId: turmaAlunos.turmaId,
+        status: turmaAlunos.status,
+        position: turmaAlunos.position,
+        turmaName: turmas.name,
+        turmaStatus: turmas.status,
+        modalidadeId: turmas.modalidadeId,
+        timeStr: turmas.timeStr,
+        weekdays: turmas.weekdays,
+      })
+        .from(turmaAlunos)
+        .innerJoin(turmas, eq(turmas.id, turmaAlunos.turmaId))
+        .where(and(
+          eq(turmaAlunos.studentId, input.studentId),
+          eq(turmaAlunos.organizationId, orgId),
+          sql`${turmaAlunos.status} <> 'cancelada'`,
+        ))
+        .orderBy(asc(turmas.name));
+    }),
+
+    /**
+     * Fluxo de dança (multi-turma): sincroniza TODAS as turmas do aluno de uma vez.
+     * - turmas fora da lista são canceladas (libera vaga + promove a fila);
+     * - turmas novas entram como ativa (com vaga) ou espera (lotada);
+     * - conflito de horário entre as turmas resultantes bloqueia a operação (rollback).
+     */
+    setStudentTurmas: protectedProcedure.input(z.object({
+      studentId: z.number(),
+      turmaIds: z.array(z.number()).max(10),
+    })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+
+      const [student] = await db.select({ id: students.id }).from(students)
+        .where(and(eq(students.id, input.studentId), eq(students.organizationId, orgId))).limit(1);
+      if (!student) throw new TRPCError({ code: "NOT_FOUND", message: "Aluno não encontrado nesta escola." });
+
+      const target = Array.from(new Set(input.turmaIds));
+      const currentRows = await db.select({
+        id: turmaAlunos.id,
+        turmaId: turmaAlunos.turmaId,
+        status: turmaAlunos.status,
+      }).from(turmaAlunos)
+        .where(and(
+          eq(turmaAlunos.studentId, input.studentId),
+          eq(turmaAlunos.organizationId, orgId),
+          sql`${turmaAlunos.status} <> 'cancelada'`,
+        ));
+
+      const currentIds = new Set(currentRows.map((r) => r.turmaId));
+      const toCancel = currentRows.filter((r) => !target.includes(r.turmaId));
+      const toAdd = target.filter((id) => !currentIds.has(id));
+
+      // Valida turmas de destino (mesma escola, não encerradas)
+      let targetTurmas: any[] = [];
+      if (toAdd.length > 0) {
+        targetTurmas = await db.select({
+          id: turmas.id,
+          name: turmas.name,
+          capacity: turmas.capacity,
+          status: turmas.status,
+          weekdays: turmas.weekdays,
+          timeStr: turmas.timeStr,
+          durationMinutes: turmas.durationMinutes,
+        }).from(turmas)
+          .where(and(eq(turmas.organizationId, orgId), inArray(turmas.id, toAdd)));
+        if (targetTurmas.length !== toAdd.length) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Uma ou mais turmas não existem nesta escola." });
+        }
+        const encerrada = targetTurmas.find((t) => t.status === "encerrada");
+        if (encerrada) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: `A turma "${encerrada.name}" está encerrada e não aceita matrículas.` });
+        }
+      }
+
+      const added: string[] = [];
+      const removed: string[] = [];
+      const waitlisted: string[] = [];
+
+      await db.transaction(async (tx) => {
+        // 1) Sai das turmas que não estão mais selecionadas
+        for (const row of toCancel) {
+          await releaseEnrollmentSlot(tx, row, orgId);
+        }
+        // 2) Entra nas novas (conflito com o que permaneceu + com as já aceitas)
+        for (const turma of targetTurmas) {
+          const conflict = await findStudentScheduleConflict(
+            tx, orgId, input.studentId, (turma.weekdays as number[] | null) ?? [], turma.timeStr, turma.durationMinutes,
+          );
+          if (conflict) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: conflict });
+          }
+
+          const [ocupadas] = await tx.select({ count: sql<number>`CAST(COUNT(*) AS INT)` })
+            .from(turmaAlunos)
+            .where(and(eq(turmaAlunos.turmaId, turma.id), eq(turmaAlunos.status, "ativa")));
+          const temVaga = (Number(ocupadas?.count) || 0) < turma.capacity;
+
+          const [{ maxPosition }] = await tx.select({ maxPosition: sql<number>`COALESCE(MAX(${turmaAlunos.position}), 0)` })
+            .from(turmaAlunos)
+            .where(and(eq(turmaAlunos.turmaId, turma.id), eq(turmaAlunos.status, "espera")));
+
+          const [reusable] = await tx.select({ id: turmaAlunos.id }).from(turmaAlunos)
+            .where(and(eq(turmaAlunos.turmaId, turma.id), eq(turmaAlunos.studentId, input.studentId)))
+            .limit(1);
+
+          const values = {
+            organizationId: orgId,
+            turmaId: turma.id,
+            studentId: input.studentId,
+            status: temVaga ? ("ativa" as const) : ("espera" as const),
+            position: temVaga ? 0 : (Number(maxPosition) || 0) + 1,
+            enrolledAt: new Date(),
+            updatedAt: new Date(),
+          };
+
+          if (reusable) {
+            await tx.update(turmaAlunos).set(values).where(eq(turmaAlunos.id, reusable.id));
+          } else {
+            await tx.insert(turmaAlunos).values(values);
+          }
+
+          added.push(turma.name);
+          if (!temVaga) waitlisted.push(turma.name);
+        }
+      });
+
+      return { success: true, added, removed: toCancel.length, waitlisted };
+    }),
+
     searchAlunos: protectedProcedure.input(z.object({
       q: z.string().max(120),
       turmaId: z.number().optional(),
@@ -851,6 +991,166 @@ export const turmasRouters = {
         lte(lessons.scheduledAt, new Date(`${today}T23:59:59.999-03:00`)),
       )).limit(1);
       return { lesson: lesson ?? null };
+    }),
+  }),
+
+  // ─── Rematrícula por período (fluxo de dança) ──────────────────────────────
+  renewals: router({
+    /** Alunos por turma com os dados do ciclo (para montar a rematrícula). */
+    list: protectedProcedure.input(z.object({ turmaId: z.number().optional() })).query(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) return [];
+      const orgId = ctx.user.organizationId!;
+      return db.select({
+        enrollmentId: turmaAlunos.id,
+        turmaId: turmas.id,
+        turmaName: turmas.name,
+        studentId: students.id,
+        studentName: students.name,
+        studentStatus: students.status,
+        monthlyFee: students.monthlyFee,
+        dueDay: students.dueDay,
+        billingPeriodicity: students.billingPeriodicity,
+        planMonths: schoolPlans.duracaoMeses,
+        generatedUntil: turmas.generatedUntil,
+      })
+        .from(turmaAlunos)
+        .innerJoin(turmas, eq(turmas.id, turmaAlunos.turmaId))
+        .innerJoin(students, eq(students.id, turmaAlunos.studentId))
+        .leftJoin(schoolPlans, eq(schoolPlans.id, students.schoolPlanId))
+        .where(and(
+          eq(turmaAlunos.organizationId, orgId),
+          eq(turmaAlunos.status, "ativa"),
+          eq(turmas.status, "ativa"),
+          input.turmaId ? eq(turmas.id, input.turmaId) : undefined,
+        ))
+        .orderBy(asc(turmas.name), asc(students.name));
+    }),
+
+    /**
+     * Renova o ciclo: gera as mensalidades do novo período (idempotente por
+     * aluno/mês/ano) e as aulas da grade das turmas envolvidas. Opcionalmente
+     * desativa quem não renovou (sai da grade, libera vaga e promove a fila).
+     */
+    run: protectedProcedure.input(z.object({
+      startMonth: z.number().min(1).max(12),
+      startYear: z.number().min(2020).max(2100),
+      monthsCount: z.number().int().min(1).max(12).default(6),
+      studentIds: z.array(z.number()).min(1).max(500),
+      turmaIds: z.array(z.number()).max(100).optional(),
+      deactivateUnselected: z.boolean().default(false),
+    })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+      const studentIds = Array.from(new Set(input.studentIds));
+
+      const selected = await db.select({
+        id: students.id,
+        name: students.name,
+        monthlyFee: students.monthlyFee,
+        dueDay: students.dueDay,
+        billingPeriodicity: students.billingPeriodicity,
+      }).from(students).where(and(eq(students.organizationId, orgId), inArray(students.id, studentIds)));
+      if (selected.length !== studentIds.length) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Um ou mais alunos não pertencem a esta escola." });
+      }
+
+      const enrollments = await db.select({ studentId: turmaAlunos.studentId, turmaId: turmaAlunos.turmaId })
+        .from(turmaAlunos)
+        .where(and(
+          eq(turmaAlunos.organizationId, orgId),
+          eq(turmaAlunos.status, "ativa"),
+          inArray(turmaAlunos.studentId, studentIds),
+        ));
+      let turmaIds = input.turmaIds ?? [];
+      if (turmaIds.length === 0) turmaIds = Array.from(new Set(enrollments.map((e) => e.turmaId)));
+
+      const fromISO = todayBR();
+      const toISOStr = addMonthsISO(fromISO, input.monthsCount);
+
+      // 1) Mensalidades do novo ciclo (idempotente por aluno/mês/ano)
+      let duesCreated = 0;
+      for (const s of selected) {
+        const periodicity = s.billingPeriodicity || "mensal";
+        const series = buildDueDateSeries(input.startMonth, input.startYear, input.monthsCount, s.dueDay || 10, periodicity);
+        const existingRows = await db.select({ month: paymentDues.month, year: paymentDues.year }).from(paymentDues)
+          .where(and(eq(paymentDues.organizationId, orgId), eq(paymentDues.studentId, s.id)));
+        const existingSet = new Set(existingRows.map((r) => `${r.month}_${r.year}`));
+        const rows = series
+          .filter((d) => !existingSet.has(`${d.month}_${d.year}`))
+          .map((d) => ({
+            organizationId: orgId,
+            userId: ctx.user.id,
+            studentId: s.id,
+            amount: Number(s.monthlyFee || 0).toFixed(2),
+            dueDate: d.dueDateISO,
+            month: d.month,
+            year: d.year,
+            status: "pendente" as const,
+            notes: "Rematrícula — novo ciclo",
+            billingPeriodicity: periodicity,
+          }));
+        if (rows.length > 0) {
+          await db.insert(paymentDues).values(rows);
+          duesCreated += rows.length;
+        }
+      }
+
+      // 2) Aulas do novo ciclo para as turmas (idempotente por sessão existente)
+      let lessonsCreated = 0;
+      let lessonsExisting = 0;
+      for (const tid of turmaIds) {
+        const [turma] = await db.select().from(turmas)
+          .where(and(eq(turmas.id, tid), eq(turmas.organizationId, orgId))).limit(1);
+        if (!turma || turma.status !== "ativa") continue;
+        try {
+          const res = await generateTurmaLessons(db, turma as any, fromISO, toISOStr);
+          lessonsCreated += res.created;
+          lessonsExisting += res.existing;
+        } catch {
+          // Turma sem professor/grade: segue com as demais
+        }
+      }
+
+      // 3) Quem não renovou sai da grade (opcional)
+      let deactivated = 0;
+      if (input.deactivateUnselected && turmaIds.length > 0) {
+        const selectedSet = new Set(studentIds);
+        const scopeEnrollments = await db.select({
+          id: turmaAlunos.id,
+          turmaId: turmaAlunos.turmaId,
+          status: turmaAlunos.status,
+          studentId: turmaAlunos.studentId,
+        }).from(turmaAlunos)
+          .where(and(
+            eq(turmaAlunos.organizationId, orgId),
+            eq(turmaAlunos.status, "ativa"),
+            inArray(turmaAlunos.turmaId, turmaIds),
+          ));
+        const toDeactivate = scopeEnrollments.filter((e) => !selectedSet.has(e.studentId));
+        const studentIdsToDeactivate = Array.from(new Set(toDeactivate.map((e) => e.studentId)));
+        for (const e of toDeactivate) {
+          await releaseEnrollmentSlot(db, { id: e.id, turmaId: e.turmaId, status: e.status }, orgId);
+        }
+        if (studentIdsToDeactivate.length > 0) {
+          await db.update(students).set({ status: "inativo" })
+            .where(and(eq(students.organizationId, orgId), inArray(students.id, studentIdsToDeactivate)));
+          deactivated = studentIdsToDeactivate.length;
+        }
+      }
+
+      return {
+        success: true,
+        renewed: selected.length,
+        duesCreated,
+        lessonsCreated,
+        lessonsExisting,
+        deactivated,
+        turmas: turmaIds.length,
+      };
     }),
   }),
 };

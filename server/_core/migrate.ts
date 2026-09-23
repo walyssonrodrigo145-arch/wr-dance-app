@@ -451,7 +451,8 @@ export async function runAutoMigrations() {
         "createdAt" timestamp DEFAULT now() NOT NULL,
         "updatedAt" timestamp DEFAULT now() NOT NULL
       );` },
-      { table: 'lesson_repositions', sql: `CREATE UNIQUE INDEX IF NOT EXISTS "lesson_repositions_lesson_unique" ON "lesson_repositions" ("lessonId")` },
+      { table: 'lesson_repositions', sql: `DROP INDEX IF EXISTS "lesson_repositions_lesson_unique"` },
+      { table: 'lesson_repositions', sql: `CREATE UNIQUE INDEX IF NOT EXISTS "lesson_repositions_lesson_student_unique" ON "lesson_repositions" ("lessonId", "studentId")` },
       { table: 'lesson_repositions', sql: `CREATE INDEX IF NOT EXISTS "lesson_repositions_org_idx" ON "lesson_repositions" ("organizationId")` },
       { table: 'lesson_repositions', sql: `CREATE INDEX IF NOT EXISTS "lesson_repositions_student_idx" ON "lesson_repositions" ("studentId")` },
       { table: 'lesson_repositions', sql: `CREATE INDEX IF NOT EXISTS "lesson_repositions_status_idx" ON "lesson_repositions" ("status")` },

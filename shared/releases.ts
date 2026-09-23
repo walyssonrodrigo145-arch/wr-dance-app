@@ -26,6 +26,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.18.7",
+    date: "2026-09-18",
+    title: "Fluxo de dança — Fase 2: multi-turma, rematrícula e reposição de turma",
+    summary: "O aluno agora entra em várias turmas pelo cadastro, a escola renova o período em lote e a falta em turma gera crédito de reposição por aluno.",
+    items: [
+      { type: "novo", title: "Aluno em várias turmas no cadastro", description: "No cadastro/edição, selecione quantas turmas quiser (ex.: Ballet + Jazz) com vagas em tempo real; sem vaga entra na lista de espera e choque de horário é avisado antes de salvar (bloqueado no servidor)." },
+      { type: "novo", title: "Rematrícula do período", description: "Botão Rematrícula em Turmas & Vagas: escolha o período (3/6/12 meses), marque quem renova e o sistema gera as mensalidades do novo ciclo e as aulas da grade. Opcionalmente, quem não renovar é desativado e libera a vaga para a fila." },
+      { type: "novo", title: "Reposição de falta em turma", description: "A falta em aula de turma gera crédito de reposição por aluno (com o motivo da escola), sem afetar os demais alunos da turma." },
+      { type: "melhoria", title: "Modalidade agora é filtro, não eixo", description: "A lista de turmas aparece mesmo sem modalidade escolhida e turmas de outras modalidades já matriculadas continuam mantidas." },
+    ],
+  },
+  {
     version: "2026.09.18.6",
     date: "2026-09-18",
     title: "Fluxo de dança: a grade da turma vira agenda (Fase 1)",

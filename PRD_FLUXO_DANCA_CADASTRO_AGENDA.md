@@ -401,8 +401,9 @@ Geração, propagação de grade, chamada e rematrícula registram log com conta
 
 ## 16. Suposições e Perguntas Abertas
 
-> **Status de implementação (18/09/2026):** ✅ **Fase 1 concluída e publicada** — `lessons.turmaId` + `lesson_attendance` + `turmas.generatedUntil` (migração idempotente); `TurmaScheduleService` (prévia/geração/cancelamento/propagação de cancelamento + chamada); endpoints `turmas.previewLessons|generateLessons|cancelFutureLessons|todayLesson` e `turmaAttendance.get|save`; UI no card da turma (Gerar aulas + Chamada); portal do aluno e próximas aulas do professor já enxergam sessões de turma; folha mantém sessões fora do cálculo até a fase de remuneração por turma.
-> **Próximas fases:** 2 (cadastro multi-turma + rematrícula + reposição de turma), 3 (agenda modo Grade + propagação de mudança de grade com preview), 4 (QR exibindo turma + termos), 5 (testes dedicados).
+> **Status de implementação (18/09/2026):** ✅ **Fase 1 concluída e publicada** — `lessons.turmaId` + `lesson_attendance` + `turmas.generatedUntil` (migração idempotente); `TurmaScheduleService` (prévia/geração/cancelamento + chamada); endpoints `turmas.previewLessons|generateLessons|cancelFutureLessons|todayLesson` e `turmaAttendance.get|save`; UI no card da turma (Gerar aulas + Chamada); portal do aluno e próximas aulas do professor já enxergam sessões de turma; folha mantém sessões fora do cálculo até a fase de remuneração por turma.
+> ✅ **Fase 2 concluída e publicada** — `turmas.studentTurmas` + `turmas.setStudentTurmas` (multi-turma com vaga/fila/conflito em transação) e cadastro multi-turma no NovoAluno; `renewals.list|apply` (mensalidades do ciclo + aulas da grade + desativação de não renovados) com modal de Rematrícula; reposição de falta em turma (`createFromLesson` aceita sessão + aluno, índice único `(lessonId, studentId)`).
+> **Próximas fases:** 3 (agenda modo Grade + propagação de mudança de grade com preview), 4 (QR exibindo turma + termos), 5 (testes dedicados).
 
 ### Decisões já validadas
 Ver seção 0 — as respostas 1, 2, 3, 5 e 6 estão fechadas. A pergunta 4 (calendário de feriados) segue em aberto e fora do escopo desta fase.

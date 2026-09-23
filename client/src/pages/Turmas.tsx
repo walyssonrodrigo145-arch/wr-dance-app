@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import {
   Users, Plus, Search, Pencil, Trash2, Loader2, DoorOpen, Clock, X,
-  UserPlus, ArrowUpCircle, Star, GraduationCap, CalendarPlus, ClipboardCheck,
+  UserPlus, ArrowUpCircle, Star, GraduationCap, CalendarPlus, ClipboardCheck, RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { GerarAulasModal } from "@/components/turmas/GerarAulasModal";
 import { TurmaAttendanceModal } from "@/components/turmas/TurmaAttendanceModal";
+import { RenewalModal } from "@/components/turmas/RenewalModal";
 
 const WEEKDAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
@@ -504,6 +505,7 @@ export default function Turmas() {
   const [deleting, setDeleting] = useState<TurmaRow | null>(null);
   const [gradeTurma, setGradeTurma] = useState<TurmaRow | null>(null);
   const [chamadaTurma, setChamadaTurma] = useState<TurmaRow | null>(null);
+  const [renewalOpen, setRenewalOpen] = useState(false);
 
   const { data: stats } = trpc.turmas.stats.useQuery();
   const { data: turmasList = [], isLoading } = trpc.turmas.list.useQuery({
@@ -541,9 +543,14 @@ export default function Turmas() {
             Turmas fixas com capacidade, grade semanal e lista de espera com promoção automática.
           </p>
         </div>
-        <Button onClick={() => { setEditing(null); setModalOpen(true); }} className="bg-indigo-600 hover:bg-indigo-700">
-          <Plus size={16} className="mr-2" /> Nova turma
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setRenewalOpen(true)} className="border-indigo-500/30 text-indigo-600 hover:bg-indigo-500/10">
+            <RefreshCw size={16} className="mr-2" /> Rematrícula
+          </Button>
+          <Button onClick={() => { setEditing(null); setModalOpen(true); }} className="bg-indigo-600 hover:bg-indigo-700">
+            <Plus size={16} className="mr-2" /> Nova turma
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -683,6 +690,8 @@ export default function Turmas() {
         open={chamadaTurma !== null}
         onOpenChange={(o) => { if (!o) setChamadaTurma(null); }}
       />
+
+      <RenewalModal open={renewalOpen} onOpenChange={setRenewalOpen} />
 
       <AlertDialog open={deleting !== null} onOpenChange={(value) => { if (!value) setDeleting(null); }}>
         <AlertDialogContent>

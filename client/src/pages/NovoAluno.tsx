@@ -244,7 +244,6 @@ export default function NovoAluno() {
     generateMonthly: false,
     monthsCount: 3,
     schoolPlanId: null as number | null,
-    turmaId: "",
     matriculas: [] as MatriculaForm[],
   });
 
@@ -282,7 +281,6 @@ export default function NovoAluno() {
         generateMonthly: false,
         monthsCount: 3,
         schoolPlanId: (studentData as any).schoolPlanId ?? null,
-        turmaId: "",
         matriculas: [],
       });
 
@@ -367,61 +365,74 @@ export default function NovoAluno() {
   const { data: schoolPlans = [] } = trpc.schoolPlans.list.useQuery({ somenteAtivos: true });
   const selectedPlan = (schoolPlans as any[]).find((p) => p.id === form.schoolPlanId) ?? null;
 
-  // ─── TURMA: matrícula por modalidade (vagas + lista de espera) ────────────────
+  // ─── TURMAS: matrícula multi-turma (vagas + lista de espera + conflito) ──────
   const { data: turmasList = [] } = trpc.turmas.list.useQuery({ status: "ativa" });
-  const { data: currentEnrollment } = trpc.turmas.studentEnrollment.useQuery(
+  const { data: currentTurmas = [] } = trpc.turmas.studentTurmas.useQuery(
     { studentId: studentId! },
     { enabled: isEditMode && !!studentId }
   );
+  const [selectedTurmaIds, setSelectedTurmaIds] = useState<number[]>([]);
+  const turmasTouchedRef = useRef(false);
 
   const turmasDaModalidade = useMemo(() => {
-    if (!form.instrumentId) return [];
-    return (turmasList as any[]).filter(
-      (turma) => String(turma.modalidadeId) === form.instrumentId && turma.status === "ativa"
-    );
+    const ativas = (turmasList as any[]).filter((turma) => turma.status === "ativa");
+    if (!form.instrumentId) return ativas;
+    return ativas.filter((turma) => String(turma.modalidadeId) === form.instrumentId);
   }, [turmasList, form.instrumentId]);
 
-  // Preenche a turma atual ao editar (matrícula ativa ou em espera) — só se o
-  // usuário ainda não escolheu manualmente (evita sobrescrever seleção rápida)
+  // Preenche as turmas atuais ao editar (só se o usuário ainda não mexeu na seleção)
   useEffect(() => {
-    if (isEditMode && currentEnrollment) {
-      setForm((prev) => (prev.turmaId ? prev : { ...prev, turmaId: String(currentEnrollment.turmaId) }));
+    if (isEditMode && !turmasTouchedRef.current && currentTurmas.length > 0) {
+      setSelectedTurmaIds(currentTurmas.map((t: any) => t.turmaId));
     }
-  }, [isEditMode, currentEnrollment]);
+  }, [isEditMode, currentTurmas]);
 
-  // Ao trocar a modalidade, limpa a turma selecionada que não pertence à nova
-  // (inclusive quando a nova modalidade não tem turma ativa — evita matrícula cruzada)
-  const prevInstrumentRef = useRef(form.instrumentId);
-  useEffect(() => {
-    if (prevInstrumentRef.current !== form.instrumentId) {
-      prevInstrumentRef.current = form.instrumentId;
-      if (form.turmaId && !turmasDaModalidade.some((turma: any) => String(turma.id) === form.turmaId)) {
-        setForm((prev) => ({ ...prev, turmaId: "" }));
+  const toggleTurma = (turmaId: number) => {
+    turmasTouchedRef.current = true;
+    setSelectedTurmaIds((prev) =>
+      prev.includes(turmaId) ? prev.filter((id) => id !== turmaId) : [...prev, turmaId]
+    );
+  };
+
+  const clearTurmas = () => {
+    turmasTouchedRef.current = true;
+    setSelectedTurmaIds([]);
+  };
+
+  // Aviso de conflito entre as turmas selecionadas (o servidor bloqueia no salvar)
+  const turmaConflicts = useMemo(() => {
+    const selected = (turmasList as any[]).filter((t) => selectedTurmaIds.includes(t.id));
+    const out: string[] = [];
+    for (let i = 0; i < selected.length; i++) {
+      for (let j = i + 1; j < selected.length; j++) {
+        const a = selected[i];
+        const b = selected[j];
+        const sameTime = (a.timeStr || "") === (b.timeStr || "");
+        const sharedDay = (a.weekdays || []).some((d: number) => (b.weekdays || []).includes(d));
+        if (sameTime && sharedDay) out.push(`"${a.name}" e "${b.name}"`);
       }
     }
-  }, [form.instrumentId, form.turmaId, turmasDaModalidade]);
+    return out;
+  }, [turmasList, selectedTurmaIds]);
 
-  const setStudentTurmaMutation = trpc.turmas.setStudentTurma.useMutation();
+  const setStudentTurmasMutation = trpc.turmas.setStudentTurmas.useMutation();
 
-  /** Sincroniza a turma escolhida no formulário com a matrícula real do aluno. */
-  const syncStudentTurma = async (id: number) => {
-    const desired = form.turmaId ? Number(form.turmaId) : null;
-    const current = currentEnrollment?.turmaId ?? null;
-    if (desired === current) return;
-    if (desired === null && !isEditMode) return;
+  /** Sincroniza TODAS as turmas escolhidas no formulário com a matrícula real do aluno. */
+  const syncStudentTurmas = async (id: number) => {
+    const currentIds = currentTurmas.map((t: any) => t.turmaId).sort((a: number, b: number) => a - b);
+    const desired = [...selectedTurmaIds].sort((a, b) => a - b);
+    if (JSON.stringify(currentIds) === JSON.stringify(desired)) return;
     try {
-      const result = await setStudentTurmaMutation.mutateAsync({ studentId: id, turmaId: desired });
-      if (result.waitlisted) {
-        toast.info(`Turma "${result.turmaName}" lotada — aluno entrou na lista de espera.`);
-      } else if (desired) {
-        toast.success(`Aluno matriculado na turma "${result.turmaName}"!`);
-      } else {
-        toast.success("Aluno removido da turma.");
+      const result = await setStudentTurmasMutation.mutateAsync({ studentId: id, turmaIds: desired });
+      if (result.waitlisted.length > 0) {
+        toast.info(`Sem vaga em: ${result.waitlisted.join(", ")} — aluno entrou na lista de espera.`);
       }
-      utils.turmas.studentEnrollment.invalidate({ studentId: id });
+      if (result.added.length > 0) toast.success(`Aluno matriculado em ${result.added.length} turma(s)!`);
+      if (result.removed > 0) toast.success(`Aluno removido de ${result.removed} turma(s).`);
+      utils.turmas.studentTurmas.invalidate({ studentId: id });
       utils.turmas.list.invalidate();
     } catch (error: any) {
-      toast.error("Aluno salvo, mas houve erro ao definir a turma: " + (error?.message || "tente novamente."));
+      toast.error("Aluno salvo, mas houve erro nas turmas: " + (error?.message || "tente novamente."));
     }
   };
 
@@ -548,7 +559,7 @@ export default function NovoAluno() {
         });
       }
       if (data.studentId) {
-        await syncStudentTurma(data.studentId);
+        await syncStudentTurmas(data.studentId);
         await syncStudentEnrollments(data.studentId);
       }
       setLocation("/alunos");
@@ -580,7 +591,7 @@ export default function NovoAluno() {
       toast.success("Aluno atualizado com sucesso!");
       utils.students.list.invalidate();
       utils.students.getForEdit.invalidate({ id: studentId! });
-      await syncStudentTurma(studentId!);
+      await syncStudentTurmas(studentId!);
       await syncStudentEnrollments(studentId!);
       setLocation("/alunos");
     },
@@ -1890,44 +1901,47 @@ export default function NovoAluno() {
                   </div>
                 )}
 
-                {/* TURMA: filtrada pela modalidade escolhida (vagas + lista de espera) */}
+                {/* TURMAS: multi-seleção (vagas + lista de espera + conflito) */}
                 <div className="mt-6 p-4 bg-violet-500/5 backdrop-blur-sm rounded-xl border border-violet-500/20 space-y-3">
                   <div>
-                    <p className="text-sm font-bold text-foreground flex items-center gap-1.5"><Users size={15} className="text-violet-600 dark:text-violet-400" /> Turma</p>
+                    <p className="text-sm font-bold text-foreground flex items-center gap-1.5"><Users size={15} className="text-violet-600 dark:text-violet-400" /> Turmas</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Mostra apenas as turmas da modalidade escolhida. Se estiver lotada, o aluno entra automaticamente na lista de espera.
+                      O aluno pode estar em várias turmas (ex.: Ballet + Jazz). Sem vaga, entra na lista de espera. A modalidade filtra a lista.
                     </p>
                   </div>
 
-                  {isEditMode && currentEnrollment?.status === "espera" && (
+                  {isEditMode && currentTurmas.some((t: any) => t.status === "espera") && (
                     <p className="text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
-                      Aluno está na lista de espera da turma "{currentEnrollment.turmaName}" (posição {currentEnrollment.position}).
+                      Lista de espera: {currentTurmas.filter((t: any) => t.status === "espera").map((t: any) => `${t.turmaName} (posição ${t.position})`).join(", ")}.
                     </p>
                   )}
 
-                  {isEditMode && currentEnrollment && form.turmaId &&
-                    !turmasDaModalidade.some((turma: any) => String(turma.id) === form.turmaId) && (
-                    <p className="text-[11px] font-bold text-muted-foreground bg-muted/40 border border-border rounded-xl px-3 py-2">
-                      Turma atual: "{currentEnrollment.turmaName}" (não aparece no filtro da modalidade principal). Ao salvar, a matrícula é mantida — troque a modalidade ou escolha "Sem turma" para removê-la.
+                  {turmaConflicts.length > 0 && (
+                    <p className="text-[11px] font-bold text-rose-600 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2">
+                      Conflito de horário: {turmaConflicts.join(", ")}. Ajuste antes de salvar.
                     </p>
                   )}
 
-                  {!form.instrumentId ? (
-                    <p className="text-xs font-bold text-muted-foreground bg-muted/40 border border-border rounded-xl px-3 py-2">
-                      Selecione a modalidade principal para ver as turmas disponíveis.
+                  {selectedTurmaIds.length > 0 && (
+                    <p className="text-[10px] font-black uppercase tracking-widest text-violet-600 dark:text-violet-400">
+                      {selectedTurmaIds.length} turma(s) selecionada(s)
                     </p>
-                  ) : turmasDaModalidade.length === 0 ? (
+                  )}
+
+                  {turmasDaModalidade.length === 0 ? (
                     <p className="text-xs font-bold text-muted-foreground bg-muted/40 border border-border rounded-xl px-3 py-2">
-                      Nenhuma turma ativa nesta modalidade. Crie em "Turmas &amp; Vagas".
+                      {form.instrumentId
+                        ? "Nenhuma turma ativa nesta modalidade. Crie em \"Turmas & Vagas\"."
+                        : "Nenhuma turma ativa. Crie em \"Turmas & Vagas\"."}
                     </p>
                   ) : (
                     <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
                       <button
                         type="button"
-                        onClick={() => setForm(prev => ({ ...prev, turmaId: "" }))}
+                        onClick={clearTurmas}
                         className={cn(
                           "flex-none w-40 p-3.5 rounded-2xl border text-left transition-all duration-300 active:scale-[0.98] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-violet-500/10",
-                          !form.turmaId ? "bg-primary/10 border-primary/40 shadow-lg" : "bg-card border-border hover:border-primary/30"
+                          selectedTurmaIds.length === 0 ? "bg-primary/10 border-primary/40 shadow-lg" : "bg-card border-border hover:border-primary/30"
                         )}
                       >
                         <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Sem turma</p>
@@ -1937,17 +1951,18 @@ export default function NovoAluno() {
                       {turmasDaModalidade.map((turma: any) => {
                         const lotada = (turma.vagas ?? 0) === 0;
                         const foraFaixa = isOutsideAgeRange(studentAge, turma.ageMin, turma.ageMax);
+                        const selected = selectedTurmaIds.includes(turma.id);
                         return (
                           <button
                             key={turma.id}
                             type="button"
-                            onClick={() => setForm(prev => ({ ...prev, turmaId: String(turma.id) }))}
+                            onClick={() => toggleTurma(turma.id)}
                             className={cn(
                               "flex-none w-56 p-3.5 rounded-2xl border text-left transition-all duration-300 active:scale-[0.98] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-violet-500/10 relative",
-                              form.turmaId === String(turma.id) ? "bg-violet-500/10 border-violet-500/40 shadow-lg" : "bg-card border-border hover:border-violet-500/30"
+                              selected ? "bg-violet-500/10 border-violet-500/40 shadow-lg" : "bg-card border-border hover:border-violet-500/30"
                             )}
                           >
-                            {form.turmaId === String(turma.id) && (
+                            {selected && (
                               <Check size={14} className="absolute top-2.5 right-2.5 text-violet-600 dark:text-violet-400" />
                             )}
                             <div className="flex items-center gap-1.5 flex-wrap mb-1">
@@ -1986,6 +2001,12 @@ export default function NovoAluno() {
                         );
                       })}
                     </div>
+                  )}
+
+                  {selectedTurmaIds.some((id) => !turmasDaModalidade.some((t: any) => t.id === id)) && (
+                    <p className="text-[10px] font-bold text-muted-foreground bg-muted/40 border border-border rounded-xl px-3 py-2">
+                      Turmas selecionadas fora do filtro de modalidade continuam mantidas na matrícula.
+                    </p>
                   )}
                 </div>
 
