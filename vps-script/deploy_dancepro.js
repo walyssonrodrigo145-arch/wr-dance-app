@@ -51,12 +51,12 @@ dancepro.wrmusicpro.com.br {
 }
 EOF
       echo "Recarregando Caddy da VPS..."
-      cd /root/wr-music-app && docker compose exec -w /etc/caddy caddy caddy reload || docker restart wr-music-app-caddy-1
+      cd /root/wr-music-app && (docker compose exec -w /etc/caddy caddy caddy reload || docker restart wr-music-app-caddy-1 || echo 'AVISO: Caddy nao recarregado automaticamente (dominio ja configurado). Seguindo o deploy.')
     else
       echo "Entrada dancepro.wrmusicpro.com.br já presente no Caddyfile da VPS."
       # Garante que aponta para dance-app:5000
       sed -i 's|reverse_proxy app:3000|reverse_proxy dance-app:5000|g' /root/wr-music-app/Caddyfile
-      cd /root/wr-music-app && docker compose exec -w /etc/caddy caddy caddy reload || docker restart wr-music-app-caddy-1
+      cd /root/wr-music-app && (docker compose exec -w /etc/caddy caddy caddy reload || docker restart wr-music-app-caddy-1 || echo 'AVISO: Caddy nao recarregado automaticamente (dominio ja configurado). Seguindo o deploy.')
     fi
 
     echo "=== 4. SUBINDO OS CONTAINERS DO DANCEPRO (DOCKER COMPOSE) ==="
