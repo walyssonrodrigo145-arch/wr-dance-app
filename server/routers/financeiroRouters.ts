@@ -919,6 +919,103 @@ export const financeiroRouters = {
         return { success: true, count: rows.length };
       }),
 
+    /**
+     * Onda 1.1 (migração de escola): importa MENSALIDADES EM ABERTO com "pago até".
+     * Cria as cobranças do mês seguinte ao "pago até" até o mês atual (atrasadas + atual)
+     * e atualiza valor/vencimento do cadastro quando informados. Idempotente por aluno/mês/ano.
+     */
+    importBatch: protectedProcedure.input(z.object({
+      rows: z.array(z.object({
+        studentId: z.number(),
+        amount: z.number().min(0).max(100000).optional(),
+        dueDay: z.number().int().min(1).max(31).optional(),
+        paidThroughMonth: z.number().int().min(1).max(12).nullable().optional(),
+        paidThroughYear: z.number().int().min(2000).max(2100).nullable().optional(),
+      })).min(1).max(300),
+    })).mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      const orgId = ctx.user.organizationId!;
+      const isUserAdmin = ctx.user.role === "admin" || ctx.user.openId === ENV.ownerOpenId;
+
+      const studentIds = Array.from(new Set(input.rows.map((r) => r.studentId)));
+      const studentRows = await db.select({
+        id: students.id,
+        name: students.name,
+        monthlyFee: students.monthlyFee,
+        dueDay: students.dueDay,
+        professorId: students.professorId,
+      }).from(students).where(and(eq(students.organizationId, orgId), inArray(students.id, studentIds)));
+      const studentById = new Map(studentRows.map((s) => [s.id, s]));
+
+      const todayBR = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+      const curMonth = todayBR.getMonth() + 1;
+      const curYear = todayBR.getFullYear();
+
+      let created = 0;
+      let skipped = 0;
+      const details: Array<{ name: string; reason: string }> = [];
+
+      for (const row of input.rows) {
+        const student = studentById.get(row.studentId);
+        if (!student) {
+          skipped++;
+          details.push({ name: `Aluno #${row.studentId}`, reason: "Aluno não encontrado nesta escola" });
+          continue;
+        }
+        if (!isUserAdmin && student.professorId !== ctx.user.id) {
+          skipped++;
+          details.push({ name: student.name, reason: "Aluno não pertence ao seu perfil" });
+          continue;
+        }
+
+        const amount = row.amount != null ? Number(row.amount) : Number(student.monthlyFee || 0);
+        const dueDay = row.dueDay ?? student.dueDay ?? 10;
+
+        const studentUpdate: any = {};
+        if (row.amount != null) studentUpdate.monthlyFee = amount.toFixed(2);
+        if (row.dueDay != null) studentUpdate.dueDay = dueDay;
+        if (Object.keys(studentUpdate).length > 0) {
+          await db.update(students).set({ ...studentUpdate, updatedAt: new Date() })
+            .where(and(eq(students.id, student.id), eq(students.organizationId, orgId)));
+        }
+
+        // Meses em aberto: do mês seguinte ao "pago até" até o mês atual
+        let startMonth = curMonth;
+        let startYear = curYear;
+        if (row.paidThroughMonth && row.paidThroughYear) {
+          startMonth = row.paidThroughMonth === 12 ? 1 : row.paidThroughMonth + 1;
+          startYear = row.paidThroughMonth === 12 ? row.paidThroughYear + 1 : row.paidThroughYear;
+        }
+        const monthsSpan = (curYear - startYear) * 12 + (curMonth - startMonth) + 1;
+        if (monthsSpan <= 0) continue; // já pago até o mês atual — nada em aberto
+
+        const series = buildDueDateSeries(startMonth, startYear, Math.min(monthsSpan, 24), dueDay, "mensal");
+        const existingRows = await db.select({ month: paymentDues.month, year: paymentDues.year }).from(paymentDues)
+          .where(and(eq(paymentDues.organizationId, orgId), eq(paymentDues.studentId, student.id)));
+        const existingSet = new Set(existingRows.map((r) => `${r.month}_${r.year}`));
+        const toCreate = series.filter((d) => !existingSet.has(`${d.month}_${d.year}`));
+        if (toCreate.length === 0) { skipped++; continue; }
+
+        await db.insert(paymentDues).values(toCreate.map((d) => ({
+          organizationId: orgId,
+          userId: ctx.user.id,
+          studentId: student.id,
+          amount: amount.toFixed(2),
+          dueDate: d.dueDateISO,
+          month: d.month,
+          year: d.year,
+          status: "pendente" as const,
+          notes: "Migração — mensalidade importada",
+          billingPeriodicity: "mensal",
+        })));
+        created += toCreate.length;
+      }
+
+      await syncOrgAsaasSubscription(db, orgId).catch(() => {});
+      return { success: true, created, skipped, details: details.slice(0, 30) };
+    }),
+
     // ─ Mensalidades vencidas (não pagas, data já passou) ────────────
     overdue: protectedProcedure.query(async ({ ctx }) => {
       const db = await getDb();

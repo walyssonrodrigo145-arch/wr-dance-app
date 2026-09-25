@@ -5,7 +5,7 @@ import {
   Loader2, Trash2, ChevronLeft, ChevronRight, Pencil,
   Search, MoreVertical, CreditCard,
   ChevronDown, TrendingUp, Zap, Link2, Copy, QrCode, Ban,
-  FileUp, FileCheck, FileText, Info, Wallet, Download, Send, Receipt
+  FileUp, FileCheck, FileText, Info, Wallet, Download, Send, Receipt, Upload
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { exportToCSV } from "@/lib/exportUtils";
@@ -15,6 +15,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { EditMensalidadeModal } from "@/components/modals/EditMensalidadeModal";
+import { ImportMensalidadesModal } from "@/components/financeiro/ImportMensalidadesModal";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -614,6 +615,7 @@ export default function MensalidadesTab({ viewMonth, viewYear, payments, isLoadi
   const [lessonTypeFilter, setLessonTypeFilter] = useState<string>("todos");
   const [search, setSearch] = useState("");
   const [novaOpen, setNovaOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editPayment, setEditPayment] = useState<PaymentRow | null>(null);
   const [notesPayment, setNotesPayment] = useState<PaymentRow | null>(null);
   const [detailsPaymentId, setDetailsPaymentId] = useState<number | null>(null);
@@ -807,6 +809,16 @@ export default function MensalidadesTab({ viewMonth, viewYear, payments, isLoadi
              >
                <Download size={16} />
                <span className="hidden md:inline">Exportar CSV</span>
+             </Button>
+
+             <Button
+               variant="outline"
+               onClick={() => setImportOpen(true)}
+               className="h-10 rounded-xl px-3 lg:px-4 text-xs font-bold gap-2 border-border/80 shadow-sm shrink-0"
+               title="Importar mensalidades em aberto (migração de escola)"
+             >
+               <Upload size={16} />
+               <span className="hidden lg:inline">Importar</span>
              </Button>
 
              <Button 
@@ -1362,6 +1374,7 @@ export default function MensalidadesTab({ viewMonth, viewYear, payments, isLoadi
       {editPayment && (
         <EditMensalidadeModal open={!!editPayment} onClose={() => setEditPayment(null)} payment={editPayment} />
       )}
+      <ImportMensalidadesModal open={importOpen} onOpenChange={setImportOpen} />
       <ObservacaoModal open={!!notesPayment} onClose={() => setNotesPayment(null)} payment={notesPayment} />
       <GatewayChargeModal
         open={!!asaasPayment}

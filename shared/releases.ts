@@ -26,6 +26,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.18.10",
+    date: "2026-09-18",
+    title: "Migração de escola — Etapa 2: mensalidades em aberto com saldo de meses",
+    summary: "Importe o financeiro da escola que está chegando: cada aluno com seu valor, vencimento e até quando já pagou — o sistema lança só o que está em aberto.",
+    items: [
+      { type: "novo", title: "Importar mensalidades com \"Pago até\"", description: "No Financeiro → Mensalidades, o botão Importar aceita CSV (Aluno; Valor; Vencimento; Pago até MM/AAAA). O sistema cria as cobranças do mês seguinte ao pago até o mês atual, sem duplicar nada e já atualizando valor/vencimento do cadastro." },
+      { type: "novo", title: "Migração de turmas gera a agenda junto", description: "Ao importar turmas, você pode marcar para gerar automaticamente as aulas dos próximos 3 meses — a escola fica pronta em um passo." },
+      { type: "melhoria", title: "Relatório claro da migração", description: "Ao final, a tela mostra quantos meses foram criados e quais alunos ficaram sem mudança (já quitados ou já lançados)." },
+    ],
+  },
+  {
     version: "2026.09.18.9",
     date: "2026-09-18",
     title: "Migração de escola — Etapa 1: importar turmas e alunos já matriculados",

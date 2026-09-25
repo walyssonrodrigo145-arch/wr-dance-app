@@ -206,5 +206,6 @@ Nos últimos 4 dias o MusicPro investiu em três frentes:
 
 **Status de execução (18/09/2026):**
 - ✅ **1.1 Migração — Etapa 1 concluída**: importação de **turmas por CSV** (`turmas.importBatch` + modal em Turmas & Vagas) e **alunos já matriculados** (coluna "Turma"/Turma padrão no import existente), com vaga/fila/conflito e relatório. Núcleo único de matrícula extraído (`enrollStudentInTurmaCore`) — usado pelo cadastro, multi-turma e importação.
+- ✅ **1.1 Migração — Etapa 2 concluída**: **mensalidades em aberto com saldo de meses** (`paymentDues.importBatch` + modal no Financeiro → Mensalidades) e **geração automática da agenda** (3 meses) no import de turmas.
 - ✅ **Indique e Ganhe incluído no escopo** (decisão do dono): será implementado com prêmio **configurável** (meses grátis/crédito), para funcionar mesmo antes da precificação definitiva.
-- ⏭️ Próximas etapas: **1.1 Etapa 2** (mensalidades em aberto com saldo de meses) → **1.3 Landing premium** → **2.2 Gestão de alunos na sessão** → **2.3 Agendamento visível** → **1.2 SEO público** → **2.1 Indique e Ganhe** → **2.4/3.x**.
+- ⏭️ Próximas etapas: **1.3 Landing premium** → **2.2 Gestão de alunos na sessão** → **2.3 Agendamento visível** → **1.2 SEO público** → **2.1 Indique e Ganhe** → **2.4/3.x**.

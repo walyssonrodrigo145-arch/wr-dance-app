@@ -842,6 +842,8 @@ export const turmasRouters = {
         level: z.enum(LEVELS).default("todas"),
         notes: z.string().max(2000).nullable().optional(),
       })).min(1).max(200),
+      // 0 = não gerar agora; N = gerar as aulas dos próximos N meses para cada turma criada
+      generateMonths: z.number().int().min(0).max(12).default(0),
     })).mutation(async ({ ctx, input }) => {
       assertStaff(ctx);
       const db = await getDb();
@@ -894,7 +896,28 @@ export const turmasRouters = {
       }));
 
       const inserted = await db.insert(turmas).values(values).returning({ id: turmas.id, name: turmas.name });
-      return { success: true, imported: inserted.length };
+
+      // Migração completa em 1 clique: gera a agenda das turmas criadas
+      let lessonsCreated = 0;
+      let lessonsConflicts = 0;
+      if (input.generateMonths > 0) {
+        const fromISO = todayBR();
+        const toISOStr = addMonthsISO(fromISO, input.generateMonths);
+        for (const t of inserted) {
+          const [turma] = await db.select().from(turmas)
+            .where(and(eq(turmas.id, t.id), eq(turmas.organizationId, orgId))).limit(1);
+          if (!turma || !turma.professorId) continue;
+          try {
+            const res = await generateTurmaLessons(db, turma as any, fromISO, toISOStr);
+            lessonsCreated += res.created;
+            lessonsConflicts += res.conflicts;
+          } catch {
+            // Turma sem grade/professor válido: segue com as demais
+          }
+        }
+      }
+
+      return { success: true, imported: inserted.length, generated: lessonsCreated, conflicts: lessonsConflicts };
     }),
 
     searchAlunos: protectedProcedure.input(z.object({

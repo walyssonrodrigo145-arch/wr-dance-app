@@ -138,6 +138,7 @@ export function ImportTurmasModal({ open, onOpenChange }: Props) {
   const [rows, setRows] = useState<Row[]>([]);
   const [hadHeader, setHadHeader] = useState(false);
   const [page, setPage] = useState(0);
+  const [autoGenerate, setAutoGenerate] = useState(true);
 
   const { data: instruments = [] } = trpc.instruments.list.useQuery(undefined, { enabled: open });
   const { data: profs = [] } = trpc.professores.list.useQuery(undefined, { enabled: open });
@@ -209,8 +210,11 @@ export function ImportTurmasModal({ open, onOpenChange }: Props) {
   };
 
   const importMutation = trpc.turmas.importBatch.useMutation({
-    onSuccess: (res: { imported: number }) => {
-      toast.success(`${res.imported} turma(s) importada(s)! Gere as aulas em "Gerar aulas" de cada turma.`);
+    onSuccess: (res: { imported: number; generated?: number; conflicts?: number }) => {
+      toast.success(
+        `${res.imported} turma(s) importada(s)!` +
+        ((res.generated || 0) > 0 ? ` ${res.generated} aula(s) gerada(s)${(res.conflicts || 0) > 0 ? ` • ${res.conflicts} conflito(s) pulado(s)` : ""}.` : " Gere as aulas em \"Gerar aulas\" de cada turma.")
+      );
       utils.turmas.list.invalidate();
       setRaw("");
       setRows([]);
@@ -221,7 +225,7 @@ export function ImportTurmasModal({ open, onOpenChange }: Props) {
 
   const submit = () => {
     if (ready.length === 0) { toast.error("Nenhuma turma válida para importar."); return; }
-    importMutation.mutate({ rows: ready.map((e) => e.payload) as any });
+    importMutation.mutate({ rows: ready.map((e) => e.payload) as any, generateMonths: autoGenerate ? 3 : 0 });
   };
 
   const downloadTemplate = () => {
@@ -361,6 +365,18 @@ export function ImportTurmasModal({ open, onOpenChange }: Props) {
               )}
             </div>
           )}
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={autoGenerate}
+              onChange={(e) => setAutoGenerate(e.target.checked)}
+              className="w-3.5 h-3.5 accent-primary cursor-pointer"
+            />
+            <span className="text-[11px] font-bold text-muted-foreground">
+              Gerar as aulas dos próximos <strong>3 meses</strong> para as turmas importadas (recomendado)
+            </span>
+          </label>
 
           <div className="flex items-center justify-end gap-2 pt-1">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="h-10 rounded-xl px-4 text-xs font-bold">
