@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { lazy, Suspense } from "react";
-import { Loader2 } from "lucide-react";
+import LoadingScreen from "@/components/LoadingScreen";
 import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -17,6 +17,7 @@ const Aulas = lazy(() => import("./pages/Aulas"));
 const Instrumentos = lazy(() => import("./pages/Instrumentos"));
 const Relatorios = lazy(() => import("./pages/Relatorios"));
 const Configuracoes = lazy(() => import("./pages/Configuracoes"));
+const Perfil = lazy(() => import("./pages/Perfil"));
 const Assinatura = lazy(() => import("./pages/Assinatura"));
 const Lembretes = lazy(() => import("./pages/Lembretes"));
 const Financeiro = lazy(() => import("./pages/Financeiro"));
@@ -78,12 +79,7 @@ const StudentEventos = lazy(() => import("./pages/student/Eventos"));
 const StudentFigurinos = lazy(() => import("./pages/student/Figurinos"));
 const StudentTurmas = lazy(() => import("./pages/student/Turmas"));
 
-const PageLoader = () => (
-  <div className="flex-1 h-full min-h-[50vh] flex flex-col items-center justify-center text-muted-foreground gap-4">
-    <Loader2 className="animate-spin text-primary" size={32} />
-    <span className="text-xs font-bold uppercase tracking-widest text-primary/60">Carregando DancePro...</span>
-  </div>
-);
+const PageLoader = () => <LoadingScreen />;
 
 const PublicEnrollmentPage = lazy(() => import("./pages/PublicEnrollment"));
 
@@ -256,6 +252,7 @@ function Router() {
           <Route path="/lembretes" component={Lembretes} />
           <Route path="/financeiro" component={Financeiro} />
           <Route path="/configuracoes" component={Configuracoes} />
+          <Route path="/perfil" component={Perfil} />
           <Route path="/assinatura" component={Assinatura} />
           <Route path="/progresso" component={Progresso} />
           <Route path="/rankings" component={RankingsPage} />

@@ -40,6 +40,37 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="DancePro" />
     <link rel="apple-touch-icon" href="/logo.svg" />
+    <style>
+      /* Boot loader: aparece antes do React montar (fim do flash branco) */
+      #boot-loader {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #ffffff;
+        opacity: 1;
+        transition: opacity 0.35s ease;
+      }
+      html.dark #boot-loader { background: #070514; }
+      #boot-loader.bl-hide { opacity: 0; pointer-events: none; }
+      #boot-loader .bl-box { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+      #boot-loader .bl-logo { width: 56px; height: 56px; animation: bl-pulse 1.6s ease-in-out infinite; }
+      #boot-loader .bl-spin {
+        width: 22px; height: 22px; border-radius: 9999px;
+        border: 2.5px solid rgba(236, 72, 153, 0.22);
+        border-top-color: #ec4899;
+        animation: bl-spin 0.8s linear infinite;
+      }
+      #boot-loader .bl-text {
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        font-size: 11px; font-weight: 800; letter-spacing: 0.18em;
+        text-transform: uppercase; color: #ec4899; opacity: 0.7;
+      }
+      @keyframes bl-spin { to { transform: rotate(360deg); } }
+      @keyframes bl-pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.92); opacity: 0.75; } }
+    </style>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-TNCFL02S7R"></script>
     <script>
@@ -73,6 +104,28 @@
 
   <body>
     <div id="root"></div>
+    <div id="boot-loader" aria-hidden="true">
+      <div class="bl-box">
+        <img src="/logo.svg" alt="DancePro" class="bl-logo" onerror="this.style.display='none'" />
+        <div class="bl-spin"></div>
+        <span class="bl-text">Carregando DancePro...</span>
+      </div>
+    </div>
+    <script>
+      // Remove o boot loader quando o app monta (ou após 8s como salvaguarda)
+      (function () {
+        var el = document.getElementById("boot-loader");
+        if (!el) return;
+        var hide = function () {
+          if (!el || el.classList.contains("bl-hide")) return;
+          el.classList.add("bl-hide");
+          setTimeout(function () { try { el.remove(); } catch (e) {} }, 400);
+        };
+        window.__danceproHideBoot = hide;
+        window.addEventListener("load", function () { setTimeout(hide, 600); });
+        setTimeout(hide, 8000);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
 
   </body>

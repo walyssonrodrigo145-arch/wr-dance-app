@@ -21,6 +21,7 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
   "/instrumentos": { title: "Modalidades & Ritmos", subtitle: "Modalidades de dança ensinadas" },
   "/relatorios": { title: "Relatórios", subtitle: "Análises e estatísticas da escola" },
   "/configuracoes": { title: "Configurações", subtitle: "Preferências do sistema" },
+  "/perfil": { title: "Meu Perfil", subtitle: "Seus dados, foto e senha" },
   "/financeiro": { title: "Financeiro", subtitle: "Mensalidades, despesas e fluxo de caixa" },
   "/professores": { title: "Professores & Coreógrafos", subtitle: "Gestão da equipe e remuneração" },
   "/lembretes": { title: "Lembretes", subtitle: "Comunicação automática" },
@@ -367,7 +368,7 @@ export function AppHeader({ onMobileMenuOpen, onToggleSidebar, sidebarCollapsed 
             <DropdownMenuSeparator className="bg-border/20 my-2" />
             <DropdownMenuItem 
               className="gap-4 rounded-2xl p-4 cursor-pointer text-sm font-bold text-muted-foreground hover:text-primary transition-all focus:bg-primary/5 focus:text-primary group" 
-              onClick={() => navigate(user?.role === 'aluno' ? "/aluno/perfil" : "/configuracoes")}
+              onClick={() => navigate(user?.role === 'aluno' ? "/aluno/perfil" : "/perfil")}
             >
               <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center group-hover:scale-110 transition-all">
                 <User size={18} />
@@ -387,7 +388,7 @@ export function AppHeader({ onMobileMenuOpen, onToggleSidebar, sidebarCollapsed 
             )}
             <DropdownMenuItem 
               className="gap-4 rounded-2xl p-4 cursor-pointer text-sm font-bold text-muted-foreground hover:text-primary transition-all focus:bg-primary/5 focus:text-primary group" 
-              onClick={() => navigate(user?.role === 'aluno' ? "/aluno/perfil" : "/configuracoes")}
+              onClick={() => navigate(user?.role === 'aluno' ? "/aluno/perfil" : "/perfil")}
             >
               <div className="w-9 h-9 rounded-xl bg-muted text-muted-foreground flex items-center justify-center group-hover:scale-110 transition-all">
                 <Settings size={18} />

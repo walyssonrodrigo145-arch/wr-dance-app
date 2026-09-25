@@ -78,6 +78,9 @@ createRoot(document.getElementById("root")!).render(
   </trpc.Provider>
 );
 
+// Esconde o boot loader do index.html assim que o React monta
+try { (window as any).__danceproHideBoot?.(); } catch { /* ignore */ }
+
 // Registro do Service Worker para PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

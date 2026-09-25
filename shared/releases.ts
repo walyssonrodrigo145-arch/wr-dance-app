@@ -26,6 +26,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.18.13",
+    date: "2026-09-18",
+    title: "Meu Perfil do professor e carregamento sem tela branca",
+    summary: "Professores e administradores ganharam uma página de perfil própria (foto, contato, PIX e senha) e o sistema abre com uma animação de carregamento em vez do flash branco.",
+    items: [
+      { type: "novo", title: "Meu Perfil (professor/admin)", description: "Página com foto (upload), nome, e-mail, telefone, chave PIX e apresentação. A troca de senha agora pede a senha atual para confirmar." },
+      { type: "melhoria", title: "Acesso pelo menu do usuário", description: "O atalho Meu Perfil saiu de Configurações e abre a página dedicada (alunos continuam com o perfil do portal)." },
+      { type: "melhoria", title: "Boot loader + loading unificado", description: "O app abre com a marca DancePro e um indicador de carregamento — sem mais tela branca antes do conteúdo; o mesmo visual vale para todas as rotas." },
+    ],
+  },
+  {
     version: "2026.09.18.12",
     date: "2026-09-18",
     title: "Aula de turma: incluir e remover aluno na sessão + prévia no cadastro",

@@ -323,11 +323,26 @@ export const authRouters = {
       return { success: true } as const;
     }),
     updateMyPassword: protectedProcedure
-      .input(z.object({ password: z.string().min(6) }))
+      .input(z.object({ password: z.string().min(6), currentPassword: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
         if (!db) throw new Error("Database not available");
-        
+
+        // Onda 3.1: troca voluntária (fora do primeiro acesso) exige a senha atual
+        const [me] = await db
+          .select({ passwordHash: users.passwordHash, mustChangePassword: users.mustChangePassword })
+          .from(users)
+          .where(eq(users.id, ctx.user.id))
+          .limit(1);
+
+        if (me && !me.mustChangePassword) {
+          if (!input.currentPassword) throw new Error("Informe a senha atual para confirmar a troca.");
+          if (!me.passwordHash) throw new Error("Sua conta não usa senha (login social). Fale com o suporte para definir uma senha.");
+          const [currentSalt, currentKey] = me.passwordHash.split(":");
+          const derivedCurrent = crypto.scryptSync(input.currentPassword, currentSalt, 64).toString("hex");
+          if (derivedCurrent !== currentKey) throw new Error("Senha atual incorreta.");
+        }
+
         const salt = crypto.randomBytes(16).toString("hex");
         const derivedKey = crypto.scryptSync(input.password, salt, 64).toString("hex");
         const passwordHash = `${salt}:${derivedKey}`;

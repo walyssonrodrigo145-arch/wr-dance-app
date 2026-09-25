@@ -77,6 +77,55 @@ export const plataformaRouters = {
       return { success: true };
     }),
 
+    /** Onda 3.1: perfil do usuário logado (professor/admin) — dados + foto. */
+    getMyProfile: protectedProcedure.query(async ({ ctx }) => {
+      const orgId = ctx.user.organizationId!;
+      const db = await getDb();
+      const settingsData = await getSettingsByUserId(orgId, ctx.user.id);
+
+      let avatar: string | null = null;
+      let especialidade: string | null = null;
+      if (db) {
+        const [prof] = await db
+          .select({ foto: professores.foto, especialidade: professores.especialidade })
+          .from(professores)
+          .where(and(eq(professores.organizationId, orgId), eq(professores.userId, ctx.user.id)))
+          .limit(1);
+        avatar = prof?.foto ?? null;
+        especialidade = prof?.especialidade ?? null;
+      }
+
+      return {
+        name: ctx.user.name ?? "",
+        email: ctx.user.email ?? "",
+        role: ctx.user.role,
+        phone: settingsData?.phone ?? "",
+        bio: (settingsData as any)?.bio ?? "",
+        pixKey: settingsData?.pixKey ?? "",
+        avatar,
+        especialidade,
+      };
+    }),
+
+    /** Foto de perfil do professor (o aluno usa studentPortal.updateMyAvatar). */
+    updateMyAvatar: protectedProcedure
+      .input(z.object({ avatar: z.string().min(10).max(3_000_000) }))
+      .mutation(async ({ ctx, input }) => {
+        const orgId = ctx.user.organizationId!;
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        const [prof] = await db
+          .select({ id: professores.id })
+          .from(professores)
+          .where(and(eq(professores.organizationId, orgId), eq(professores.userId, ctx.user.id)))
+          .limit(1);
+        if (!prof) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Seu usuário ainda não tem cadastro de professor. Peça ao administrador para criar o perfil." });
+        }
+        await db.update(professores).set({ foto: input.avatar }).where(eq(professores.id, prof.id));
+        return { success: true };
+      }),
+
     updateSchool: adminProcedure.input(z.object({
       schoolName: z.string().optional(),
       schoolCnpj: z.string().optional(),
