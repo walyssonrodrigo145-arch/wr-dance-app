@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import {
   Users, Plus, Search, Pencil, Trash2, Loader2, DoorOpen, Clock, X,
-  UserPlus, ArrowUpCircle, Star, GraduationCap, CalendarPlus, ClipboardCheck, RefreshCw,
+  UserPlus, ArrowUpCircle, Star, GraduationCap, CalendarPlus, ClipboardCheck, RefreshCw, Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,7 @@ import {
 import { GerarAulasModal } from "@/components/turmas/GerarAulasModal";
 import { TurmaAttendanceModal } from "@/components/turmas/TurmaAttendanceModal";
 import { RenewalModal } from "@/components/turmas/RenewalModal";
+import { ImportTurmasModal } from "@/components/turmas/ImportTurmasModal";
 
 const WEEKDAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
@@ -506,6 +507,7 @@ export default function Turmas() {
   const [gradeTurma, setGradeTurma] = useState<TurmaRow | null>(null);
   const [chamadaTurma, setChamadaTurma] = useState<TurmaRow | null>(null);
   const [renewalOpen, setRenewalOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const { data: stats } = trpc.turmas.stats.useQuery();
   const { data: turmasList = [], isLoading } = trpc.turmas.list.useQuery({
@@ -544,6 +546,9 @@ export default function Turmas() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)} className="border-border/80">
+            <Upload size={16} className="mr-2" /> Importar CSV
+          </Button>
           <Button variant="outline" onClick={() => setRenewalOpen(true)} className="border-indigo-500/30 text-indigo-600 hover:bg-indigo-500/10">
             <RefreshCw size={16} className="mr-2" /> Rematrícula
           </Button>
@@ -692,6 +697,8 @@ export default function Turmas() {
       />
 
       <RenewalModal open={renewalOpen} onOpenChange={setRenewalOpen} />
+
+      <ImportTurmasModal open={importOpen} onOpenChange={setImportOpen} />
 
       <AlertDialog open={deleting !== null} onOpenChange={(value) => { if (!value) setDeleting(null); }}>
         <AlertDialogContent>

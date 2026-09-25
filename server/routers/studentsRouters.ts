@@ -53,6 +53,7 @@ import { schoolAiRouter } from "../schoolAiRouter";
 import { fiscalRouter } from "../fiscalRouter";
 import { FiscalService } from "../services/fiscal/FiscalService";
 import { loginAttempts, safeEqualStr, isReservedSuperAdminEmail, getOrgPlanLimits, syncOrgAsaasSubscription, reconcileOrgAsaasCharges, runCreateAssinafyContract } from "./helpers";
+import { enrollStudentInTurmaCore } from "./turmasRouters";
 
 /** Apenas dígitos — usado para comparar telefones independentemente do formato. */
 function normalizePhoneDigits(value: string | null | undefined) {
@@ -1061,6 +1062,8 @@ export const studentsRouters = {
         email: z.string().trim().email("E-mail inválido").or(z.literal("")).optional().nullable(),
         phone: z.string().trim().max(30).optional().nullable(),
         birthDate: z.string().trim().max(10).optional().nullable(),
+        // Migração de escola: matricula o aluno na turma indicada (vaga ou fila)
+        turmaId: z.number().nullable().optional(),
       })).min(1).max(300),
     })).mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -1134,7 +1137,7 @@ export const studentsRouters = {
         });
       }
 
-      await db.insert(students).values(toImport.map((row) => ({
+      const created = await db.insert(students).values(toImport.map((row) => ({
         organizationId: orgId,
         userId: ctx.user.id,
         professorId,
@@ -1146,7 +1149,29 @@ export const studentsRouters = {
         level: input.level,
         status: "ativo" as const,
         startDate: new Date().toISOString().slice(0, 10),
-      })));
+      }))).returning({ id: students.id, name: students.name });
+
+      // Migração de escola: matricula em lote nas turmas indicadas (conflito/vaga/fila)
+      const enrolled: string[] = [];
+      const waitlisted: string[] = [];
+      const enrollSkipped: Array<{ name: string; reason: string }> = [];
+      for (let i = 0; i < toImport.length; i++) {
+        const turmaId = toImport[i].turmaId;
+        if (!turmaId) continue;
+        const studentId = created[i]?.id;
+        const name = created[i]?.name || toImport[i].name.trim();
+        if (!studentId) {
+          enrollSkipped.push({ name, reason: "Aluno não criado" });
+          continue;
+        }
+        try {
+          const result = await enrollStudentInTurmaCore(db, orgId, turmaId, studentId);
+          enrolled.push(name);
+          if (result.waitlisted) waitlisted.push(name);
+        } catch (err: any) {
+          enrollSkipped.push({ name, reason: err?.message || "Falha ao matricular na turma" });
+        }
+      }
 
       await syncOrgAsaasSubscription(db, orgId).catch(() => {});
       return {
@@ -1154,6 +1179,9 @@ export const studentsRouters = {
         imported: toImport.length,
         skipped: input.rows.length - toImport.length,
         skippedDetails: skipped.slice(0, 50),
+        enrolled: enrolled.length,
+        waitlisted: waitlisted.length,
+        enrollSkipped: enrollSkipped.slice(0, 20),
       };
     }),
   }),

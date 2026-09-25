@@ -147,6 +147,64 @@ async function findStudentScheduleConflict(
   return null;
 }
 
+/**
+ * Núcleo de matrícula do aluno em uma turma: valida turma, conflito de horário,
+ * vaga/fila (com posição) e reaproveita linha cancelada (unique turma+aluno).
+ * Usado pelo `enroll`, pelo `setStudentTurmas` e pela importação em lote.
+ */
+export async function enrollStudentInTurmaCore(db: any, orgId: number, turmaId: number, studentId: number) {
+  const [turma] = await db.select({
+    id: turmas.id,
+    name: turmas.name,
+    capacity: turmas.capacity,
+    status: turmas.status,
+    weekdays: turmas.weekdays,
+    timeStr: turmas.timeStr,
+    durationMinutes: turmas.durationMinutes,
+  }).from(turmas)
+    .where(and(eq(turmas.id, turmaId), eq(turmas.organizationId, orgId))).limit(1);
+  if (!turma) throw new TRPCError({ code: "NOT_FOUND", message: "Turma não encontrada." });
+  if (turma.status === "encerrada") {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Esta turma está encerrada e não aceita novas matrículas." });
+  }
+
+  const conflict = await findStudentScheduleConflict(
+    db, orgId, studentId, (turma.weekdays as number[] | null) ?? [], turma.timeStr, turma.durationMinutes,
+  );
+  if (conflict) throw new TRPCError({ code: "BAD_REQUEST", message: conflict });
+
+  const [ocupadas] = await db.select({ count: sql<number>`CAST(COUNT(*) AS INT)` })
+    .from(turmaAlunos)
+    .where(and(eq(turmaAlunos.turmaId, turmaId), eq(turmaAlunos.status, "ativa")));
+  const temVaga = (Number(ocupadas?.count) || 0) < turma.capacity;
+
+  const [{ maxPosition }] = await db.select({ maxPosition: sql<number>`COALESCE(MAX(${turmaAlunos.position}), 0)` })
+    .from(turmaAlunos)
+    .where(and(eq(turmaAlunos.turmaId, turmaId), eq(turmaAlunos.status, "espera")));
+
+  const [reusable] = await db.select({ id: turmaAlunos.id }).from(turmaAlunos)
+    .where(and(eq(turmaAlunos.turmaId, turmaId), eq(turmaAlunos.studentId, studentId)))
+    .limit(1);
+
+  const values = {
+    organizationId: orgId,
+    turmaId,
+    studentId,
+    status: temVaga ? ("ativa" as const) : ("espera" as const),
+    position: temVaga ? 0 : (Number(maxPosition) || 0) + 1,
+    enrolledAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  if (reusable) {
+    await db.update(turmaAlunos).set(values).where(eq(turmaAlunos.id, reusable.id));
+  } else {
+    await db.insert(turmaAlunos).values(values);
+  }
+
+  return { waitlisted: !temVaga, turmaName: turma.name };
+}
+
 const turmaInput = z.object({
   name: z.string().min(2, "Informe o nome da turma").max(255),
   modalidadeId: z.number().nullable().optional(),
@@ -377,22 +435,6 @@ export const turmasRouters = {
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
       const orgId = ctx.user.organizationId!;
 
-      const [turma] = await db.select({
-        id: turmas.id,
-        capacity: turmas.capacity,
-        status: turmas.status,
-        name: turmas.name,
-        weekdays: turmas.weekdays,
-        timeStr: turmas.timeStr,
-        durationMinutes: turmas.durationMinutes,
-      })
-        .from(turmas)
-        .where(and(eq(turmas.id, input.turmaId), eq(turmas.organizationId, orgId))).limit(1);
-      if (!turma) throw new TRPCError({ code: "NOT_FOUND", message: "Turma não encontrada." });
-      if (turma.status === "encerrada") {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Esta turma está encerrada e não aceita novas matrículas." });
-      }
-
       const [student] = await db.select({ id: students.id }).from(students)
         .where(and(eq(students.id, input.studentId), eq(students.organizationId, orgId))).limit(1);
       if (!student) throw new TRPCError({ code: "NOT_FOUND", message: "Aluno não encontrado nesta escola." });
@@ -408,38 +450,9 @@ export const turmasRouters = {
         });
       }
 
-      // D3: bloqueio de conflito de horário do aluno (depois de descartar duplicidade)
-      const conflict = await findStudentScheduleConflict(
-        db, orgId, input.studentId, (turma.weekdays as number[] | null) ?? [], turma.timeStr, turma.durationMinutes,
-      );
-      if (conflict) throw new TRPCError({ code: "BAD_REQUEST", message: conflict });
-
-      const [ocupadas] = await db.select({ count: sql<number>`CAST(COUNT(*) AS INT)` })
-        .from(turmaAlunos)
-        .where(and(eq(turmaAlunos.turmaId, input.turmaId), eq(turmaAlunos.status, "ativa")));
-      const temVaga = (Number(ocupadas?.count) || 0) < turma.capacity;
-
-      const [{ maxPosition }] = await db.select({ maxPosition: sql<number>`COALESCE(MAX(${turmaAlunos.position}), 0)` })
-        .from(turmaAlunos)
-        .where(and(eq(turmaAlunos.turmaId, input.turmaId), eq(turmaAlunos.status, "espera")));
-
-      const values = {
-        organizationId: orgId,
-        turmaId: input.turmaId,
-        studentId: input.studentId,
-        status: temVaga ? ("ativa" as const) : ("espera" as const),
-        position: temVaga ? 0 : (Number(maxPosition) || 0) + 1,
-        enrolledAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      if (existing) {
-        await db.update(turmaAlunos).set(values).where(eq(turmaAlunos.id, existing.id));
-      } else {
-        await db.insert(turmaAlunos).values(values);
-      }
-
-      return { success: true, waitlisted: !temVaga };
+      // D3 + vaga/fila + upsert em um único núcleo compartilhado com a importação
+      const result = await enrollStudentInTurmaCore(db, orgId, input.turmaId, input.studentId);
+      return { success: true, waitlisted: result.waitlisted };
     }),
 
     updateEnrollment: protectedProcedure.input(z.object({
@@ -800,48 +813,88 @@ export const turmasRouters = {
         }
         // 2) Entra nas novas (conflito com o que permaneceu + com as já aceitas)
         for (const turma of targetTurmas) {
-          const conflict = await findStudentScheduleConflict(
-            tx, orgId, input.studentId, (turma.weekdays as number[] | null) ?? [], turma.timeStr, turma.durationMinutes,
-          );
-          if (conflict) {
-            throw new TRPCError({ code: "BAD_REQUEST", message: conflict });
-          }
-
-          const [ocupadas] = await tx.select({ count: sql<number>`CAST(COUNT(*) AS INT)` })
-            .from(turmaAlunos)
-            .where(and(eq(turmaAlunos.turmaId, turma.id), eq(turmaAlunos.status, "ativa")));
-          const temVaga = (Number(ocupadas?.count) || 0) < turma.capacity;
-
-          const [{ maxPosition }] = await tx.select({ maxPosition: sql<number>`COALESCE(MAX(${turmaAlunos.position}), 0)` })
-            .from(turmaAlunos)
-            .where(and(eq(turmaAlunos.turmaId, turma.id), eq(turmaAlunos.status, "espera")));
-
-          const [reusable] = await tx.select({ id: turmaAlunos.id }).from(turmaAlunos)
-            .where(and(eq(turmaAlunos.turmaId, turma.id), eq(turmaAlunos.studentId, input.studentId)))
-            .limit(1);
-
-          const values = {
-            organizationId: orgId,
-            turmaId: turma.id,
-            studentId: input.studentId,
-            status: temVaga ? ("ativa" as const) : ("espera" as const),
-            position: temVaga ? 0 : (Number(maxPosition) || 0) + 1,
-            enrolledAt: new Date(),
-            updatedAt: new Date(),
-          };
-
-          if (reusable) {
-            await tx.update(turmaAlunos).set(values).where(eq(turmaAlunos.id, reusable.id));
-          } else {
-            await tx.insert(turmaAlunos).values(values);
-          }
-
+          const result = await enrollStudentInTurmaCore(tx, orgId, turma.id, input.studentId);
           added.push(turma.name);
-          if (!temVaga) waitlisted.push(turma.name);
+          if (result.waitlisted) waitlisted.push(turma.name);
         }
       });
 
       return { success: true, added, removed: toCancel.length, waitlisted };
+    }),
+
+    /**
+     * Importação em lote de turmas (migração de escola): cria a grade de uma vez.
+     * As aulas são geradas depois, no botão "Gerar aulas" de cada turma.
+     */
+    importBatch: protectedProcedure.input(z.object({
+      rows: z.array(z.object({
+        name: z.string().trim().min(2).max(255),
+        modalidadeId: z.number().nullable().optional(),
+        professorId: z.number().nullable().optional(),
+        studioRoomId: z.number().nullable().optional(),
+        weekdays: z.array(z.number().int().min(0).max(6)).max(7).default([]),
+        timeStr: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+        durationMinutes: z.number().int().min(15).max(600).default(60),
+        capacity: z.number().int().min(1).max(500).default(20),
+        ageMin: z.number().int().min(0).max(120).nullable().optional(),
+        ageMax: z.number().int().min(0).max(120).nullable().optional(),
+        shift: z.string().max(40).nullable().optional(),
+        level: z.enum(LEVELS).default("todas"),
+        notes: z.string().max(2000).nullable().optional(),
+      })).min(1).max(200),
+    })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+
+      // FKs validadas por escola (nunca aceitar vínculo de outra organização)
+      const modalidadeIds = Array.from(new Set(input.rows.map((r) => r.modalidadeId).filter((v): v is number => v != null)));
+      if (modalidadeIds.length > 0) {
+        const found = await db.select({ id: instruments.id }).from(instruments)
+          .where(and(eq(instruments.organizationId, orgId), inArray(instruments.id, modalidadeIds)));
+        if (found.length !== modalidadeIds.length) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Uma ou mais modalidades não existem nesta escola." });
+        }
+      }
+      const professorIds = Array.from(new Set(input.rows.map((r) => r.professorId).filter((v): v is number => v != null)));
+      if (professorIds.length > 0) {
+        const found = await db.select({ id: users.id }).from(users)
+          .where(and(eq(users.organizationId, orgId), inArray(users.id, professorIds)));
+        if (found.length !== professorIds.length) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Um ou mais professores não existem nesta escola." });
+        }
+      }
+      const roomIds = Array.from(new Set(input.rows.map((r) => r.studioRoomId).filter((v): v is number => v != null)));
+      if (roomIds.length > 0) {
+        const found = await db.select({ id: studioRooms.id }).from(studioRooms)
+          .where(and(eq(studioRooms.organizationId, orgId), inArray(studioRooms.id, roomIds)));
+        if (found.length !== roomIds.length) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Uma ou mais salas não existem nesta escola." });
+        }
+      }
+
+      const values = input.rows.map((row) => ({
+        organizationId: orgId,
+        createdByUserId: ctx.user.id,
+        name: row.name.trim(),
+        modalidadeId: row.modalidadeId ?? null,
+        professorId: row.professorId ?? null,
+        studioRoomId: row.studioRoomId ?? null,
+        weekdays: row.weekdays,
+        timeStr: row.timeStr ?? null,
+        durationMinutes: row.durationMinutes,
+        capacity: row.capacity,
+        ageMin: row.ageMin ?? null,
+        ageMax: row.ageMax ?? null,
+        shift: row.shift ?? null,
+        level: row.level,
+        status: "ativa" as const,
+        notes: row.notes ?? null,
+      }));
+
+      const inserted = await db.insert(turmas).values(values).returning({ id: turmas.id, name: turmas.name });
+      return { success: true, imported: inserted.length };
     }),
 
     searchAlunos: protectedProcedure.input(z.object({

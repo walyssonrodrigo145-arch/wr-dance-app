@@ -26,6 +26,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.18.9",
+    date: "2026-09-18",
+    title: "Migração de escola — Etapa 1: importar turmas e alunos já matriculados",
+    summary: "Para escolas de dança que estão chegando de planilha ou outro sistema: crie a grade de turmas por CSV e importe os alunos já matriculados em cada turma.",
+    items: [
+      { type: "novo", title: "Importar turmas por CSV", description: "Em Turmas & Vagas, o botão Importar CSV cria a grade de uma vez (modalidade, professor, sala, dias, horário, duração, capacidade, faixa etária, turno e nível) com prévia, validação de nomes e relatório. Depois, o botão Gerar aulas cria as sessões do período." },
+      { type: "novo", title: "Importar alunos já matriculados na turma", description: "No import de alunos, escolha uma Turma padrão para o lote ou use a coluna Turma no CSV. A matrícula respeita vaga, lista de espera e conflito de horário, com relatório do que ficou pendente." },
+      { type: "melhoria", title: "Matrícula em massa consistente", description: "Toda matrícula em lote passa a usar a mesma regra do cadastro individual (vaga → ativa; lotada → fila; choque de horário bloqueado)." },
+    ],
+  },
+  {
     version: "2026.09.18.8",
     date: "2026-09-18",
     title: "Checkout de plano sem cobrança não dá mais erro",

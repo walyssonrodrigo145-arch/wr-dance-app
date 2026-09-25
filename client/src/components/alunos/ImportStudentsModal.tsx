@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { MAX_CSV_ROWS, parseDelimited, normalizeHeader, downloadCsv } from "@/lib/csv";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,7 +22,7 @@ import {
   Trash2, ChevronLeft, ChevronRight, CheckCircle2,
 } from "lucide-react";
 
-const MAX_ROWS = 300;
+const MAX_ROWS = MAX_CSV_ROWS;
 const PAGE_SIZE = 25;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -31,12 +32,13 @@ type Row = {
   phone: string;
   email: string;
   birthDate: string;
+  turma?: string;
   include: boolean;
 };
 
 type SkippedDetail = { name: string; phone?: string; email?: string; birthDate?: string; reason: string };
 
-type Report = { imported: number; skipped: number; details: SkippedDetail[] };
+type Report = { imported: number; skipped: number; details: SkippedDetail[]; enrolled?: number; waitlisted?: number };
 
 const digits = (v: string) => (v || "").replace(/\D/g, "");
 
@@ -61,66 +63,13 @@ function normalizeBirthDate(raw: string): string {
   return iso;
 }
 
-function detectDelimiter(line: string): string {
-  const candidates = [";", ",", "\t"];
-  let best = ";";
-  let bestCount = -1;
-  for (const c of candidates) {
-    const count = line.split(c).length - 1;
-    if (count > bestCount) { best = c; bestCount = count; }
-  }
-  return best;
-}
-
-/** Parser CSV real: aspas, escapes, BOM, CRLF e delimitador detectado. */
-function parseDelimited(text: string): string[][] {
-  const clean = text.replace(/^\uFEFF/, "");
-  const firstLine = clean.split(/\r?\n/)[0] || "";
-  const delimiter = detectDelimiter(firstLine);
-  const rows: string[][] = [];
-  let field = "";
-  let row: string[] = [];
-  let inQuotes = false;
-
-  for (let i = 0; i < clean.length; i++) {
-    const ch = clean[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (clean[i + 1] === '"') { field += '"'; i++; }
-        else inQuotes = false;
-      } else {
-        field += ch;
-      }
-    } else if (ch === '"') {
-      inQuotes = true;
-    } else if (ch === "\n" || ch === "\r") {
-      if (ch === "\r" && clean[i + 1] === "\n") i++;
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = "";
-    } else if (ch === delimiter) {
-      row.push(field);
-      field = "";
-    } else {
-      field += ch;
-    }
-  }
-  row.push(field);
-  rows.push(row);
-
-  return rows.filter((r) => r.some((c) => c.trim() !== ""));
-}
-
-const HEADER_ALIASES: Record<"name" | "phone" | "email" | "birthDate", string[]> = {
+const HEADER_ALIASES: Record<"name" | "phone" | "email" | "birthDate" | "turma", string[]> = {
   name: ["nome", "nome completo", "nome do aluno", "aluno", "aluna", "name"],
   phone: ["telefone", "telefone celular", "celular", "whatsapp", "fone", "phone"],
   email: ["email", "e-mail", "e mail"],
   birthDate: ["nascimento", "data de nascimento", "nasc", "aniversario", "birthdate", "data nasc"],
+  turma: ["turma", "turma atual", "turma do aluno", "turmas"],
 };
-
-const normalizeHeader = (v: string) =>
-  (v || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
 function buildRows(text: string): { rows: Row[]; hadHeader: boolean; truncated: boolean } {
   const parsed = parseDelimited(text);
@@ -131,7 +80,7 @@ function buildRows(text: string): { rows: Row[]; hadHeader: boolean; truncated: 
     (Object.keys(HEADER_ALIASES) as Array<keyof typeof HEADER_ALIASES>).some((k) => HEADER_ALIASES[k].includes(cell));
   const hadHeader = first.some(isHeaderCell);
 
-  let mapping: Partial<Record<"name" | "phone" | "email" | "birthDate", number>> = { name: 0, phone: 1, email: 2, birthDate: 3 };
+  let mapping: Partial<Record<"name" | "phone" | "email" | "birthDate" | "turma", number>> = { name: 0, phone: 1, email: 2, birthDate: 3 };
   let dataRows = parsed;
   if (hadHeader) {
     mapping = {};
@@ -152,6 +101,7 @@ function buildRows(text: string): { rows: Row[]; hadHeader: boolean; truncated: 
     let phone = cell(mapping.phone);
     let email = cell(mapping.email).toLowerCase();
     const birthRaw = cell(mapping.birthDate);
+    const turma = cell(mapping.turma);
 
     // Tolerância legada: 2ª coluna com e-mail (formato Nome;E-mail;Telefone)
     if (!hadHeader && phone.includes("@")) {
@@ -159,23 +109,10 @@ function buildRows(text: string): { rows: Row[]; hadHeader: boolean; truncated: 
       phone = "";
     }
 
-    return { key: i, name, phone, email, birthDate: birthRaw, include: name.length >= 2 };
+    return { key: i, name, phone, email, birthDate: birthRaw, turma, include: name.length >= 2 };
   });
 
   return { rows, hadHeader, truncated };
-}
-
-function downloadCsv(filename: string, header: string[], data: string[][]) {
-  const csv = "\uFEFF" + [header, ...data]
-    .map((r) => r.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(";"))
-    .join("\r\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 type Props = {
@@ -212,10 +149,29 @@ export function ImportStudentsModal({ open, onOpenChange }: Props) {
   const [professorId, setProfessorId] = useState<string>("");
   const [instrumentId, setInstrumentId] = useState<string>("none");
   const [level, setLevel] = useState<"iniciante" | "intermediario" | "avancado">("iniciante");
+  const [defaultTurmaId, setDefaultTurmaId] = useState<string>("none");
   const [precheckTick, setPrecheckTick] = useState(0);
 
   const { data: profs = [] } = trpc.professores.list.useQuery(undefined, { enabled: open });
   const { data: instruments = [] } = trpc.instruments.list.useQuery(undefined, { enabled: open });
+  const { data: turmasAtivas = [] } = trpc.turmas.list.useQuery({ status: "ativa" }, { enabled: open });
+
+  // Migração de escola: turma por linha (coluna "Turma") ou turma padrão do lote
+  const turmaByName = useMemo(() => {
+    const m = new Map<string, { id: number; name: string }>();
+    (turmasAtivas as any[]).forEach((t) => m.set(normalizeHeader(t.name), { id: t.id, name: t.name }));
+    return m;
+  }, [turmasAtivas]);
+
+  const resolveRowTurma = (r: Row): { id?: number; unknownName?: string } => {
+    const raw = (r.turma || "").trim();
+    if (raw) {
+      const found = turmaByName.get(normalizeHeader(raw));
+      return found ? { id: found.id } : { unknownName: raw };
+    }
+    if (defaultTurmaId !== "none") return { id: Number(defaultTurmaId) };
+    return {};
+  };
 
   useEffect(() => {
     const t = setTimeout(() => setPrecheckTick((v) => v + 1), 600);
@@ -267,6 +223,8 @@ export function ImportStudentsModal({ open, onOpenChange }: Props) {
       else if ((phoneCount.get(p) || 0) > 1) warnings.push("Telefone repetido no arquivo");
     }
     if (r.birthDate.trim() && !normalizeBirthDate(r.birthDate)) warnings.push("Data de nascimento inválida — será ignorada");
+    const turmaRes = resolveRowTurma(r);
+    if (turmaRes.unknownName) warnings.push(`Turma "${turmaRes.unknownName}" não encontrada — entra sem turma`);
     return { errors, warnings };
   };
 
@@ -321,7 +279,7 @@ export function ImportStudentsModal({ open, onOpenChange }: Props) {
     rows.forEach((r) => m.set(r.key, rowIssues(r)));
     return m;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, precheck]);
+  }, [rows, precheck, defaultTurmaId, turmaByName]);
 
   const problemCount = useMemo(
     () => rows.filter((r) => { const i = issuesByKey.get(r.key); return (i?.errors.length || 0) > 0 || (i?.warnings.length || 0) > 0; }).length,
@@ -348,6 +306,7 @@ export function ImportStudentsModal({ open, onOpenChange }: Props) {
           email: finalEmail,
           phone: r.phone.trim() || undefined,
           birthDate: normalizeBirthDate(r.birthDate) || undefined,
+          turmaId: resolveRowTurma(r).id,
         };
       })
       .filter((r) => r.name.length >= 2);
@@ -365,9 +324,14 @@ export function ImportStudentsModal({ open, onOpenChange }: Props) {
           birthDate: r.birthDate.trim() || undefined,
           reason: issuesByKey.get(r.key)?.errors[0] || "Linha desmarcada na revisão",
         }));
-      const details = [...res.skippedDetails.map((d) => ({ name: d.name, reason: d.reason })), ...localSkipped];
-      setReport({ imported: res.imported, skipped: details.length, details });
+      const details = [
+        ...res.skippedDetails.map((d) => ({ name: d.name, reason: d.reason })),
+        ...((res.enrollSkipped || []).map((d: { name: string; reason: string }) => ({ name: d.name, reason: `Turma: ${d.reason}` }))),
+        ...localSkipped,
+      ];
+      setReport({ imported: res.imported, skipped: details.length, details, enrolled: res.enrolled, waitlisted: res.waitlisted });
       if (res.imported > 0) toast.success(`${res.imported} aluno${res.imported === 1 ? "" : "s"} importado${res.imported === 1 ? "" : "s"}!`);
+      if ((res.waitlisted || 0) > 0) toast.info(`${res.waitlisted} aluno(s) entraram na lista de espera da turma.`);
     },
     onError: (err) => toast.error(err.message || "Não foi possível importar os alunos."),
   });
@@ -446,6 +410,7 @@ export function ImportStudentsModal({ open, onOpenChange }: Props) {
                   {report.skipped > 0
                     ? `${report.skipped} linha(s) não importada(s) — veja os motivos abaixo.`
                     : "Todas as linhas foram importadas."}
+                  {(report.enrolled || 0) > 0 && ` • ${report.enrolled} matriculado(s) em turma${(report.waitlisted || 0) > 0 ? ` (${report.waitlisted} na lista de espera)` : ""}.`}
                 </p>
               </div>
             </div>
@@ -486,7 +451,7 @@ export function ImportStudentsModal({ open, onOpenChange }: Props) {
           </div>
         ) : (
           <div className="space-y-4 pt-1">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Professor responsável</label>
                 <Select value={professorId} onValueChange={setProfessorId}>
@@ -526,6 +491,21 @@ export function ImportStudentsModal({ open, onOpenChange }: Props) {
                     <SelectItem value="iniciante">Iniciante</SelectItem>
                     <SelectItem value="intermediario">Intermediário</SelectItem>
                     <SelectItem value="avancado">Avançado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Turma padrão</label>
+                <Select value={defaultTurmaId} onValueChange={setDefaultTurmaId}>
+                  <SelectTrigger className="h-10 rounded-xl text-xs font-bold">
+                    <SelectValue placeholder="Sem turma" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem turma</SelectItem>
+                    {(turmasAtivas as any[]).map((t) => (
+                      <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
