@@ -1,8 +1,8 @@
 // Fluxo de dança — a GRADE da turma vira agenda.
 // A turma gera AULAS (sessões) mesmo sem alunos; a presença por aluno é
 // registrada em lesson_attendance na chamada (professor ou recepção).
-import { and, eq, gte, lte, ne, or, sql, isNotNull } from "drizzle-orm";
-import { lessons, turmas, turmaAlunos, students, lessonAttendance } from "../../drizzle/schema";
+import { and, eq, gte, inArray, lte, ne, or, sql, isNotNull } from "drizzle-orm";
+import { lessons, turmas, turmaAlunos, students, lessonAttendance, lessonOverrides } from "../../drizzle/schema";
 
 export interface TurmaGrade {
   id: number;
@@ -182,7 +182,7 @@ export async function cancelFutureTurmaLessons(db: any, organizationId: number, 
   return { cancelled: cancelled.length };
 }
 
-/** Lista da chamada: alunos ativos da turma + presença já registrada na sessão. */
+/** Lista da chamada: alunos ativos da turma + extras − excluídos, com a presença da sessão. */
 export async function getTurmaAttendance(db: any, organizationId: number, lessonId: number) {
   const [session] = await db.select().from(lessons)
     .where(and(eq(lessons.id, lessonId), eq(lessons.organizationId, organizationId), isNotNull(lessons.turmaId)))
@@ -194,7 +194,7 @@ export async function getTurmaAttendance(db: any, organizationId: number, lesson
     .limit(1);
   if (!turma) return null;
 
-  const roster = await db.select({
+  const baseRoster = await db.select({
     id: students.id,
     name: students.name,
     phone: students.phone,
@@ -206,13 +206,34 @@ export async function getTurmaAttendance(db: any, organizationId: number, lesson
       eq(turmaAlunos.organizationId, organizationId),
       eq(turmaAlunos.turmaId, session.turmaId),
       eq(turmaAlunos.status, "ativa"),
-    ))
-    .orderBy(students.name);
+    ));
+
+  const overrides = await db.select().from(lessonOverrides)
+    .where(and(eq(lessonOverrides.organizationId, organizationId), eq(lessonOverrides.lessonId, lessonId)));
+  const excludeIds = new Set(overrides.filter((o: any) => o.type === "exclude").map((o: any) => o.studentId));
+  const includeIds = overrides.filter((o: any) => o.type === "include").map((o: any) => o.studentId);
+
+  const roster: any[] = baseRoster
+    .filter((r: any) => !excludeIds.has(r.id))
+    .map((r: any) => ({ ...r, isExtra: false }));
+
+  if (includeIds.length > 0) {
+    const extras = await db.select({ id: students.id, name: students.name, phone: students.phone })
+      .from(students)
+      .where(and(eq(students.organizationId, organizationId), inArray(students.id, includeIds)));
+    const rosterIds = new Set(roster.map((r) => r.id));
+    for (const e of extras) {
+      if (rosterIds.has(e.id)) continue;
+      roster.push({ ...e, enrollmentStatus: "extra", isExtra: true });
+    }
+  }
+
+  roster.sort((a: any, b: any) => String(a.name).localeCompare(String(b.name), "pt-BR"));
 
   const attendance = await db.select().from(lessonAttendance)
     .where(and(eq(lessonAttendance.organizationId, organizationId), eq(lessonAttendance.lessonId, lessonId)));
 
-  return { session, turma, roster, attendance };
+  return { session, turma, roster, attendance, overrides };
 }
 
 /** Salva a chamada (upsert por aluno) e marca a sessão como concluída. */
@@ -235,6 +256,14 @@ export async function saveTurmaAttendance(
       eq(turmaAlunos.status, "ativa"),
     ));
   const allowed = new Set(roster.map((r: any) => r.studentId));
+
+  // Exceções da sessão: extras entram, excluídos saem da chamada
+  const overrides = await db.select({ studentId: lessonOverrides.studentId, type: lessonOverrides.type })
+    .from(lessonOverrides)
+    .where(and(eq(lessonOverrides.organizationId, organizationId), eq(lessonOverrides.lessonId, lessonId)));
+  for (const o of overrides as any[]) if (o.type === "include") allowed.add(o.studentId);
+  for (const o of overrides as any[]) if (o.type === "exclude") allowed.delete(o.studentId);
+
   const valid = entries.filter((e) => allowed.has(e.studentId));
   if (valid.length === 0) return { saved: 0 };
 
@@ -256,4 +285,141 @@ export async function saveTurmaAttendance(
     .where(and(eq(lessons.id, lessonId), eq(lessons.organizationId, organizationId)));
 
   return { saved: valid.length };
+}
+
+/** Sessão de turma + acesso (admin ou professor da turma). */
+async function loadSessionForEdit(db: any, organizationId: number, lessonId: number) {
+  const [session] = await db.select({
+    id: lessons.id,
+    turmaId: lessons.turmaId,
+    scheduledAt: lessons.scheduledAt,
+  }).from(lessons)
+    .where(and(eq(lessons.id, lessonId), eq(lessons.organizationId, organizationId), isNotNull(lessons.turmaId)))
+    .limit(1);
+  if (!session) throw new Error("Aula de turma não encontrada.");
+  return session;
+}
+
+/**
+ * Inclui um aluno EXTRA na aula (reposição/experimental/visitante), sem mexer na
+ * matrícula. scope "upcoming" aplica na aula atual e nas próximas ainda agendadas.
+ */
+export async function addStudentToLesson(
+  db: any,
+  organizationId: number,
+  lessonId: number,
+  studentId: number,
+  scope: "single" | "upcoming",
+  createdByUserId: number,
+  reason?: string,
+) {
+  const session = await loadSessionForEdit(db, organizationId, lessonId);
+  const [student] = await db.select({ id: students.id, name: students.name }).from(students)
+    .where(and(eq(students.id, studentId), eq(students.organizationId, organizationId))).limit(1);
+  if (!student) throw new Error("Aluno não encontrado nesta escola.");
+
+  const lessonIds: number[] = [lessonId];
+  if (scope === "upcoming") {
+    const future = await db.select({ id: lessons.id }).from(lessons)
+      .where(and(
+        eq(lessons.organizationId, organizationId),
+        eq(lessons.turmaId, session.turmaId),
+        gte(lessons.scheduledAt, session.scheduledAt),
+        eq(lessons.status, "agendada"),
+      ));
+    for (const f of future) if (!lessonIds.includes(f.id)) lessonIds.push(f.id);
+  }
+
+  const reasonValue = reason ? reason.slice(0, 120) : null;
+  for (const id of lessonIds) {
+    await db.insert(lessonOverrides).values({
+      organizationId,
+      lessonId: id,
+      studentId,
+      type: "include",
+      reason: reasonValue,
+      createdByUserId,
+      createdAt: new Date(),
+    }).onConflictDoUpdate({
+      target: [lessonOverrides.lessonId, lessonOverrides.studentId],
+      set: { type: "include", reason: reasonValue, createdByUserId, createdAt: new Date() },
+    });
+  }
+
+  return { success: true, lessons: lessonIds.length, studentName: student.name };
+}
+
+/**
+ * Remove um aluno da aula: aluno da turma → exceção "não participa desta aula";
+ * aluno extra → remove a inclusão (desta aula ou de todas as próximas).
+ */
+export async function removeStudentFromLesson(
+  db: any,
+  organizationId: number,
+  lessonId: number,
+  studentId: number,
+  scope: "single" | "upcoming",
+  createdByUserId: number,
+) {
+  const session = await loadSessionForEdit(db, organizationId, lessonId);
+
+  const [enrollment] = await db.select({ id: turmaAlunos.id }).from(turmaAlunos)
+    .where(and(
+      eq(turmaAlunos.organizationId, organizationId),
+      eq(turmaAlunos.turmaId, session.turmaId),
+      eq(turmaAlunos.studentId, studentId),
+      eq(turmaAlunos.status, "ativa"),
+    )).limit(1);
+
+  if (enrollment) {
+    if (scope === "upcoming") {
+      throw new Error("Para sair da turma das próximas aulas, use Turmas & Vagas → Matrículas (libera a vaga para a fila).");
+    }
+    await db.insert(lessonOverrides).values({
+      organizationId,
+      lessonId,
+      studentId,
+      type: "exclude",
+      createdByUserId,
+      createdAt: new Date(),
+    }).onConflictDoUpdate({
+      target: [lessonOverrides.lessonId, lessonOverrides.studentId],
+      set: { type: "exclude", createdByUserId, createdAt: new Date() },
+    });
+    // Limpa presença já marcada desta aula (o aluno não participa mais)
+    await db.delete(lessonAttendance).where(and(
+      eq(lessonAttendance.organizationId, organizationId),
+      eq(lessonAttendance.lessonId, lessonId),
+      eq(lessonAttendance.studentId, studentId),
+    ));
+    return { success: true, affected: 1, mode: "excluded" as const };
+  }
+
+  if (scope === "upcoming") {
+    const future = await db.select({ id: lessons.id }).from(lessons)
+      .where(and(
+        eq(lessons.organizationId, organizationId),
+        eq(lessons.turmaId, session.turmaId),
+        gte(lessons.scheduledAt, session.scheduledAt),
+        eq(lessons.status, "agendada"),
+      ));
+    const ids = future.map((r: any) => r.id);
+    if (ids.length > 0) {
+      await db.delete(lessonOverrides).where(and(
+        eq(lessonOverrides.organizationId, organizationId),
+        inArray(lessonOverrides.lessonId, ids),
+        eq(lessonOverrides.studentId, studentId),
+        eq(lessonOverrides.type, "include"),
+      ));
+    }
+    return { success: true, affected: ids.length, mode: "removed_extra" as const };
+  }
+
+  await db.delete(lessonOverrides).where(and(
+    eq(lessonOverrides.organizationId, organizationId),
+    eq(lessonOverrides.lessonId, lessonId),
+    eq(lessonOverrides.studentId, studentId),
+    eq(lessonOverrides.type, "include"),
+  ));
+  return { success: true, affected: 1, mode: "removed_extra" as const };
 }

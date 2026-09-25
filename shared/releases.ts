@@ -26,6 +26,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.18.12",
+    date: "2026-09-18",
+    title: "Aula de turma: incluir e remover aluno na sessão + prévia no cadastro",
+    summary: "A chamada ficou completa: dá para incluir uma aluna extra (reposição/visitante) só naquela aula ou nas próximas, e remover quem não participa — sem mexer na matrícula.",
+    items: [
+      { type: "novo", title: "Incluir aluno extra na aula", description: "Na chamada, o botão Adicionar à aula busca alunas fora da turma e inclui como Extra — para reposição, experimental ou visitante — só naquela aula ou nesta e nas próximas." },
+      { type: "novo", title: "Remover aluno da aula", description: "Aluna da turma pode ser removida apenas daquela aula (a matrícula continua); aluna extra pode sair só da aula ou de todas as próximas. Com quem incluiu/removeu registrado." },
+      { type: "novo", title: "Prévia ao salvar o cadastro", description: "Ao selecionar turmas no cadastro, o sistema mostra o que será criado: grade de cada turma, estimativa de aulas até o fim do período e quantas mensalidades serão geradas." },
+    ],
+  },
+  {
     version: "2026.09.18.11",
     date: "2026-09-18",
     title: "Landing premium: números reais, pagamentos integrados e implantação",

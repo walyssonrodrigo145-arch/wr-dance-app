@@ -35,7 +35,7 @@ import { nanoid } from "nanoid";
 import { sdk } from "../_core/sdk";
 import { sendVerificationEmail, sendSimpleEmail } from "../_core/email";
 import { ENV } from "../_core/env";
-import { getTurmaAttendance, saveTurmaAttendance } from "../services/TurmaScheduleService";
+import { getTurmaAttendance, saveTurmaAttendance, addStudentToLesson, removeStudentFromLesson } from "../services/TurmaScheduleService";
 import { storagePut } from "../storage";
 import { superAdminRouter } from "../superAdminRouter";
 import { pairingActiveSessions } from "../automationJob";
@@ -1950,6 +1950,51 @@ export const lessonsRouters = {
         return { success: true, ...res };
       } catch (err: any) {
         throw new TRPCError({ code: "BAD_REQUEST", message: err.message || "Não foi possível salvar a chamada." });
+      }
+    }),
+
+    /** Inclui aluno extra na aula (reposição/visitante) — nesta ou nas próximas. */
+    addStudent: protectedProcedure.input(z.object({
+      lessonId: z.number(),
+      studentId: z.number(),
+      scope: z.enum(["single", "upcoming"]).default("single"),
+      reason: z.string().max(120).optional(),
+    })).mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+      const data = await getTurmaAttendance(db, orgId, input.lessonId);
+      if (!data) throw new TRPCError({ code: "NOT_FOUND", message: "Aula de turma não encontrada" });
+      const isAdmin = ctx.user.role === "admin" || ctx.user.openId === ENV.ownerOpenId;
+      if (!isAdmin && data.turma.professorId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Você não é o professor desta turma." });
+      }
+      try {
+        return await addStudentToLesson(db, orgId, input.lessonId, input.studentId, input.scope, ctx.user.id, input.reason);
+      } catch (err: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: err.message || "Não foi possível incluir o aluno." });
+      }
+    }),
+
+    /** Remove aluno da aula (da turma = exceção só desta aula; extra = remove a inclusão). */
+    removeStudent: protectedProcedure.input(z.object({
+      lessonId: z.number(),
+      studentId: z.number(),
+      scope: z.enum(["single", "upcoming"]).default("single"),
+    })).mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+      const data = await getTurmaAttendance(db, orgId, input.lessonId);
+      if (!data) throw new TRPCError({ code: "NOT_FOUND", message: "Aula de turma não encontrada" });
+      const isAdmin = ctx.user.role === "admin" || ctx.user.openId === ENV.ownerOpenId;
+      if (!isAdmin && data.turma.professorId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Você não é o professor desta turma." });
+      }
+      try {
+        return await removeStudentFromLesson(db, orgId, input.lessonId, input.studentId, input.scope, ctx.user.id);
+      } catch (err: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: err.message || "Não foi possível remover o aluno." });
       }
     }),
   }),

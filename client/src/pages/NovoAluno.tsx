@@ -1923,6 +1923,35 @@ export default function NovoAluno() {
                   )}
 
                   {selectedTurmaIds.length > 0 && (
+                    <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-1.5">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-primary">Prévia ao salvar</p>
+                      {selectedTurmaIds
+                        .map((id) => (turmasList as any[]).find((t) => t.id === id))
+                        .filter(Boolean)
+                        .map((t: any) => {
+                          const weeks = Math.round(Number(form.monthsCount || 3) * 4.33);
+                          const totalAulas = weeks * ((t.weekdays || []).length || 0);
+                          const end = new Date();
+                          end.setMonth(end.getMonth() + Number(form.monthsCount || 3));
+                          const endLabel = `${String(end.getMonth() + 1).padStart(2, "0")}/${end.getFullYear()}`;
+                          return (
+                            <p key={t.id} className="text-[11px] text-muted-foreground">
+                              <strong className="text-foreground">{t.name}</strong>
+                              {": "}{formatTurmaGrade(t.weekdays, t.timeStr)}
+                              {totalAulas > 0 ? ` • ≈ ${totalAulas} aulas até ${endLabel}` : " • defina dias/horário e gere as aulas na turma"}
+                            </p>
+                          );
+                        })}
+                      <p className="text-[11px] text-muted-foreground">
+                        {form.generateMonthly
+                          ? <>Mensalidades: <strong className="text-foreground">{form.monthsCount}</strong> mês(es) a partir do mês atual</>
+                          : "Mensalidades: não serão geradas agora"}
+                        {Number(form.monthlyFee) > 0 ? <> • valor sugerido <strong className="text-foreground">R$ {Number(form.monthlyFee).toFixed(2)}</strong></> : null}
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedTurmaIds.length > 0 && (
                     <p className="text-[10px] font-black uppercase tracking-widest text-violet-600 dark:text-violet-400">
                       {selectedTurmaIds.length} turma(s) selecionada(s)
                     </p>

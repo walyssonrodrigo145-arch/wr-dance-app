@@ -2841,6 +2841,28 @@ export const lessonAttendance = pgTable("lesson_attendance", {
 export type LessonAttendance = typeof lessonAttendance.$inferSelect;
 export type InsertLessonAttendance = typeof lessonAttendance.$inferInsert;
 
+// ─── Exceções por aula de turma (fluxo de dança) ────────────────────────────
+// include: aluno EXTRA nesta aula (reposição/experimental/visitante), sem
+//   alterar a matrícula na turma.
+// exclude: aluno da turma que NÃO participa desta aula específica.
+export const lessonOverrides = pgTable("lesson_overrides", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").notNull(),
+  lessonId: integer("lessonId").notNull(),
+  studentId: integer("studentId").notNull(),
+  type: varchar("type", { length: 10 }).notNull(), // include | exclude
+  reason: varchar("reason", { length: 120 }),
+  createdByUserId: integer("createdByUserId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("lesson_overrides_unique").on(table.lessonId, table.studentId),
+  index("lesson_overrides_lesson_idx").on(table.lessonId),
+  index("lesson_overrides_student_idx").on(table.studentId),
+]);
+
+export type LessonOverride = typeof lessonOverrides.$inferSelect;
+export type InsertLessonOverride = typeof lessonOverrides.$inferInsert;
+
 /** Matrícula em turma: ativa (vaga) ou espera (fila com posição). */
 export const turmaAlunos = pgTable("turma_alunos", {
   id: serial("id").primaryKey(),

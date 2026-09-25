@@ -743,6 +743,19 @@ export async function runAutoMigrations() {
       { table: 'lesson_attendance', sql: `CREATE UNIQUE INDEX IF NOT EXISTS "lesson_attendance_unique" ON "lesson_attendance" ("lessonId", "studentId")` },
       { table: 'lesson_attendance', sql: `CREATE INDEX IF NOT EXISTS "lesson_attendance_lesson_idx" ON "lesson_attendance" ("lessonId")` },
       { table: 'lesson_attendance', sql: `CREATE INDEX IF NOT EXISTS "lesson_attendance_student_idx" ON "lesson_attendance" ("studentId")` },
+      { table: 'lesson_overrides', sql: `CREATE TABLE IF NOT EXISTS "lesson_overrides" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "organizationId" integer NOT NULL,
+        "lessonId" integer NOT NULL,
+        "studentId" integer NOT NULL,
+        "type" varchar(10) NOT NULL,
+        "reason" varchar(120),
+        "createdByUserId" integer,
+        "createdAt" timestamp DEFAULT now() NOT NULL
+      );` },
+      { table: 'lesson_overrides', sql: `CREATE UNIQUE INDEX IF NOT EXISTS "lesson_overrides_unique" ON "lesson_overrides" ("lessonId", "studentId")` },
+      { table: 'lesson_overrides', sql: `CREATE INDEX IF NOT EXISTS "lesson_overrides_lesson_idx" ON "lesson_overrides" ("lessonId")` },
+      { table: 'lesson_overrides', sql: `CREATE INDEX IF NOT EXISTS "lesson_overrides_student_idx" ON "lesson_overrides" ("studentId")` },
 
       // ═══ SAÚDE / CONDICIONAMENTO FÍSICO (DancePro) ═══
       { table: 'student_health_records', sql: `CREATE TABLE IF NOT EXISTS "student_health_records" (
