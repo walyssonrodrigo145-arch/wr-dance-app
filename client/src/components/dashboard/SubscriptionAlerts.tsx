@@ -76,14 +76,14 @@ export function SubscriptionAlertBanner() {
       <button
         type="button"
         onClick={() => setLocation("/assinatura")}
-        className="shrink-0 h-8 px-3 rounded-lg bg-current/10 hover:bg-current/20 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-colors"
+        className="shrink-0 h-8 px-3 rounded-lg bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-colors"
       >
         {meta.cta} <ArrowRight size={12} />
       </button>
       <button
         type="button"
         onClick={() => { try { sessionStorage.setItem("dp_sub_alert_dismissed", "1"); } catch { /* ignore */ } setDismissed(true); }}
-        className="shrink-0 w-7 h-7 rounded-lg hover:bg-current/10 flex items-center justify-center transition-colors"
+        className="shrink-0 w-7 h-7 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 flex items-center justify-center transition-colors"
         aria-label="Ocultar aviso"
         title="Ocultar por hoje"
       >
