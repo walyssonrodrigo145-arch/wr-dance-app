@@ -26,6 +26,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.18.8",
+    date: "2026-09-18",
+    title: "Checkout de plano sem cobrança não dá mais erro",
+    summary: "Planos com valor R$ 0,00 (ex.: parceiro/ilimitado) não chamam mais o Asaas com valor inválido — o sistema orienta em vez de falhar.",
+    items: [
+      { type: "correcao", title: "Assinatura com valor zero bloqueada com aviso", description: "Ao tentar gerar pagamento de um plano sem cobrança, o sistema explica que não há valor a pagar (antes o Asaas retornava 'O parâmetro value deve ser informado')." },
+      { type: "correcao", title: "Trocar/reativar para plano sem cobrança funciona", description: "Mudar para um plano gratuito aplica o plano na hora e encerra a assinatura antiga no Asaas, sem gerar cobrança." },
+      { type: "correcao", title: "Sincronização protege contra valor inválido", description: "A atualização automática de assinatura ignora planos sem cobrança, evitando erros silenciosos no Asaas." },
+    ],
+  },
+  {
     version: "2026.09.18.7",
     date: "2026-09-18",
     title: "Fluxo de dança — Fase 2: multi-turma, rematrícula e reposição de turma",

@@ -761,6 +761,14 @@ export const plataformaRouters = {
           const excessFee = (allowExtra && excessCount > 0) ? excessCount * extraPrice : 0;
           const totalValue = baseValue + excessFee;
 
+          // AUDITORIA: plano sem cobrança (ex.: parceiro/ilimitado) não gera assinatura.
+          if (!Number.isFinite(totalValue) || totalValue <= 0) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Seu plano atual não possui valor de cobrança (R$ 0,00) — não é necessário gerar pagamento. Fale com o suporte para contratar um plano pago.",
+            });
+          }
+
           const description = excessCount > 0
             ? `Assinatura MusicPro - Plano ${planInfo?.name || org.planId} (${input.planType}) + ${excessCount} alunos excedentes`
             : `Assinatura MusicPro - Plano ${planInfo?.name || org.planId} (${input.planType})`;
@@ -934,6 +942,26 @@ export const plataformaRouters = {
       const excessFee = (allowExtra && excessCount > 0) ? excessCount * extraPrice : 0;
       const totalValue = baseValue + excessFee;
 
+      // AUDITORIA: plano sem cobrança — aplica localmente e encerra assinatura antiga
+      // (nunca chamar o Asaas com value 0, que retorna "O parâmetro value deve ser informado").
+      if (!Number.isFinite(totalValue) || totalValue <= 0) {
+        if (org.asaasSubscriptionId) {
+          try {
+            const { deleteAsaasSubscription } = await import('../utils/asaas');
+            await deleteAsaasSubscription(org.asaasSubscriptionId);
+            await db.update(organizations).set({ asaasSubscriptionId: null, updatedAt: new Date() })
+              .where(eq(organizations.id, orgId));
+            debugLog(`[ChangePlan] Assinatura anterior #${org.asaasSubscriptionId} encerrada (novo plano sem cobrança).`);
+          } catch (e) {
+            console.warn(`[ChangePlan] Falha ao encerrar assinatura anterior:`, e);
+          }
+        }
+        await db.update(organizations)
+          .set({ planId: input.planId, subscriptionStatus: "active", updatedAt: new Date() })
+          .where(eq(organizations.id, orgId));
+        return { success: true, paymentLink: null, message: "Plano sem cobrança aplicado — nenhuma assinatura foi gerada." };
+      }
+
       const description = excessCount > 0
         ? `Assinatura MusicPro - Plano ${planInfo.name} (${input.planType}) + ${excessCount} alunos excedentes`
         : `Assinatura MusicPro - Plano ${planInfo.name} (${input.planType})`;
@@ -1102,6 +1130,28 @@ export const plataformaRouters = {
         const excessCount = Math.max(0, activeStudentsCount - maxStudents);
         const excessFee = (allowExtra && excessCount > 0) ? excessCount * extraPrice : 0;
         const totalValue = baseValue + excessFee;
+
+        // AUDITORIA: plano sem cobrança — aplica localmente sem gerar assinatura no Asaas
+        if (!Number.isFinite(totalValue) || totalValue <= 0) {
+          if (org.asaasSubscriptionId) {
+            try {
+              const { deleteAsaasSubscription } = await import('../utils/asaas');
+              await deleteAsaasSubscription(org.asaasSubscriptionId);
+            } catch (err) {
+              console.warn(`[Reactivate] Erro ao cancelar assinatura anterior #${org.asaasSubscriptionId}:`, err);
+            }
+          }
+          await db.update(organizations)
+            .set({
+              planId,
+              asaasSubscriptionId: null,
+              subscriptionStatus: "active",
+              trialEndsAt: null,
+              updatedAt: new Date(),
+            })
+            .where(eq(organizations.id, orgId));
+          return { success: true, paymentLink: null, message: "Plano sem cobrança ativado — nenhuma assinatura foi gerada." };
+        }
 
         const description = excessCount > 0
           ? `Assinatura MusicPro - Plano ${planInfo?.name || planId} (${input.planType}) + ${excessCount} alunos excedentes`

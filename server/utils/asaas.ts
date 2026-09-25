@@ -264,13 +264,22 @@ export async function createAsaasSubscription(params: {
   successUrl?: string;
   maxPayments?: number;
 }, apiKey?: string) {
+  // AUDITORIA: o Asaas rejeita valor ausente/zero ("O parâmetro value deve ser
+  // informado"). Nunca chamar a API com valor inválido — falha com mensagem clara.
+  const value = Number(params.value);
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(
+      `[Asaas] Valor da assinatura inválido (R$ ${Number.isFinite(value) ? value.toFixed(2) : "?"}). ` +
+      "Verifique o preço do plano antes de gerar a cobrança."
+    );
+  }
   const res = await asaasRequest(
     "POST",
     `${ENV.asaasBaseUrl}/subscriptions`,
     {
       customer: params.customer,
       billingType: params.billingType,
-      value: params.value,
+      value,
       nextDueDate: params.nextDueDate,
       cycle: params.cycle,
       description: params.description,

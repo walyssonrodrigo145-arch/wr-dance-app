@@ -268,6 +268,9 @@ export async function syncOrgAsaasSubscription(db: any, orgId: number) {
     const baseValue = cycle === "YEARLY" ? Number(planInfo.priceYearly) : Number(planInfo.priceMonthly);
     const totalValue = baseValue + excessFee;
 
+    // AUDITORIA: nunca sincronizar valor inválido/zero com o Asaas (plano sem cobrança)
+    if (!Number.isFinite(totalValue) || totalValue <= 0) return;
+
     const description = excessCount > 0
       ? `Assinatura MusicPro - Plano ${planInfo.name} (${cycle}) + ${excessCount} alunos excedentes`
       : `Assinatura MusicPro - Plano ${planInfo.name} (${cycle})`;
