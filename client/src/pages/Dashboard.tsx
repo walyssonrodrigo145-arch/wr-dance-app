@@ -19,6 +19,7 @@ import { FreeSlotsCard } from "@/components/dashboard/FreeSlotsCard";
 import { LiveRoomsCard } from "@/components/dashboard/LiveRoomsCard";
 import { SetupChecklistCard } from "@/components/dashboard/SetupChecklistCard";
 import { AttentionCard } from "@/components/dashboard/AttentionCard";
+import { SubscriptionAlertBanner } from "@/components/dashboard/SubscriptionAlerts";
 import { PlanSelectionModal } from "@/components/PlanSelectionModal";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -504,6 +505,8 @@ export default function Dashboard() {
         )}
 
         {/* Fase 3 — Onboarding "Escola pronta em 10 minutos" (só admin) */}
+        {prefs.isAdmin && <SubscriptionAlertBanner />}
+
         {prefs.isAdmin && <SetupChecklistCard />}
 
         {/* Fase 3 — Central de pendências "Atenção hoje" */}

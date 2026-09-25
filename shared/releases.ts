@@ -26,6 +26,20 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.18.11",
+    date: "2026-09-18",
+    title: "Landing premium: números reais, pagamentos integrados e implantação",
+    summary: "A página inicial agora mostra prova real, os pagamentos que a escola já usa e como a migração funciona — com navegação guiada e atalho para voltar ao topo.",
+    items: [
+      { type: "novo", title: "Números reais da plataforma", description: "A faixa de credibilidade mostra escolas, alunos, modalidades e aulas no mês direto da base (aparece quando a escola cresce)." },
+      { type: "novo", title: "Logos oficiais dos pagamentos", description: "Asaas, Mercado Pago e InfinitePay aparecem na landing — os mesmos gateways que a escola já pode conectar." },
+      { type: "novo", title: "Seção “Sua escola não foi feita para viver em planilha”", description: "As dores do dia a dia (chamada, mensalidade, figurino) com a solução do DancePro ao lado." },
+      { type: "novo", title: "Implantação, migração e suporte", description: "Cards explicando a migração assistida por CSV, o checklist “Escola pronta em 10 minutos” e o suporte no WhatsApp." },
+      { type: "melhoria", title: "Navegação guiada na landing", description: "Menu com destaque da seção atual (scrollspy), barra de progresso no topo e botão de voltar ao topo." },
+      { type: "novo", title: "Aviso de assinatura no painel", description: "Administradores veem aviso quando o teste está terminando ou a fatura está pendente, com atalho para a tela de assinatura — sem bloquear o acesso." },
+    ],
+  },
+  {
     version: "2026.09.18.10",
     date: "2026-09-18",
     title: "Migração de escola — Etapa 2: mensalidades em aberto com saldo de meses",

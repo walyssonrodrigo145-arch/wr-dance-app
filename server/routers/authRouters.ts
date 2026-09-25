@@ -70,6 +70,35 @@ export const authRouters = {
       const { asc, eq } = await import("drizzle-orm");
       return await db.select().from(landingClients).where(eq(landingClients.isActive, true)).orderBy(asc(landingClients.order), asc(landingClients.createdAt));
     }),
+    /**
+     * Números reais da plataforma para a faixa de credibilidade da landing.
+     * Somente contagens agregadas — nunca dados de escolas/alunos.
+     */
+    getPublicStats: publicProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) return { schools: 0, students: 0, modalities: 0, lessonsThisMonth: 0 };
+      const { organizations, students, lessons, instruments } = await import("../../drizzle/schema");
+      const { gte, and, sql } = await import("drizzle-orm");
+
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
+      const [schoolsRow] = await db.select({ value: sql<number>`CAST(COUNT(*) AS INT)` }).from(organizations);
+      const [studentsRow] = await db.select({ value: sql<number>`CAST(COUNT(*) AS INT)` }).from(students);
+      const [modalitiesRow] = await db.select({ value: sql<number>`CAST(COUNT(*) AS INT)` }).from(instruments);
+      const [lessonsRow] = await db
+        .select({ value: sql<number>`CAST(COUNT(*) AS INT)` })
+        .from(lessons)
+        .where(and(gte(lessons.scheduledAt, startOfMonth), sql`${lessons.status} <> 'cancelada'`));
+
+      return {
+        schools: Number(schoolsRow?.value) || 0,
+        students: Number(studentsRow?.value) || 0,
+        modalities: Number(modalitiesRow?.value) || 0,
+        lessonsThisMonth: Number(lessonsRow?.value) || 0,
+      };
+    }),
     getPlans: publicProcedure.query(async () => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });

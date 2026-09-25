@@ -27,6 +27,11 @@ import {
   Sparkles,
   Eye,
   EyeOff,
+  ArrowUp,
+  CheckCircle2,
+  FileSpreadsheet,
+  Rocket,
+  Headphones,
 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
@@ -34,6 +39,7 @@ import { BenefitsCarousel } from '@/components/BenefitsCarousel';
 import { HeroSlider } from '@/components/HeroSlider';
 import ClientsMarquee from '@/components/ClientsMarquee';
 import { DanceProLogo } from '@/components/DanceProLogo';
+import { PaymentBrandLogos } from '@/components/logos/PaymentBrandLogos';
 import { trpc } from '@/lib/trpc';
 import { SUPPORT_WHATSAPP_URL } from '@/lib/support';
 
@@ -704,6 +710,32 @@ const LandingPage = () => {
   }, [signupPlan, showAllPlans]);
 
   const { data: dbPlans, isLoading: loadingPlans } = trpc.publicData.getPlans.useQuery();
+  const { data: publicStats } = trpc.publicData.getPublicStats.useQuery(undefined, { staleTime: 5 * 60_000 });
+
+  // Progresso de leitura + voltar ao topo + scrollspy do menu
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const [showBackToTop, setShowBackToTop] = useState(false);
+  const [activeSection, setActiveSection] = useState<string>("");
+  useEffect(() => {
+    const onScroll = () => {
+      const doc = document.documentElement;
+      const total = doc.scrollHeight - doc.clientHeight;
+      const top = window.scrollY;
+      setScrollProgress(total > 0 ? Math.min(100, Math.max(0, (top / total) * 100)) : 0);
+      setShowBackToTop(top > 600);
+      let current = "";
+      for (const link of navLinks) {
+        if (!link.href.startsWith("#")) continue;
+        const el = document.getElementById(link.href.slice(1));
+        if (el && el.getBoundingClientRect().top <= 140) current = link.href;
+      }
+      setActiveSection(current);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const parseFeatures = (fStr: any) => {
     if (Array.isArray(fStr)) return fStr;
@@ -739,6 +771,8 @@ const LandingPage = () => {
 
   const navLinks = [
     { name: 'Recursos', href: '#features' },
+    { name: 'Desafio', href: '#desafio' },
+    { name: 'Implantação', href: '#implantacao' },
     { name: 'Clientes & Parceiros', href: '#clients' },
     { name: 'Depoimentos', href: '#testimonials' },
     { name: 'Preços', href: '#pricing' },
@@ -778,6 +812,7 @@ const LandingPage = () => {
           : 'bg-transparent border-transparent py-5'
         }`}
       >
+        <div className="absolute bottom-0 left-0 h-0.5 bg-primary transition-[width] duration-150" style={{ width: `${scrollProgress}%` }} />
         <div className="container flex items-center justify-between">
           <div className="flex items-center gap-2 group cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
             <DanceProLogo size="md" />
@@ -790,7 +825,9 @@ const LandingPage = () => {
                 key={link.name} 
                 href={link.href}
                 target={link.target || "_self"}
-                className="text-sm font-semibold text-muted-foreground hover:text-primary transition-colors"
+                className={`text-sm font-semibold transition-colors ${
+                  activeSection && activeSection === link.href ? "text-primary" : "text-muted-foreground hover:text-primary"
+                }`}
               >
                 {link.name}
               </a>
@@ -961,6 +998,31 @@ const LandingPage = () => {
 
           <div className="mt-20 w-full">
             <HeroSlider />
+          </div>
+        </div>
+      </section>
+
+      {/* CREDIBILIDADE: números reais + pagamentos integrados */}
+      <section className="relative py-10 bg-background border-b border-border/50">
+        <div className="container">
+          {(publicStats?.schools || 0) >= 3 ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center mb-8">
+              {[
+                { value: publicStats?.schools || 0, label: "escolas usando o DancePro" },
+                { value: publicStats?.students || 0, label: "alunos geridos" },
+                { value: publicStats?.modalities || 0, label: "modalidades cadastradas" },
+                { value: publicStats?.lessonsThisMonth || 0, label: "aulas no mês" },
+              ].map((s) => (
+                <div key={s.label}>
+                  <p className="text-2xl md:text-3xl font-black text-foreground tracking-tight">{s.value.toLocaleString("pt-BR")}</p>
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mt-1">{s.label}</p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8">
+            <p className="text-sm font-bold text-muted-foreground">Pagamentos integrados e conciliação automática:</p>
+            <PaymentBrandLogos />
           </div>
         </div>
       </section>
@@ -1226,6 +1288,60 @@ const LandingPage = () => {
         </div>
       </section>
 
+      {/* ── DESAFIO ────────────────────────────────────────────────────────────── */}
+      <section id="desafio" className="relative py-24 bg-background overflow-hidden">
+        <div className="container">
+          <motion.div {...fadeIn} className="text-center max-w-3xl mx-auto mb-14">
+            <span className="text-xs font-black uppercase tracking-widest text-primary">O dia a dia hoje</span>
+            <h2 className="text-3xl md:text-4xl font-outfit font-extrabold tracking-tight mt-3">Sua escola não foi feita para viver em planilha</h2>
+            <p className="text-muted-foreground mt-4">
+              Caderno de chamada, fila de espera no papel, cobrança um a um no WhatsApp e aluna esquecida fora da grade.
+            </p>
+          </motion.div>
+          <div className="grid md:grid-cols-3 gap-5">
+            {[
+              { titulo: "“Quem faltou hoje?”", texto: "Chamada em papel ou planilha que ninguém acha depois. Sem histórico de frequência e reposição esquecida.", solucao: "Chamada por turma no celular, frequência por aluna e crédito de reposição." },
+              { titulo: "“A mensalidade está em dia?”", texto: "Cobrança manual, PIX perdido na conversa e inadimplência descoberta tarde demais.", solucao: "PIX e boleto na hora, lembretes automáticos e painel de inadimplência em tempo real." },
+              { titulo: "“Qual o figurino da aluna?”", texto: "Figurino, espetáculo e ensaio espalhados em conversas separadas — nada conversa entre si.", solucao: "Figurino integrado à loja, eventos com autorização de imagem e coreografias por turma." },
+            ].map((c) => (
+              <motion.div key={c.titulo} {...fadeIn} className="rounded-3xl border border-border/60 bg-card/60 p-6">
+                <p className="text-lg font-outfit font-extrabold text-foreground">{c.titulo}</p>
+                <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{c.texto}</p>
+                <div className="mt-4 pt-4 border-t border-border/50 flex items-start gap-2">
+                  <CheckCircle2 size={16} className="text-emerald-500 mt-0.5 shrink-0" />
+                  <p className="text-xs font-semibold text-foreground">{c.solucao}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── IMPLANTAÇÃO ────────────────────────────────────────────────────────── */}
+      <section id="implantacao" className="relative py-24 bg-muted/20 border-y border-border/50 overflow-hidden">
+        <div className="container">
+          <motion.div {...fadeIn} className="text-center max-w-3xl mx-auto mb-14">
+            <span className="text-xs font-black uppercase tracking-widest text-primary">Do zero à escola rodando</span>
+            <h2 className="text-3xl md:text-4xl font-outfit font-extrabold tracking-tight mt-3">A gente migra, implanta e fica do seu lado</h2>
+          </motion.div>
+          <div className="grid md:grid-cols-3 gap-5">
+            {[
+              { icon: FileSpreadsheet, titulo: "Migração assistida", texto: "Traga turmas, alunos e mensalidades em aberto por CSV — com saldo de meses. A gente revisa junto se precisar." },
+              { icon: Rocket, titulo: "Implantação guiada", texto: "Checklist “Escola pronta em 10 minutos” no painel: dados, modalidades, salas, turmas, professores e alunos." },
+              { icon: Headphones, titulo: "Suporte no WhatsApp", texto: "Time de verdade para tirar dúvida de operação, cobrança e espetáculo — sem robô de fila." },
+            ].map((c) => (
+              <motion.div key={c.titulo} {...fadeIn} className="rounded-3xl border border-border/60 bg-background/60 p-6">
+                <div className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
+                  <c.icon size={20} />
+                </div>
+                <p className="text-lg font-outfit font-extrabold text-foreground">{c.titulo}</p>
+                <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{c.texto}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── PREÇOS ─────────────────────────────────────────────────────────────── */}
       <section id="pricing" className="relative py-24 bg-muted/30 border-y border-border/50 overflow-hidden">
         {/* Glow decor */}
@@ -1429,6 +1545,17 @@ const LandingPage = () => {
           </div>
         </div>
       </footer>
+
+      {showBackToTop && (
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          className="fixed bottom-6 right-6 z-50 w-11 h-11 rounded-full bg-primary text-white shadow-xl shadow-primary/30 flex items-center justify-center hover:bg-primary/90 active:scale-95 transition-all"
+          aria-label="Voltar ao topo"
+          title="Voltar ao topo"
+        >
+          <ArrowUp size={18} />
+        </button>
+      )}
     </div>
   );
 };
