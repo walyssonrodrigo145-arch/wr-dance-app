@@ -26,6 +26,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.18.16",
+    date: "2026-09-18",
+    title: "Contratos em blocos: monte o modelo cláusula por cláusula",
+    summary: "O editor de modelos de contrato agora é visual: título, cláusulas, assinaturas e local/data em blocos, com variáveis clicáveis e prévia — tudo pensado para escola de dança.",
+    items: [
+      { type: "novo", title: "Editor de contrato em blocos", description: "Adicione blocos de Título, Cláusula, Parágrafo, Contratante, Contratada, Assinaturas e Local/Data — reordene, duplique e remova. Cada bloco tem título e texto." },
+      { type: "novo", title: "Variáveis clicáveis (com Modalidade)", description: "Clique para inserir dados da escola, responsável, aluna, modalidade, mensalidade, vencimento e datas do contrato. A variável {{modalidade}} agora é aceita no texto final." },
+      { type: "melhoria", title: "Prévia com variáveis destacadas", description: "Veja o contrato final com as variáveis marcadas antes de salvar; e use Auto-identificar para transformar um texto colado em blocos." },
+      { type: "melhoria", title: "Modelos antigos viram blocos ao abrir", description: "Os modelos que a escola já tinha são convertidos automaticamente no editor — nada quebra e o contrato continua sendo gerado igual." },
+    ],
+  },
+  {
     version: "2026.09.18.15",
     date: "2026-09-18",
     title: "Site de dança no Google: funcionalidades, modalidades, blog e glossário",

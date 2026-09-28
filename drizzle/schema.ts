@@ -841,6 +841,9 @@ export const contractTemplates = pgTable("contract_templates", {
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   content: text("content").notNull(),
+  // Editor em blocos: JSON de [{ type, title, text }]. `content` continua sendo
+  // o texto final usado na assinatura (renderizado dos blocos ao salvar).
+  blocks: text("blocks"),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdateFn(() => new Date()).notNull(),

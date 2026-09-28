@@ -239,6 +239,8 @@ export function buildContractVariables(input: ContractVariablesInput): Record<st
     guardian_email: input.guardianEmail || input.studentEmail || "__________",
     guardian_address: input.guardianAddress || input.studentAddress || "__________",
     instrument: input.instrument || "dança",
+    // Identidade de dança: {{modalidade}} é aceito como apelido de {{instrument}}
+    modalidade: input.instrument || "dança",
     monthly_fee: input.monthlyFee || "__________",
     due_date: input.dueDay || "10",
     contract_start_date: fmtDate(input.startDate),

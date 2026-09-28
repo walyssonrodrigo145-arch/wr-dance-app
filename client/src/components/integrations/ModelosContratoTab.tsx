@@ -1,331 +1,393 @@
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  FileSignature, Plus, Pencil, Trash2, Loader2, Sparkles, HelpCircle, FileText, CheckCircle2, Copy, Wand2
+  CONTRACT_BLOCK_LABELS,
+  blocksFromContent,
+  emptyContractBlock,
+  parseContractBlocks,
+  renderContractBlocks,
+  serializeContractBlocks,
+  type ContractBlock,
+  type ContractBlockType,
+} from "@shared/contractBlocks";
+import {
+  FileText, Plus, Pencil, Trash2, Loader2, Sparkles, CheckCircle2,
+  ArrowUp, ArrowDown, Copy, Eye, EyeOff, Wand2, X,
 } from "lucide-react";
 
+const BLOCK_TYPES = Object.keys(CONTRACT_BLOCK_LABELS) as ContractBlockType[];
+
+/** Variáveis suportadas pelo servidor (@server/services/contractService). */
+const AVAILABLE_VARIABLES = [
+  { tag: "{{school_name}}", label: "Nome da Escola" },
+  { tag: "{{school_cnpj}}", label: "CNPJ da Escola" },
+  { tag: "{{school_address}}", label: "Endereço da Escola" },
+  { tag: "{{school_email}}", label: "E-mail da Escola" },
+  { tag: "{{school_phone}}", label: "Telefone da Escola" },
+  { tag: "{{guardian_name}}", label: "Nome do Responsável" },
+  { tag: "{{guardian_cpf}}", label: "CPF do Responsável" },
+  { tag: "{{guardian_phone}}", label: "Telefone do Responsável" },
+  { tag: "{{guardian_email}}", label: "E-mail do Responsável" },
+  { tag: "{{guardian_address}}", label: "Endereço do Responsável" },
+  { tag: "{{student_name}}", label: "Nome do Aluno(a)" },
+  { tag: "{{student_cpf}}", label: "CPF do Aluno(a)" },
+  { tag: "{{student_rg}}", label: "RG do Aluno(a)" },
+  { tag: "{{student_birth_date}}", label: "Nascimento do Aluno(a)" },
+  { tag: "{{student_address}}", label: "Endereço do Aluno(a)" },
+  { tag: "{{student_email}}", label: "E-mail do Aluno(a)" },
+  { tag: "{{student_phone}}", label: "Telefone do Aluno(a)" },
+  { tag: "{{modalidade}}", label: "Modalidade / Curso" },
+  { tag: "{{monthly_fee}}", label: "Valor da Mensalidade" },
+  { tag: "{{due_date}}", label: "Dia do Vencimento" },
+  { tag: "{{contract_start_date}}", label: "Início do Contrato" },
+  { tag: "{{contract_end_date}}", label: "Término do Contrato" },
+];
+
+function newBlockId(): string {
+  try {
+    return (globalThis.crypto as any)?.randomUUID?.() ?? `b_${Math.random().toString(36).slice(2, 10)}`;
+  } catch {
+    return `b_${Math.random().toString(36).slice(2, 10)}`;
+  }
+}
+
+const withIds = (blocks: ContractBlock[]) => blocks.map((b) => ({ ...b, id: b.id || newBlockId() }));
+
+/** Estrutura inicial sugerida para novos modelos (dança). */
+function starterBlocks(): ContractBlock[] {
+  return withIds([
+    { type: "titulo", title: "CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE DANÇA", text: "" },
+    { type: "contratada", title: "CONTRATADA", text: "{{school_name}}, CNPJ {{school_cnpj}}, com sede em {{school_address}}." },
+    { type: "contratante", title: "CONTRATANTE", text: "{{student_name}}, CPF {{student_cpf}}, residente em {{student_address}}." },
+    { type: "clausula", title: "CLÁUSULA 1ª — DO OBJETO", text: "O presente contrato tem como objeto a prestação de aulas de {{modalidade}}, conforme grade e horários da escola." },
+    { type: "clausula", title: "CLÁUSULA 2ª — DO PAGAMENTO", text: "A mensalidade é de R$ {{monthly_fee}}, com vencimento todo dia {{due_date}}." },
+    { type: "clausula", title: "CLÁUSULA 3ª — DA IMAGEM E ESPETÁCULOS", text: "A escola poderá registrar imagens de aulas e apresentações para fins pedagógicos e de divulgação, salvo manifestação em contrário do CONTRATANTE." },
+    { type: "assinatura", title: "ASSINATURAS", text: "{{school_name}} (CONTRATADA)\n\n{{student_name}} ou responsável (CONTRATANTE)" },
+    { type: "data", title: "LOCAL E DATA", text: "{{school_address}}, ____/____/________" },
+  ]);
+}
+
+function Highlighted({ text }: { text: string }) {
+  const parts = useMemo(() => text.split(/(\{\{[^}]+\}\})/g), [text]);
+  return (
+    <pre className="whitespace-pre-wrap break-words font-sans text-xs leading-relaxed">
+      {parts.map((p, i) =>
+        p.startsWith("{{") ? (
+          <span key={i} className="rounded bg-primary/10 px-1 text-primary font-bold">{p}</span>
+        ) : (
+          <span key={i}>{p}</span>
+        )
+      )}
+    </pre>
+  );
+}
+
+/** Aba "Modelos de Contrato" — editor em blocos (tipo/título/texto). */
 export function ModelosContratoTab() {
   const utils = trpc.useUtils();
   const { data: templates = [], isLoading } = trpc.contractTemplates.list.useQuery();
 
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [content, setContent] = useState("");
+  const [editing, setEditing] = useState<{ id?: number; name: string; description: string } | null>(null);
+  const [blocks, setBlocks] = useState<ContractBlock[]>([]);
+  const [preview, setPreview] = useState(false);
+  const [selectedBlock, setSelectedBlock] = useState<number>(-1);
+  const textareaRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
 
   const autoMutation = trpc.contractTemplates.autoInsertVariables.useMutation({
     onSuccess: (res) => {
       if (res.content) {
-        setContent(res.content);
-        toast.success("Variáveis identificadas e substituídas automaticamente no texto!");
+        setBlocks(withIds(blocksFromContent(res.content)));
+        toast.success("Variáveis identificadas automaticamente!");
       }
     },
     onError: (e) => toast.error(e.message),
   });
 
-  const createMutation = trpc.contractTemplates.create.useMutation({
-    onSuccess: () => {
-      toast.success("Modelo de contrato criado com sucesso!");
-      resetForm();
-      utils.contractTemplates.list.invalidate();
-    },
+  const saveMutation = trpc.contractTemplates.create.useMutation({
+    onSuccess: () => { toast.success("Modelo criado!"); close(); utils.contractTemplates.list.invalidate(); },
     onError: (e) => toast.error(e.message),
   });
-
   const updateMutation = trpc.contractTemplates.update.useMutation({
-    onSuccess: () => {
-      toast.success("Modelo de contrato atualizado!");
-      resetForm();
-      utils.contractTemplates.list.invalidate();
-    },
+    onSuccess: () => { toast.success("Modelo atualizado!"); close(); utils.contractTemplates.list.invalidate(); },
     onError: (e) => toast.error(e.message),
   });
-
   const deleteMutation = trpc.contractTemplates.delete.useMutation({
-    onSuccess: () => {
-      toast.success("Modelo desativado com sucesso.");
-      utils.contractTemplates.list.invalidate();
-    },
+    onSuccess: () => { toast.success("Modelo removido."); utils.contractTemplates.list.invalidate(); },
     onError: (e) => toast.error(e.message),
   });
 
-  const resetForm = () => {
-    setEditingId(null);
-    setIsCreating(false);
-    setName("");
-    setDescription("");
-    setContent("");
+  const close = () => { setEditing(null); setBlocks([]); setPreview(false); setSelectedBlock(-1); };
+
+  const openNew = () => { setEditing({ name: "", description: "" }); setBlocks(starterBlocks()); setPreview(false); setSelectedBlock(0); };
+  const openEdit = (t: any) => {
+    setEditing({ id: t.id, name: t.name, description: t.description || "" });
+    setBlocks(withIds(parseContractBlocks(t.blocks, t.content)));
+    setPreview(false);
+    setSelectedBlock(0);
   };
 
-  const handleEdit = (tpl: any) => {
-    setEditingId(tpl.id);
-    setIsCreating(false);
-    setName(tpl.name);
-    setDescription(tpl.description || "");
-    setContent(tpl.content || "");
+  const updateBlock = (index: number, patch: Partial<ContractBlock>) =>
+    setBlocks((prev) => prev.map((b, i) => (i === index ? { ...b, ...patch } : b)));
+
+  const addBlock = (type: ContractBlockType) => {
+    setBlocks((prev) => [...prev, { ...emptyContractBlock(type), id: newBlockId() }]);
+    setSelectedBlock(blocks.length);
   };
 
-  const handleNew = () => {
-    resetForm();
-    setIsCreating(true);
-    setName("Novo Modelo de Contrato");
-    setDescription("Descreva o objetivo deste contrato (ex: Aulas Individuais)");
+  const move = (index: number, dir: -1 | 1) => {
+    setBlocks((prev) => {
+      const next = [...prev];
+      const target = index + dir;
+      if (target < 0 || target >= next.length) return prev;
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+    setSelectedBlock(index + dir);
   };
 
-  const handleSave = () => {
-    if (!name.trim()) return toast.error("Preencha o nome do modelo");
-    if (!content.trim() || content.length < 10) return toast.error("O texto do contrato deve ser preenchido");
+  const duplicate = (index: number) =>
+    setBlocks((prev) => {
+      const copy = { ...prev[index], id: newBlockId() };
+      const next = [...prev];
+      next.splice(index + 1, 0, copy);
+      return next;
+    });
 
-    if (editingId) {
-      updateMutation.mutate({ id: editingId, name, description, content });
+  const removeBlock = (index: number) => {
+    setBlocks((prev) => prev.filter((_, i) => i !== index));
+    setSelectedBlock((prev) => Math.max(0, prev >= index ? prev - 1 : prev));
+  };
+
+  const insertVariable = (tag: string) => {
+    const index = selectedBlock >= 0 && selectedBlock < blocks.length ? selectedBlock : blocks.length - 1;
+    if (index < 0) return;
+    const block = blocks[index];
+    const textarea = textareaRefs.current[index];
+    if (textarea) {
+      const start = textarea.selectionStart ?? block.text.length;
+      const end = textarea.selectionEnd ?? block.text.length;
+      const nextText = block.text.slice(0, start) + tag + block.text.slice(end);
+      updateBlock(index, { text: nextText });
+      requestAnimationFrame(() => {
+        textarea.focus();
+        const pos = start + tag.length;
+        textarea.setSelectionRange(pos, pos);
+      });
     } else {
-      createMutation.mutate({ name, description, content });
+      updateBlock(index, { text: `${block.text}${block.text ? " " : ""}${tag}` });
     }
   };
 
-  const isSaving = createMutation.isPending || updateMutation.isPending;
-
-  const insertVariable = (varTag: string) => {
-    setContent((prev) => prev + ` ${varTag}`);
-    toast.success(`Variável ${varTag} adicionada ao final do texto!`);
+  const save = () => {
+    if (!editing) return;
+    const name = editing.name.trim();
+    if (name.length < 3) { toast.error("Informe o nome do modelo."); return; }
+    const content = renderContractBlocks(blocks);
+    if (content.length < 10) { toast.error("O modelo precisa de conteúdo."); return; }
+    const payload = {
+      name,
+      description: editing.description.trim() || undefined,
+      content,
+      blocks: serializeContractBlocks(blocks),
+    };
+    if (editing.id) updateMutation.mutate({ id: editing.id, ...payload });
+    else saveMutation.mutate(payload);
   };
 
-  const availableVariables = [
-    { tag: "{{school_name}}", label: "Nome da Escola" },
-    { tag: "{{school_cnpj}}", label: "CNPJ da Escola" },
-    { tag: "{{school_address}}", label: "Endereço da Escola" },
-    { tag: "{{school_email}}", label: "E-mail da Escola" },
-    { tag: "{{school_phone}}", label: "Telefone da Escola" },
-    { tag: "{{guardian_name}}", label: "Nome do Responsável Legal" },
-    { tag: "{{guardian_cpf}}", label: "CPF do Responsável Legal" },
-    { tag: "{{guardian_phone}}", label: "Telefone do Responsável" },
-    { tag: "{{guardian_email}}", label: "E-mail do Responsável" },
-    { tag: "{{guardian_address}}", label: "Endereço do Responsável" },
-    { tag: "{{student_name}}", label: "Nome do Aluno (Beneficiário)" },
-    { tag: "{{student_cpf}}", label: "CPF do Aluno" },
-    { tag: "{{student_rg}}", label: "RG do Aluno" },
-    { tag: "{{student_birth_date}}", label: "Data Nasc. do Aluno" },
-    { tag: "{{student_address}}", label: "Endereço do Aluno" },
-    { tag: "{{student_email}}", label: "E-mail do Aluno" },
-    { tag: "{{student_phone}}", label: "Telefone do Aluno" },
-    { tag: "{{instrument}}", label: "Instrumento/Curso" },
-    { tag: "{{monthly_fee}}", label: "Valor da Mensalidade" },
-    { tag: "{{due_date}}", label: "Dia do Vencimento" },
-    { tag: "{{contract_start_date}}", label: "Data de Início" },
-    { tag: "{{contract_end_date}}", label: "Data de Término" },
-  ];
+  const isSaving = saveMutation.isPending || updateMutation.isPending;
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card/60 backdrop-blur-md p-6 rounded-[2rem] border border-border shadow-sm">
-        <div>
-          <h2 className="text-xl font-black text-foreground flex items-center gap-2 tracking-tight">
-            <FileSignature className="text-violet-600" size={24} /> Modelos de Contratos Digitais
-          </h2>
-          <p className="text-xs text-muted-foreground font-medium mt-1">
-            Cadastre e edite as cláusulas contratuais personalizadas da sua escola para assinatura via Assinafy.
+  if (editing) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-sm font-black text-foreground flex items-center gap-2">
+            <FileText size={16} className="text-primary" />
+            {editing.id ? "Editando modelo" : "Novo modelo de contrato"}
           </p>
-        </div>
-        {!isCreating && editingId === null && (
-          <Button
-            onClick={handleNew}
-            className="rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold h-11 px-5 flex items-center gap-2 shadow-lg shadow-violet-500/20"
-          >
-            <Plus size={18} /> Novo Modelo
-          </Button>
-        )}
-      </div>
-
-      {/* Formulário de Criação / Edição */}
-      {(isCreating || editingId !== null) && (
-        <div className="bg-card rounded-[2rem] border border-border p-6 shadow-xl space-y-6 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between border-b border-border pb-4">
-            <h3 className="text-base font-black text-foreground">
-              {editingId ? "Editar Modelo de Contrato" : "Criar Novo Modelo de Contrato"}
-            </h3>
-            <Button variant="ghost" size="sm" onClick={resetForm} className="rounded-xl font-bold">
-              Cancelar
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" onClick={() => setPreview((v) => !v)} className="h-9 rounded-xl px-3 text-xs font-bold gap-1.5">
+              {preview ? <EyeOff size={14} /> : <Eye size={14} />} {preview ? "Editar" : "Prévia"}
+            </Button>
+            <Button type="button" variant="ghost" onClick={close} className="h-9 rounded-xl px-3 text-xs font-bold gap-1.5">
+              <X size={14} /> Cancelar
+            </Button>
+            <Button type="button" onClick={save} disabled={isSaving} className="h-9 rounded-xl px-4 text-xs font-bold gap-1.5">
+              {isSaving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Salvar modelo
             </Button>
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">
-                Nome do Modelo *
-              </label>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Ex: Contrato de Matrícula Padrão"
-                className="h-12 rounded-xl border-border font-bold text-sm"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">
-                Descrição Breve
-              </label>
-              <Input
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Ex: Utilizado para novos alunos de cursos presenciais"
-                className="h-12 rounded-xl border-border font-medium text-sm"
-              />
-            </div>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Nome do modelo *</label>
+            <Input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} placeholder="Ex: Contrato de Ballet Infantil 2026" className="h-10 rounded-xl text-sm" />
           </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Descrição</label>
+            <Input value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} placeholder="Quando usar este modelo?" className="h-10 rounded-xl text-sm" />
+          </div>
+        </div>
 
-          {/* Variáveis Dinâmicas & Auto-Formatação IA */}
-          <div className="space-y-3 bg-muted/40 p-4 rounded-2xl border border-border/50">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-              <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
-                <Sparkles size={12} className="text-violet-500" /> Variáveis Dinâmicas
-              </span>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={!content.trim() || autoMutation.isPending}
-                onClick={() => {
-                  if (!content.trim()) return toast.error("Cole o texto do contrato primeiro");
-                  autoMutation.mutate({ content });
-                }}
-                className="h-9 rounded-xl border-violet-500/30 text-violet-600 dark:text-violet-400 hover:bg-violet-500/10 text-xs font-bold flex items-center gap-1.5 shadow-xs"
-              >
-                {autoMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
-                Substituir Variáveis Automático (IA)
-              </Button>
+        {!preview ? (
+          <>
+            <div className="rounded-2xl border border-border/60 bg-muted/20 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Variáveis (clique para inserir no bloco selecionado)</p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 rounded-lg px-2 text-[10px] font-black uppercase tracking-widest gap-1.5"
+                  onClick={() => autoMutation.mutate({ content: renderContractBlocks(blocks) })}
+                  disabled={autoMutation.isPending}
+                >
+                  {autoMutation.isPending ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />} Auto-identificar
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {AVAILABLE_VARIABLES.map((v) => (
+                  <button
+                    key={v.tag}
+                    type="button"
+                    title={v.tag}
+                    onClick={() => insertVariable(v.tag)}
+                    className="px-2 py-1 rounded-lg border border-border/60 bg-background text-[10px] font-bold text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors"
+                  >
+                    {v.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {availableVariables.map((v) => (
-                <button
-                  key={v.tag}
-                  type="button"
-                  onClick={() => insertVariable(v.tag)}
-                  className="px-2.5 py-1 bg-card hover:bg-violet-50 hover:text-violet-600 dark:hover:bg-violet-950/40 border border-border/80 rounded-lg text-[11px] font-bold text-foreground transition-all flex items-center gap-1 shadow-2xs active:scale-95"
+            <div className="space-y-3">
+              {blocks.map((block, index) => (
+                <div
+                  key={block.id || index}
+                  className={cn(
+                    "rounded-2xl border p-3 space-y-2 transition-colors",
+                    selectedBlock === index ? "border-primary/40 bg-primary/5" : "border-border/60 bg-card/40"
+                  )}
+                  onClick={() => setSelectedBlock(index)}
                 >
-                  <code className="text-violet-600 font-mono text-[10px]">{v.tag}</code>
-                  <span className="text-muted-foreground text-[9px] font-normal">({v.label})</span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <select
+                      value={block.type}
+                      onChange={(e) => updateBlock(index, { type: e.target.value as ContractBlockType })}
+                      className="h-8 rounded-lg border border-border/60 bg-background px-2 text-[10px] font-black uppercase tracking-widest cursor-pointer"
+                    >
+                      {BLOCK_TYPES.map((t) => <option key={t} value={t}>{CONTRACT_BLOCK_LABELS[t]}</option>)}
+                    </select>
+                    <Input
+                      value={block.title}
+                      onChange={(e) => updateBlock(index, { title: e.target.value })}
+                      placeholder="Título do bloco (opcional)"
+                      className="h-8 rounded-lg text-xs font-bold flex-1 min-w-[180px]"
+                    />
+                    <div className="flex items-center gap-1">
+                      <button type="button" onClick={() => move(index, -1)} disabled={index === 0} className="w-7 h-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 flex items-center justify-center disabled:opacity-30" title="Subir"><ArrowUp size={13} /></button>
+                      <button type="button" onClick={() => move(index, 1)} disabled={index === blocks.length - 1} className="w-7 h-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 flex items-center justify-center disabled:opacity-30" title="Descer"><ArrowDown size={13} /></button>
+                      <button type="button" onClick={() => duplicate(index)} className="w-7 h-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 flex items-center justify-center" title="Duplicar"><Copy size={13} /></button>
+                      <button type="button" onClick={() => removeBlock(index)} className="w-7 h-7 rounded-lg text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 flex items-center justify-center" title="Remover"><Trash2 size={13} /></button>
+                    </div>
+                  </div>
+                  <Textarea
+                    ref={(el) => { textareaRefs.current[index] = el; }}
+                    value={block.text}
+                    onChange={(e) => updateBlock(index, { text: e.target.value })}
+                    onFocus={() => setSelectedBlock(index)}
+                    rows={block.type === "titulo" ? 2 : 4}
+                    placeholder="Escreva o texto do bloco. Use as variáveis acima para dados da escola, aluna e contrato."
+                    className="rounded-xl text-xs resize-y"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Adicionar bloco:</span>
+              {BLOCK_TYPES.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => addBlock(t)}
+                  className="px-2.5 py-1.5 rounded-lg border border-dashed border-border/70 text-[10px] font-bold text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors flex items-center gap-1"
+                >
+                  <Plus size={11} /> {CONTRACT_BLOCK_LABELS[t]}
                 </button>
               ))}
             </div>
+          </>
+        ) : (
+          <div className="rounded-2xl border border-border/60 bg-background p-5 space-y-4">
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Prévia do contrato (variáveis destacadas)</p>
+            <Highlighted text={renderContractBlocks(blocks)} />
           </div>
+        )}
+      </div>
+    );
+  }
 
-          {/* Editor de Texto do Contrato */}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">
-              Texto das Cláusulas do Contrato *
-            </label>
-            <Textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              rows={16}
-              placeholder="Digite aqui as cláusulas e o contrato completo..."
-              className="rounded-2xl border-border font-mono text-xs leading-relaxed p-4 bg-muted/20"
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="outline" onClick={resetForm} className="h-11 rounded-xl font-bold px-6">
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="h-11 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold px-8 shadow-lg shadow-violet-500/20"
-            >
-              {isSaving ? <Loader2 size={16} className="animate-spin mr-2" /> : <CheckCircle2 size={16} className="mr-2" />}
-              {editingId ? "Salvar Alterações" : "Criar Modelo"}
-            </Button>
-          </div>
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <p className="text-sm font-black text-foreground flex items-center gap-2"><FileText size={16} className="text-primary" /> Modelos de contrato</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Monte o contrato em blocos (título, cláusulas, assinaturas) com as variáveis da escola, da aluna e do plano.</p>
         </div>
-      )}
+        <Button type="button" onClick={openNew} className="h-9 rounded-xl px-4 text-xs font-bold gap-1.5">
+          <Plus size={14} /> Novo modelo
+        </Button>
+      </div>
 
-      {/* Lista de Modelos */}
       {isLoading ? (
-        <div className="p-12 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
-          <Loader2 size={18} className="animate-spin text-violet-600" /> Carregando modelos de contrato...
+        <div className="flex items-center gap-2 text-xs text-muted-foreground py-8 justify-center">
+          <Loader2 size={14} className="animate-spin" /> Carregando modelos...
         </div>
-      ) : templates.length === 0 ? (
-        <div className="p-12 text-center bg-card rounded-[2rem] border border-border">
-          <FileText size={36} className="mx-auto text-muted-foreground/40 mb-3" />
-          <p className="text-sm font-bold text-foreground">Nenhum modelo de contrato cadastrado</p>
-          <p className="text-xs text-muted-foreground mt-1 mb-4">
-            Crie seu primeiro modelo de contrato para que sua escola possa enviar contratos para assinatura digital.
-          </p>
-          <Button onClick={handleNew} className="rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold">
-            <Plus size={16} className="mr-1.5" /> Criar Primeiro Modelo
-          </Button>
+      ) : (templates as any[]).length === 0 ? (
+        <div className="rounded-2xl border border-border/60 bg-muted/30 p-6 text-center">
+          <p className="text-xs font-bold text-foreground">Nenhum modelo ainda.</p>
+          <p className="text-[10px] text-muted-foreground mt-1">Crie o primeiro modelo ou edite o padrão que a escola já usa.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {templates.map((tpl: any) => (
-            <div
-              key={tpl.id}
-              className="bg-card rounded-[2rem] border border-border/80 p-6 flex flex-col justify-between hover:border-violet-500/40 transition-all shadow-xs group"
-            >
-              <div className="space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-violet-500/10 text-violet-600 flex items-center justify-center font-bold shrink-0">
-                      <FileText size={20} />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-black text-foreground">{tpl.name}</h4>
-                      {tpl.description && (
-                        <p className="text-xs text-muted-foreground font-medium line-clamp-1 mt-0.5">
-                          {tpl.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-muted/30 p-3 rounded-xl border border-border/40 text-[11px] font-mono text-muted-foreground line-clamp-3 leading-relaxed">
-                  {tpl.content}
-                </div>
+        <div className="rounded-2xl border border-border/60 divide-y divide-border/40">
+          {(templates as any[]).map((t) => (
+            <div key={t.id} className="flex items-center gap-3 px-3.5 py-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-foreground truncate flex items-center gap-1.5">
+                  {t.name}
+                  {t.blocks ? (
+                    <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[8px] font-black uppercase tracking-widest">Blocos</span>
+                  ) : null}
+                </p>
+                {t.description ? <p className="text-[10px] text-muted-foreground truncate">{t.description}</p> : null}
               </div>
-
-              <div className="flex items-center justify-between border-t border-border/40 pt-4 mt-4">
-                <span className="text-[10px] text-muted-foreground font-bold">
-                  {tpl.createdAt ? `Criado em ${new Date(tpl.createdAt).toLocaleDateString("pt-BR")}` : ""}
-                </span>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleEdit(tpl)}
-                    className="h-9 rounded-xl font-bold text-xs"
-                  >
-                    <Pencil size={13} className="mr-1.5" /> Editar Cláusulas
-                  </Button>
-                  {templates.length > 1 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        if (confirm(`Deseja realmente desativar o modelo "${tpl.name}"?`)) {
-                          deleteMutation.mutate({ id: tpl.id });
-                        }
-                      }}
-                      className="h-9 w-9 p-0 rounded-xl text-rose-500 hover:bg-rose-50 hover:text-rose-600"
-                    >
-                      <Trash2 size={14} />
-                    </Button>
-                  )}
-                </div>
-              </div>
+              <button type="button" onClick={() => openEdit(t)} className="w-8 h-8 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 flex items-center justify-center" title="Editar"><Pencil size={14} /></button>
+              <button
+                type="button"
+                onClick={() => { if (confirm(`Remover o modelo "${t.name}"?`)) deleteMutation.mutate({ id: t.id }); }}
+                className="w-8 h-8 rounded-lg text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 flex items-center justify-center"
+                title="Remover"
+              >
+                <Trash2 size={14} />
+              </button>
             </div>
           ))}
         </div>
       )}
+
+      <div className="rounded-2xl border border-border/60 bg-muted/20 p-4 flex items-start gap-2.5">
+        <Sparkles size={14} className="text-primary mt-0.5 shrink-0" />
+        <p className="text-[10px] text-muted-foreground leading-relaxed">
+          <strong className="text-foreground">Como funciona:</strong> os blocos viram o texto do contrato enviado para assinatura —
+          as variáveis (como {"{{modalidade}}"} e {"{{monthly_fee}}"}) são preenchidas com os dados da aluna no momento da geração.
+          Modelos antigos são convertidos automaticamente ao abrir.
+        </p>
+      </div>
     </div>
   );
 }

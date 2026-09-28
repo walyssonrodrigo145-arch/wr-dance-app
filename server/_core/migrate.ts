@@ -780,6 +780,9 @@ export async function runAutoMigrations() {
       { table: 'referrals', sql: `CREATE INDEX IF NOT EXISTS "referrals_email_idx" ON "referrals" ("referredEmail")` },
       { table: 'referrals', sql: `CREATE INDEX IF NOT EXISTS "referrals_code_idx" ON "referrals" ("code")` },
 
+      // ═══ MODELOS DE CONTRATO EM BLOCOS ═══
+      { table: 'contract_templates', sql: `ALTER TABLE "contract_templates" ADD COLUMN IF NOT EXISTS "blocks" text` },
+
       // ═══ SAÚDE / CONDICIONAMENTO FÍSICO (DancePro) ═══
       { table: 'student_health_records', sql: `CREATE TABLE IF NOT EXISTS "student_health_records" (
         "id" serial PRIMARY KEY NOT NULL,
