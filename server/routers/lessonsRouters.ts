@@ -35,7 +35,8 @@ import { nanoid } from "nanoid";
 import { sdk } from "../_core/sdk";
 import { sendVerificationEmail, sendSimpleEmail } from "../_core/email";
 import { ENV } from "../_core/env";
-import { getTurmaAttendance, saveTurmaAttendance, addStudentToLesson, removeStudentFromLesson } from "../services/TurmaScheduleService";
+import { getTurmaAttendance, saveTurmaAttendance, addStudentToLesson, removeStudentFromLesson, sessionWeekdayTime } from "../services/TurmaScheduleService";
+import { findStudentScheduleConflict } from "./turmasRouters";
 import { storagePut } from "../storage";
 import { superAdminRouter } from "../superAdminRouter";
 import { pairingActiveSessions } from "../automationJob";
@@ -1968,6 +1969,12 @@ export const lessonsRouters = {
       const isAdmin = ctx.user.role === "admin" || ctx.user.openId === ENV.ownerOpenId;
       if (!isAdmin && data.turma.professorId !== ctx.user.id) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Você não é o professor desta turma." });
+      }
+      // Auditoria (M1): aluno extra não pode ter outra turma/matrícula no mesmo dia/horário
+      const { weekday, timeStr } = sessionWeekdayTime({ scheduledAt: data.session.scheduledAt, duration: data.session.duration });
+      const conflict = await findStudentScheduleConflict(db, orgId, input.studentId, [weekday], timeStr, data.session.duration || 60);
+      if (conflict) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: conflict });
       }
       try {
         return await addStudentToLesson(db, orgId, input.lessonId, input.studentId, input.scope, ctx.user.id, input.reason);

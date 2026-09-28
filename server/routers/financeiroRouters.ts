@@ -1075,7 +1075,7 @@ export const financeiroRouters = {
     generateAsaasCharge: protectedProcedure
       .input(z.object({
         paymentDueId: z.number(),
-        billingType: z.enum(["PIX", "CREDIT_CARD"]),
+        billingType: z.enum(["PIX", "CREDIT_CARD", "BOLETO"]),
       }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();

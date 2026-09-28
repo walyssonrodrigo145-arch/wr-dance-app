@@ -293,11 +293,25 @@ async function loadSessionForEdit(db: any, organizationId: number, lessonId: num
     id: lessons.id,
     turmaId: lessons.turmaId,
     scheduledAt: lessons.scheduledAt,
+    duration: lessons.duration,
   }).from(lessons)
     .where(and(eq(lessons.id, lessonId), eq(lessons.organizationId, organizationId), isNotNull(lessons.turmaId)))
     .limit(1);
   if (!session) throw new Error("Aula de turma não encontrada.");
   return session;
+}
+
+/** Dia da semana (0-6) e horário "HH:MM" da sessão, no fuso America/Sao_Paulo. */
+export function sessionWeekdayTime(session: { scheduledAt: Date | string; duration?: number | null }) {
+  const iso = new Date(session.scheduledAt).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const time = new Date(session.scheduledAt).toLocaleTimeString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const [y, m, d] = iso.split("-").map(Number);
+  return { weekday: new Date(y, m - 1, d).getDay(), timeStr: time.slice(0, 5) };
 }
 
 /**

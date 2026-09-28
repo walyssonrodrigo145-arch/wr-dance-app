@@ -26,6 +26,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.18.14",
+    date: "2026-09-18",
+    title: "Indique e Ganhe + boleto na cobrança + ajustes da auditoria",
+    summary: "A escola agora tem link de indicação para ganhar meses grátis, boleto junto de PIX/cartão no Asaas, e a inclusão de aluna extra na aula valida conflito de horário.",
+    items: [
+      { type: "novo", title: "Programa Indique e Ganhe", description: "Painel na escola com link/código exclusivo, botão de copiar e compartilhar no WhatsApp, lista das indicações (aguardando, convertida, prêmio aplicado) e contador de meses ganhos. Página pública de convite com cadastro da escola indicada." },
+      { type: "novo", title: "Boleto na cobrança Asaas", description: "Além de PIX e cartão, agora dá para gerar boleto direto na cobrança da mensalidade." },
+      { type: "correcao", title: "Aluna extra não entra em choque de horário", description: "Incluir uma aluna como extra na aula agora valida se ela já tem turma/matrícula no mesmo dia e horário (achado M1 da auditoria)." },
+      { type: "melhoria", title: "Fatura avulsa confirmada na tela de Assinatura", description: "O card Sua Fatura já mostra a cobrança pendente/vencida (inclusive avulsa gerada pela equipe), com link para pagar." },
+    ],
+  },
+  {
     version: "2026.09.18.13",
     date: "2026-09-18",
     title: "Meu Perfil do professor e carregamento sem tela branca",

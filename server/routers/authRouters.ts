@@ -722,6 +722,10 @@ export const authRouters = {
           createdAt: new Date(),
         }).returning();
 
+        // Indique e Ganhe: se este e-mail veio de uma indicação, marca como convertida
+        const { markReferralConvertedByEmail } = await import("../referralRouter");
+        await markReferralConvertedByEmail(db, input.email, org.id);
+
         const [newUser] = await db.insert(users).values({
           openId,
           organizationId: org.id,

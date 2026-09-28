@@ -19,6 +19,7 @@ import {
   Megaphone,
   Inbox,
   Sparkles,
+  Gift,
   Zap,
   CreditCard,
   ShieldAlert,
@@ -156,6 +157,7 @@ export function AppSidebar({ collapsed, onToggle, onNavigate }: AppSidebarProps)
       textColor: "text-blue-400",
       items: [
         { label: "Comunicados", href: "/comunicados", icon: Megaphone },
+        { label: "Indique e Ganhe", href: "/indicacoes", icon: Gift },
       ],
     },
     {

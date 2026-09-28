@@ -86,7 +86,7 @@ function timeToMinutes(time: string | null | undefined): number | null {
  * aluno já tem outra turma ativa ou matrícula adicional no mesmo dia/horário.
  * Retorna a mensagem de conflito (null = sem conflito).
  */
-async function findStudentScheduleConflict(
+export async function findStudentScheduleConflict(
   db: any,
   orgId: number,
   studentId: number,

@@ -18,6 +18,8 @@ const Instrumentos = lazy(() => import("./pages/Instrumentos"));
 const Relatorios = lazy(() => import("./pages/Relatorios"));
 const Configuracoes = lazy(() => import("./pages/Configuracoes"));
 const Perfil = lazy(() => import("./pages/Perfil"));
+const Indique = lazy(() => import("./pages/Indique"));
+const Indicacoes = lazy(() => import("./pages/Indicacoes"));
 const Assinatura = lazy(() => import("./pages/Assinatura"));
 const Lembretes = lazy(() => import("./pages/Lembretes"));
 const Financeiro = lazy(() => import("./pages/Financeiro"));
@@ -95,6 +97,15 @@ function Router() {
         <Switch>
           <Route path="/matricula/:code" component={PublicEnrollmentPage} />
         </Switch>
+      </Suspense>
+    );
+  }
+
+  // Rota pública do programa Indique e Ganhe — acessível independente de autenticação
+  if (currentPath === "/indique") {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <Indique />
       </Suspense>
     );
   }
@@ -253,6 +264,7 @@ function Router() {
           <Route path="/financeiro" component={Financeiro} />
           <Route path="/configuracoes" component={Configuracoes} />
           <Route path="/perfil" component={Perfil} />
+          <Route path="/indicacoes" component={Indicacoes} />
           <Route path="/assinatura" component={Assinatura} />
           <Route path="/progresso" component={Progresso} />
           <Route path="/rankings" component={RankingsPage} />

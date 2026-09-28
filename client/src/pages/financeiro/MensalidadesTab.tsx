@@ -73,7 +73,7 @@ function GatewayChargeModal({ open, onClose, payment, gateway }: {
 }) {
   const utils = trpc.useUtils();
   const { maskBRL } = useDashboardPrefs();
-  const [billingType, setBillingType] = useState<"PIX" | "CREDIT_CARD">("PIX");
+  const [billingType, setBillingType] = useState<"PIX" | "CREDIT_CARD" | "BOLETO">("PIX");
   const [result, setResult] = useState<{
     paymentLink: string;
     pixQrCode?: string | null;
@@ -171,24 +171,21 @@ function GatewayChargeModal({ open, onClose, payment, gateway }: {
               {gateway === "asaas" && (
                 <div className="space-y-2">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">Método de pagamento</p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-3 gap-2.5">
                     {([
-                      { key: "PIX", label: "PIX", icon: QrCode, color: "emerald" },
-                      { key: "CREDIT_CARD", label: "Cartão de Crédito", icon: CreditCard, color: "blue" },
-                    ] as const).map(({ key, label, icon: Icon, color }) => (
+                      { key: "PIX", label: "PIX", icon: QrCode, cls: "border-emerald-500 bg-emerald-500/10 text-emerald-600" },
+                      { key: "BOLETO", label: "Boleto", icon: FileText, cls: "border-violet-500 bg-violet-500/10 text-violet-600" },
+                      { key: "CREDIT_CARD", label: "Cartão", icon: CreditCard, cls: "border-blue-500 bg-blue-500/10 text-blue-600" },
+                    ] as const).map(({ key, label, icon: Icon, cls }) => (
                       <button
                         key={key}
                         onClick={() => setBillingType(key)}
                         className={cn(
-                          "flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all",
-                          billingType === key
-                            ? color === "emerald"
-                              ? "border-emerald-500 bg-emerald-500/10 text-emerald-600"
-                              : "border-blue-500 bg-blue-500/10 text-blue-600"
-                            : "border-border bg-muted/30 text-muted-foreground hover:border-muted-foreground/40"
+                          "flex flex-col items-center gap-2 p-3.5 rounded-2xl border-2 transition-all",
+                          billingType === key ? cls : "border-border bg-muted/30 text-muted-foreground hover:border-muted-foreground/40"
                         )}
                       >
-                        <Icon size={22} />
+                        <Icon size={20} />
                         <span className="text-[10px] font-bold uppercase tracking-wider">{label}</span>
                       </button>
                     ))}

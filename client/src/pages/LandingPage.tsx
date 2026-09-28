@@ -1515,6 +1515,7 @@ const LandingPage = () => {
                 <li><a href="#testimonials" onClick={(e) => { e.preventDefault(); document.getElementById('testimonials')?.scrollIntoView({ behavior: 'smooth' }); }} className="hover:text-primary transition-colors cursor-pointer">Depoimentos</a></li>
                 <li><a href="#pricing" onClick={(e) => { e.preventDefault(); document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' }); }} className="hover:text-primary transition-colors cursor-pointer">Preços</a></li>
                 <li><Link href="/login" className="hover:text-primary transition-colors">Área do Aluno</Link></li>
+                <li><Link href="/indique" className="hover:text-primary transition-colors">Indique e Ganhe</Link></li>
               </ul>
             </div>
 

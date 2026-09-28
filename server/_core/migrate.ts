@@ -757,6 +757,29 @@ export async function runAutoMigrations() {
       { table: 'lesson_overrides', sql: `CREATE INDEX IF NOT EXISTS "lesson_overrides_lesson_idx" ON "lesson_overrides" ("lessonId")` },
       { table: 'lesson_overrides', sql: `CREATE INDEX IF NOT EXISTS "lesson_overrides_student_idx" ON "lesson_overrides" ("studentId")` },
 
+      // ═══ INDIQUE E GANHE (programa de indicação) ═══
+      { table: 'organizations', sql: `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "referralCode" varchar(20)` },
+      { table: 'referrals', sql: `CREATE TABLE IF NOT EXISTS "referrals" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "referrerOrganizationId" integer NOT NULL,
+        "code" varchar(20) NOT NULL,
+        "referredName" varchar(255) NOT NULL,
+        "referredEmail" varchar(255) NOT NULL,
+        "referredPhone" varchar(30),
+        "referredOrganizationId" integer,
+        "status" varchar(20) DEFAULT 'pendente' NOT NULL,
+        "rewardType" varchar(20) DEFAULT 'mes_gratis' NOT NULL,
+        "rewardValue" integer DEFAULT 1 NOT NULL,
+        "notes" text,
+        "convertedAt" timestamp,
+        "creditedAt" timestamp,
+        "createdAt" timestamp DEFAULT now() NOT NULL,
+        "updatedAt" timestamp DEFAULT now() NOT NULL
+      );` },
+      { table: 'referrals', sql: `CREATE INDEX IF NOT EXISTS "referrals_referrer_idx" ON "referrals" ("referrerOrganizationId", "status")` },
+      { table: 'referrals', sql: `CREATE INDEX IF NOT EXISTS "referrals_email_idx" ON "referrals" ("referredEmail")` },
+      { table: 'referrals', sql: `CREATE INDEX IF NOT EXISTS "referrals_code_idx" ON "referrals" ("code")` },
+
       // ═══ SAÚDE / CONDICIONAMENTO FÍSICO (DancePro) ═══
       { table: 'student_health_records', sql: `CREATE TABLE IF NOT EXISTS "student_health_records" (
         "id" serial PRIMARY KEY NOT NULL,

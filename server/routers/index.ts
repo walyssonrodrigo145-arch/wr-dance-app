@@ -13,6 +13,7 @@ import { crmRouter } from "../crmRouter";
 import { chatbotFlowRouter } from "../chatbotFlowRouter";
 import { schoolAiRouter } from "../schoolAiRouter";
 import { fcmRouter } from "../fcmRouter";
+import { referralRouter } from "../referralRouter";
 import { authRouters } from "./authRouters";
 import { progressRouters } from "./progressRouters";
 import { dashboardRouters } from "./dashboardRouters";
@@ -94,6 +95,8 @@ export const appRouter = router({
   ...saudeRouters,
   // ── 📚 Matrículas adicionais / múltiplos planos (novas chaves no fim) ──
   ...matriculasRouters,
+  // ── 🎁 Indique e Ganhe (novas chaves no fim — não reordenar as existentes) ──
+  referral: referralRouter,
 });
 
 export type AppRouter = typeof appRouter;

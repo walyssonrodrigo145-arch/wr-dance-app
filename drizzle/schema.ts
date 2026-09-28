@@ -78,9 +78,41 @@ export const organizations = pgTable("organizations", {
   city: varchar("city", { length: 120 }),
   cnpj: varchar("cnpj", { length: 25 }),
 
+  // Indique e Ganhe: código único de indicação da escola (gerado sob demanda)
+  referralCode: varchar("referralCode", { length: 20 }),
+
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdateFn(() => new Date()).notNull(),
 });
+
+// ─── Indique e Ganhe (programa de indicação) ────────────────────────────────
+// A escola indica outra escola; quando a indicada entra, o vínculo é registrado.
+// O prêmio é configurável (meses grátis/crédito) e aplicado pela equipe DancePro.
+export const referrals = pgTable("referrals", {
+  id: serial("id").primaryKey(),
+  referrerOrganizationId: integer("referrerOrganizationId").notNull(),
+  code: varchar("code", { length: 20 }).notNull(),
+  referredName: varchar("referredName", { length: 255 }).notNull(),
+  referredEmail: varchar("referredEmail", { length: 255 }).notNull(),
+  referredPhone: varchar("referredPhone", { length: 30 }),
+  referredOrganizationId: integer("referredOrganizationId"),
+  status: varchar("status", { length: 20 }).default("pendente").notNull(), // pendente | convertido | creditado | expirado
+  rewardType: varchar("rewardType", { length: 20 }).default("mes_gratis").notNull(), // mes_gratis | credito
+  rewardValue: integer("rewardValue").default(1).notNull(),
+  notes: text("notes"),
+  convertedAt: timestamp("convertedAt"),
+  creditedAt: timestamp("creditedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdateFn(() => new Date()).notNull(),
+}, (table) => [
+  index("referrals_referrer_idx").on(table.referrerOrganizationId, table.status),
+  index("referrals_email_idx").on(table.referredEmail),
+  index("referrals_code_idx").on(table.code),
+]);
+
+export type Referral = typeof referrals.$inferSelect;
+export type InsertReferral = typeof referrals.$inferInsert;
+
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
