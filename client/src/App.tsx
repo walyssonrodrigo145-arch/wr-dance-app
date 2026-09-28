@@ -20,6 +20,7 @@ const Configuracoes = lazy(() => import("./pages/Configuracoes"));
 const Perfil = lazy(() => import("./pages/Perfil"));
 const Indique = lazy(() => import("./pages/Indique"));
 const Indicacoes = lazy(() => import("./pages/Indicacoes"));
+const SeoSite = lazy(() => import("./pages/SeoSite"));
 const Assinatura = lazy(() => import("./pages/Assinatura"));
 const Lembretes = lazy(() => import("./pages/Lembretes"));
 const Financeiro = lazy(() => import("./pages/Financeiro"));
@@ -106,6 +107,18 @@ function Router() {
     return (
       <Suspense fallback={<PageLoader />}>
         <Indique />
+      </Suspense>
+    );
+  }
+
+  // Páginas públicas de SEO (funcionalidades, segmentos, comparativos, blog, glossário)
+  const isSeoPath = ["/funcionalidades", "/para", "/comparar", "/blog", "/glossario"].some(
+    (prefix) => currentPath === prefix || currentPath.startsWith(`${prefix}/`)
+  );
+  if (isSeoPath) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <SeoSite />
       </Suspense>
     );
   }

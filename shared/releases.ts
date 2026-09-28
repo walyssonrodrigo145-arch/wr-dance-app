@@ -26,6 +26,19 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.18.15",
+    date: "2026-09-18",
+    title: "Site de dança no Google: funcionalidades, modalidades, blog e glossário",
+    summary: "O DancePro agora tem páginas públicas indexáveis para cada tipo de escola de dança, comparativos, blog e glossário — com sitemap e robots para o Google encontrar.",
+    items: [
+      { type: "novo", title: "Páginas por funcionalidade", description: "Turmas e chamada, financeiro com PIX, rematrícula, figurino/espetáculo, portal da aluna e IA pedagógica — cada uma com página própria e link direto no site." },
+      { type: "novo", title: "Páginas por modalidade", description: "Ballet, jazz, danças urbanas, dança de salão, sapateado, contemporâneo, dança infantil e ritmos/fitness — com a dor de cada tipo de escola e como o DancePro resolve." },
+      { type: "novo", title: "Comparativos, blog e glossário", description: "DancePro x planilha e x sistema de academia; artigos sobre rematrícula, inadimplência e espetáculo; glossário com 20 termos da dança (barra, centro, diagonal, ensaio geral...)." },
+      { type: "melhoria", title: "Sitemap e robots automáticos", description: "O endereço /sitemap.xml lista todas as páginas públicas e o /robots.txt aponta para ele — tudo gerado do próprio conteúdo, sem manutenção." },
+      { type: "melhoria", title: "Título, descrição e link canônico por página", description: "Cada página pública define seu título e descrição para o Google e redes sociais, com dados estruturados (JSON-LD)." },
+    ],
+  },
+  {
     version: "2026.09.18.14",
     date: "2026-09-18",
     title: "Indique e Ganhe + boleto na cobrança + ajustes da auditoria",

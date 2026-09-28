@@ -1,5 +1,6 @@
 import { debugLog } from "./logger";
 import "dotenv/config";
+import { SEO_PATHS } from "@shared/seo";
 import express from "express";
 import helmet from "helmet";
 import cors from "cors";
@@ -1501,6 +1502,24 @@ async function startServer() {
     } catch {
       return res.status(503).json({ status: "unhealthy", database: "down" });
     }
+  });
+
+  // SEO público: sitemap dinâmico (a partir do conteúdo de @shared/seo) e robots
+  app.get("/sitemap.xml", (_req, res) => {
+    const base = (ENV.appUrl || "https://dancepro.wrmusicpro.com.br").replace(/\/+$/, "");
+    const urls = SEO_PATHS.map((p) =>
+      `  <url><loc>${base}${p}</loc><changefreq>weekly</changefreq><priority>${p === "/" ? "1.0" : "0.7"}</priority></url>`
+    ).join("\n");
+    res.type("application/xml").send(
+      `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>`
+    );
+  });
+
+  app.get("/robots.txt", (_req, res) => {
+    const base = (ENV.appUrl || "https://dancepro.wrmusicpro.com.br").replace(/\/+$/, "");
+    res.type("text/plain").send(
+      `User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /painel/\nSitemap: ${base}/sitemap.xml\n`
+    );
   });
 
   // development mode uses Vite, production mode uses static files

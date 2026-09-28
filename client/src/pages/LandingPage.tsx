@@ -1512,6 +1512,10 @@ const LandingPage = () => {
               <h5 className="font-extrabold text-foreground mb-6 uppercase tracking-widest text-sm">Produto</h5>
               <ul className="space-y-4 text-muted-foreground font-medium">
                 <li><a href="#features" onClick={(e) => { e.preventDefault(); document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' }); }} className="hover:text-primary transition-colors cursor-pointer">Recursos</a></li>
+                <li><Link href="/funcionalidades" className="hover:text-primary transition-colors">Funcionalidades</Link></li>
+                <li><Link href="/para" className="hover:text-primary transition-colors">Para sua modalidade</Link></li>
+                <li><Link href="/blog" className="hover:text-primary transition-colors">Blog</Link></li>
+                <li><Link href="/glossario" className="hover:text-primary transition-colors">Glossário</Link></li>
                 <li><a href="#testimonials" onClick={(e) => { e.preventDefault(); document.getElementById('testimonials')?.scrollIntoView({ behavior: 'smooth' }); }} className="hover:text-primary transition-colors cursor-pointer">Depoimentos</a></li>
                 <li><a href="#pricing" onClick={(e) => { e.preventDefault(); document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' }); }} className="hover:text-primary transition-colors cursor-pointer">Preços</a></li>
                 <li><Link href="/login" className="hover:text-primary transition-colors">Área do Aluno</Link></li>
