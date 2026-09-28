@@ -268,7 +268,9 @@ await step("Remover Carla desta aula (exceção só desta aula)", async () => {
   await admin.turmaAttendance.removeStudent.mutate({ lessonId: ctxStore.lessonId, studentId: ctxStore.carlaId, scope: "single" });
   const data = await admin.turmaAttendance.get.query({ lessonId: ctxStore.lessonId });
   expect(!data.roster.some((r) => r.id === ctxStore.carlaId), "Carla continua na lista");
-  return `lista final: ${data.roster.map((r) => r.name).join(", ")}`;
+  const staleAttendance = (data.attendance || []).some((a) => a.studentId === ctxStore.carlaId);
+  expect(!staleAttendance, "presença da Carla ficou órfã após a remoção");
+  return `lista final: ${data.roster.map((r) => r.name).join(", ")} · presença removida junto`;
 });
 
 // ── 11. PORTAL DO ALUNO ────────────────────────────────────────────────────

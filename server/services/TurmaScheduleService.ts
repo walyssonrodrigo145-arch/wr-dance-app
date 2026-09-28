@@ -425,6 +425,11 @@ export async function removeStudentFromLesson(
         eq(lessonOverrides.studentId, studentId),
         eq(lessonOverrides.type, "include"),
       ));
+      await db.delete(lessonAttendance).where(and(
+        eq(lessonAttendance.organizationId, organizationId),
+        inArray(lessonAttendance.lessonId, ids),
+        eq(lessonAttendance.studentId, studentId),
+      ));
     }
     return { success: true, affected: ids.length, mode: "removed_extra" as const };
   }
@@ -434,6 +439,12 @@ export async function removeStudentFromLesson(
     eq(lessonOverrides.lessonId, lessonId),
     eq(lessonOverrides.studentId, studentId),
     eq(lessonOverrides.type, "include"),
+  ));
+  // Limpa presença já marcada desta aula (o aluno extra não participa mais)
+  await db.delete(lessonAttendance).where(and(
+    eq(lessonAttendance.organizationId, organizationId),
+    eq(lessonAttendance.lessonId, lessonId),
+    eq(lessonAttendance.studentId, studentId),
   ));
   return { success: true, affected: 1, mode: "removed_extra" as const };
 }
