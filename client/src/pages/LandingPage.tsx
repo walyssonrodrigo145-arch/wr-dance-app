@@ -40,6 +40,7 @@ import { HeroSlider } from '@/components/HeroSlider';
 import ClientsMarquee from '@/components/ClientsMarquee';
 import { DanceProLogo } from '@/components/DanceProLogo';
 import { PaymentBrandLogos } from '@/components/logos/PaymentBrandLogos';
+import PlanSimulator from '@/components/planos/PlanSimulator';
 import { trpc } from '@/lib/trpc';
 import { SUPPORT_WHATSAPP_URL } from '@/lib/support';
 
@@ -1414,6 +1415,9 @@ const LandingPage = () => {
               </span>
             </div>
           </motion.div>
+
+          {/* Simulador de preços — calcula o plano pelo nº de alunas */}
+          <PlanSimulator />
         </div>
       </section>
 

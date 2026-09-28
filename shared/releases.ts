@@ -26,6 +26,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.18.17",
+    date: "2026-09-18",
+    title: "Simulador de preço: quantas alunas tem a sua escola?",
+    summary: "Na seção de preços da landing, a escola arrasta o número de alunas e vê na hora o plano ideal, o total com excedentes e quando vale uma proposta sob medida.",
+    items: [
+      { type: "novo", title: "Simulador interativo na landing", description: "Slider (ou digitar) do número de alunas ativas mostra: plano recomendado, total mensal calculado com excedentes a R$ 1,49/aluna e todos os planos com o valor para aquele tamanho de escola." },
+      { type: "novo", title: "Proposta sob medida automática", description: "Acima de 1.200 alunas (limite do Dance Pro 1000 + excedentes), o simulador avisa e abre o WhatsApp da equipe para montar o plano personalizado." },
+      { type: "melhoria", title: "Preços sempre vindos do sistema", description: "O simulador lê os planos do banco (Super Admin → Planos): mudou o preço ou o limite, o simulador acompanha na hora." },
+    ],
+  },
+  {
     version: "2026.09.18.16",
     date: "2026-09-18",
     title: "Contratos em blocos: monte o modelo cláusula por cláusula",
