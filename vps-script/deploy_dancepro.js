@@ -71,7 +71,7 @@ EOF
     echo "=== 6. AGUARDANDO HEALTH (até 60s) ==="
     for i in $(seq 1 30); do
       if curl -sf -m 5 http://localhost:3002/api/health >/dev/null; then
-        echo "Health OK após ${i} tentativa(s)."
+        echo "Health OK após $i tentativa(s)."
         break
       fi
       sleep 2
