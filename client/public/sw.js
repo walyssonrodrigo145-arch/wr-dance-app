@@ -52,7 +52,7 @@ self.addEventListener('sync', (event) => {
 });
 
 // ─── PWA Cache ───────────────────────────────────────────────────────────────
-const CACHE_NAME = 'wr-music-cache-v9';
+const CACHE_NAME = 'dancepro-cache-v10';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -74,7 +74,7 @@ self.addEventListener('fetch', (event) => {
     // responder errado e mantém o carregamento direto da CDN oficial)
     url.includes('ytimg.com')
   ) {
-    logSWEvent('fetch_bypassed_api', { url, method: event.request.method });
+    // Requests de API passam direto para a rede (sem log para não poluir o console)
     return;
   }
 

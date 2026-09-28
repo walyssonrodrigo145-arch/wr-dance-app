@@ -61,12 +61,22 @@ EOF
 
     echo "=== 4. SUBINDO OS CONTAINERS DO DANCEPRO (DOCKER COMPOSE) ==="
     cd /root/wr-dance-app
-    docker compose down --remove-orphans || true
+    # Build ANTES de recriar: o app continua no ar durante a compilação (sem janela de 502)
     docker compose build --no-cache
-    docker compose up -d
+    docker compose up -d --remove-orphans
 
     echo "=== 5. STATUS DOS CONTAINERS DO DANCEPRO ==="
     docker ps --filter "name=dance"
+
+    echo "=== 6. AGUARDANDO HEALTH (até 60s) ==="
+    for i in $(seq 1 30); do
+      if curl -sf -m 5 http://localhost:3002/api/health >/dev/null; then
+        echo "Health OK após ${i} tentativa(s)."
+        break
+      fi
+      sleep 2
+    done
+    curl -s -m 10 http://localhost:3002/api/health || echo "ATENÇÃO: app ainda não respondeu no health"
   `;
 
   conn.exec(commands, (err, stream) => {
