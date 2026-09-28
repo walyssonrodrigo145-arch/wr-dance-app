@@ -22,6 +22,7 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
   "/relatorios": { title: "Relatórios", subtitle: "Análises e estatísticas da escola" },
   "/configuracoes": { title: "Configurações", subtitle: "Preferências do sistema" },
   "/perfil": { title: "Meu Perfil", subtitle: "Seus dados, foto e senha" },
+  "/indicacoes": { title: "Indique e Ganhe", subtitle: "Convide escolas e ganhe meses grátis" },
   "/financeiro": { title: "Financeiro", subtitle: "Mensalidades, despesas e fluxo de caixa" },
   "/professores": { title: "Professores & Coreógrafos", subtitle: "Gestão da equipe e remuneração" },
   "/lembretes": { title: "Lembretes", subtitle: "Comunicação automática" },
