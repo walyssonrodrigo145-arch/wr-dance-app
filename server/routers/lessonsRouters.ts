@@ -178,7 +178,6 @@ export const lessonsRouters = {
                 eq(students.status, 'ativo'),
               ));
             const studentIds = profStudents.map(s => s.id);
-            if (studentIds.length === 0) return [];
             return db.select({
               id: lessons.id,
               title: lessons.title,
@@ -208,7 +207,11 @@ export const lessonsRouters = {
               .leftJoin(creatorUsers, eq(lessons.userId, creatorUsers.id))
               .where(and(
                 eq(lessons.organizationId, orgId),
-                inArray(lessons.studentId, studentIds),
+                // Fluxo de dança: inclui as sessões de turma do professor (sem aluno)
+                or(
+                  eq(lessons.userId, ctx.user.id),
+                  studentIds.length > 0 ? inArray(lessons.studentId, studentIds) : sql`false`,
+                ),
                 gte(lessons.scheduledAt, startOfDay),
                 lte(lessons.scheduledAt, endOfDay),
               ))

@@ -1,5 +1,5 @@
 import { debugLog } from "./_core/logger";
-import { eq, desc, asc, sql, and, gte, lte, lt, isNotNull, inArray, aliasedTable } from "drizzle-orm";
+import { eq, desc, asc, sql, and, gte, lte, lt, isNotNull, inArray, aliasedTable, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
@@ -1826,8 +1826,9 @@ export async function getRecentLessons(
         // Se for admin/sem filtro: sem restrição de usuário
         professorStudentIds
           ? (professorStudentIds.length > 0
-              ? inArray(lessons.studentId, professorStudentIds)
-              : sql`false`  // professor sem alunos não vê nada
+              // Fluxo de dança: inclui as sessões das turmas do professor (sem aluno)
+              ? or(eq(lessons.userId, professorId!), inArray(lessons.studentId, professorStudentIds))
+              : eq(lessons.userId, professorId!)
             )
           : (userId ? eq(lessons.userId, userId) : undefined),
         gte(lessons.scheduledAt, rangeStart),
