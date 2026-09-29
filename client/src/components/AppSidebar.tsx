@@ -319,13 +319,8 @@ export function AppSidebar({ collapsed, onToggle, onNavigate }: AppSidebarProps)
                 className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 p-[1px] shadow-lg shadow-blue-500/30 flex-shrink-0 overflow-hidden hover:scale-105 transition-transform cursor-pointer"
                 title="Clique para expandir o menu"
               >
-                <div className="w-full h-full bg-gradient-to-b from-blue-500 to-indigo-700 rounded-xl flex items-center justify-center relative z-10">
-                  <div className="flex items-center gap-[3px] h-4">
-                    <div className="w-1 bg-white/90 rounded-full h-2" />
-                    <div className="w-1 bg-white/90 rounded-full h-4" />
-                    <div className="w-1 bg-white rounded-full h-full shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
-                    <div className="w-1 bg-white/90 rounded-full h-3" />
-                  </div>
+                <div className="w-full h-full bg-slate-900/80 rounded-xl flex items-center justify-center relative z-10">
+                  <img src="/logo.svg" alt="DancePro" className="w-7 h-7 object-contain" />
                 </div>
               </button>
               <button
@@ -342,13 +337,8 @@ export function AppSidebar({ collapsed, onToggle, onNavigate }: AppSidebarProps)
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-3 min-w-0 text-left">
                 <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 p-[1px] shadow-lg shadow-blue-500/30 flex-shrink-0 overflow-hidden">
-                  <div className="w-full h-full bg-gradient-to-b from-blue-500 to-indigo-700 rounded-xl flex items-center justify-center relative z-10">
-                    <div className="flex items-center gap-[3px] h-4">
-                      <div className="w-1 bg-white/90 rounded-full h-2" />
-                      <div className="w-1 bg-white/90 rounded-full h-4" />
-                      <div className="w-1 bg-white rounded-full h-full shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
-                      <div className="w-1 bg-white/90 rounded-full h-3" />
-                    </div>
+                  <div className="w-full h-full bg-slate-900/80 rounded-xl flex items-center justify-center relative z-10">
+                    <img src="/logo.svg" alt="DancePro" className="w-7 h-7 object-contain" />
                   </div>
                 </div>
                 {(user as any)?.showSchoolName !== 0 && (

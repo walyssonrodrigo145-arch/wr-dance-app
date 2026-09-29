@@ -1,13 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
-  <!-- Waveform group -->
-  <g fill="#ffffff">
-    <!-- Bar 1 -->
-    <rect x="136" y="216" width="48" height="128" rx="24" />
-    <!-- Bar 2 -->
-    <rect x="216" y="144" width="48" height="272" rx="24" />
-    <!-- Bar 3 (Main tall bar) -->
-    <rect x="296" y="80" width="48" height="384" rx="24" />
-    <!-- Bar 4 -->
-    <rect x="376" y="184" width="48" height="192" rx="24" />
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" fill="none">
+  <circle cx="282" cy="190" r="26" fill="#ffffff" />
+  <path d="M 185 190 C 220 215 255 240 285 242 C 320 245 365 195 408 145 C 390 190 350 255 315 285 C 285 310 265 375 238 432 C 226 390 245 340 270 300 C 235 290 185 315 58 382 C 125 315 180 250 185 190 Z" fill="#ffffff" />
 </svg>

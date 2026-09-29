@@ -56,13 +56,8 @@ export function MusicLayout({ children }: MusicLayoutProps) {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 p-[2px] shadow-xl animate-pulse overflow-hidden">
-            <div className="w-full h-full bg-gradient-to-b from-blue-500 to-indigo-700 rounded-2xl flex items-center justify-center relative z-10">
-              <div className="flex items-center gap-[4px] h-6">
-                <div className="w-1.5 bg-white/90 rounded-full h-3" />
-                <div className="w-1.5 bg-white/90 rounded-full h-6" />
-                <div className="w-1.5 bg-white rounded-full h-full shadow-[0_0_10px_rgba(255,255,255,0.8)]" />
-                <div className="w-1.5 bg-white/90 rounded-full h-4.5" />
-              </div>
+            <div className="w-full h-full bg-slate-900/80 rounded-2xl flex items-center justify-center relative z-10">
+              <img src="/logo.svg" alt="DancePro" className="w-9 h-9 object-contain" />
             </div>
           </div>
           <div className="flex items-center gap-2 text-muted-foreground">

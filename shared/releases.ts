@@ -26,6 +26,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.09.29.18",
+    date: "2026-09-29",
+    title: "Logo DancePro em todo o sistema",
+    summary: "A marca oficial do DancePro (o D com a bailarina) agora é a logo padrão do menu, do portal e dos ícones do app — mesmo quando a escola ainda não enviou a própria logo.",
+    items: [
+      { type: "correcao", title: "Logo padrão DancePro no menu e no portal", description: "O menu lateral (admin e aluno) e a tela de carregamento exibiam a marca antiga de ondas musicais. Agora mostram a logo oficial do DancePro quando a escola não tem logo própria." },
+      { type: "correcao", title: "Ícone do app instalável (PWA) e favicon DancePro", description: "O ícone na tela inicial do celular, o favicon da aba e o badge de notificação agora usam a marca DancePro." },
+      { type: "melhoria", title: "Cor do app instalado no azul da marca", description: "A barra do app instalado (PWA) passa a usar o azul DancePro no lugar do rosa antigo." },
+    ],
+  },
+  {
     version: "2026.09.18.17",
     date: "2026-09-18",
     title: "Simulador de preço: quantas alunas tem a sua escola?",

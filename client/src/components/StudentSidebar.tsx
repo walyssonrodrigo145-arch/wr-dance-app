@@ -225,13 +225,8 @@ export function StudentSidebar({ collapsed, onToggle, onNavigate }: StudentSideb
           </div>
         ) : (
           <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 p-[1px] shadow-lg shadow-primary/30 flex-shrink-0 overflow-hidden">
-            <div className="w-full h-full bg-gradient-to-b from-blue-500 to-indigo-700 rounded-xl flex items-center justify-center relative z-10">
-              <div className="flex items-center gap-[3px] h-4">
-                <div className="w-1 bg-white/90 rounded-full h-2" />
-                <div className="w-1 bg-white/90 rounded-full h-4" />
-                <div className="w-1 bg-white rounded-full h-full shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
-                <div className="w-1 bg-white/90 rounded-full h-3" />
-              </div>
+            <div className="w-full h-full bg-slate-900/80 rounded-xl flex items-center justify-center relative z-10">
+              <img src="/logo.svg" alt="DancePro" className="w-7 h-7 object-contain" />
             </div>
           </div>
         )}

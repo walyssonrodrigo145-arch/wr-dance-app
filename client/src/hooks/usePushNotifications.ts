@@ -95,8 +95,8 @@ export function usePushNotifications() {
       try {
         const { onClick, ...rest } = options || {};
         const n = new Notification(title, {
-          icon: "/favicon.ico",
-          badge: "/favicon.ico",
+          icon: "/icon-192.png",
+          badge: "/icon-badge.png",
           ...rest,
         });
         if (onClick) {
