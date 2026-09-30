@@ -39,7 +39,7 @@ import { BenefitsCarousel } from '@/components/BenefitsCarousel';
 import { HeroSlider } from '@/components/HeroSlider';
 import ClientsMarquee from '@/components/ClientsMarquee';
 import { DanceProLogo } from '@/components/DanceProLogo';
-import { PaymentBrandLogos } from '@/components/logos/PaymentBrandLogos';
+import { PaymentBrandLogos, AsaasLogoMark, MercadoPagoLogoMark, InfinitePayLogoMark } from '@/components/logos/PaymentBrandLogos';
 import PlanSimulator from '@/components/planos/PlanSimulator';
 import { trpc } from '@/lib/trpc';
 import { SUPPORT_WHATSAPP_URL } from '@/lib/support';
@@ -1141,10 +1141,7 @@ const LandingPage = () => {
               <div className="relative z-10">
                 <div className="flex items-center gap-4 mb-6">
                   <div className="w-16 h-16 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-600 font-black text-xl shadow-lg">
-                    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-9 h-9">
-                      <rect width="40" height="40" rx="10" fill="#005AE2"/>
-                      <path d="M10 25l5-10 5 10 5-10 5 10" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
+                    <AsaasLogoMark className="w-9 h-9" />
                   </div>
                   <div>
                     <h4 className="text-xl font-extrabold text-foreground">Asaas</h4>
@@ -1177,11 +1174,7 @@ const LandingPage = () => {
               <div className="relative z-10">
                 <div className="flex items-center gap-4 mb-6">
                   <div className="w-16 h-16 rounded-2xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center text-yellow-600 font-black text-xl shadow-lg">
-                    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-9 h-9">
-                      <rect width="40" height="40" rx="10" fill="#FFF159"/>
-                      <path d="M20 10c-5.52 0-10 4.48-10 10s4.48 10 10 10 10-4.48 10-10S25.52 10 20 10zm0 16a6 6 0 110-12 6 6 0 010 12z" fill="#009EE3"/>
-                      <circle cx="20" cy="20" r="3" fill="#009EE3"/>
-                    </svg>
+                    <MercadoPagoLogoMark className="w-9 h-9" />
                   </div>
                   <div>
                     <h4 className="text-xl font-extrabold text-foreground">Mercado Pago</h4>
@@ -1215,11 +1208,7 @@ const LandingPage = () => {
                 <div className="md:flex-1">
                   <div className="flex items-center gap-4 mb-6">
                     <div className="w-16 h-16 rounded-2xl bg-lime-500/10 border border-lime-500/20 flex items-center justify-center shadow-lg">
-                      <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-9 h-9">
-                        <rect width="40" height="40" rx="10" fill="#0E0E10"/>
-                        <circle cx="15" cy="20" r="6" stroke="#C8F169" strokeWidth="2.5"/>
-                        <circle cx="25" cy="20" r="6" stroke="#C8F169" strokeWidth="2.5"/>
-                      </svg>
+                      <InfinitePayLogoMark className="w-9 h-9" />
                     </div>
                     <div>
                       <h4 className="text-xl font-extrabold text-foreground">InfinitePay</h4>
