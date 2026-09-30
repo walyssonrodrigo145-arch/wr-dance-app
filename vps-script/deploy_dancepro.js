@@ -38,7 +38,7 @@ conn.on('ready', () => {
 
     # Ajusta o DATABASE_URL para apontar para dance-db (ou banco wrdance)
     sed -i 's|/wrmusic|/wrdance|g' /root/wr-dance-app/.env
-    sed -i 's|APP_URL=.*|APP_URL=https://dancepro.wrmusicpro.com.br|g' /root/wr-dance-app/.env
+    sed -i 's|APP_URL=.*|APP_URL=https://dancepro.wrvsystems.com.br|g' /root/wr-dance-app/.env
 
     echo "=== 3. CONFIGURANDO CADDY NA VPS PARA O SUBDOMÍNIO DANCEPRO ==="
     # Verifica se dancepro.wrmusicpro.com.br já está no Caddyfile principal da VPS
@@ -54,8 +54,8 @@ EOF
       cd /root/wr-music-app && (docker compose exec -w /etc/caddy caddy caddy reload || docker restart wr-music-app-caddy-1 || echo 'AVISO: Caddy nao recarregado automaticamente (dominio ja configurado). Seguindo o deploy.')
     else
       echo "Entrada dancepro.wrmusicpro.com.br já presente no Caddyfile da VPS."
-      # Garante que aponta para dance-app:5000
-      sed -i 's|reverse_proxy app:3000|reverse_proxy dance-app:5000|g' /root/wr-music-app/Caddyfile
+      # Garante que aponta para dance-app:5000 (escopado SOMENTE ao bloco dancepro — nunca mexer nos blocos do MusicPro)
+      sed -i '/dancepro\.wrmusicpro\.com\.br {/,/^}/ s|reverse_proxy app:3000|reverse_proxy dance-app:5000|g' /root/wr-music-app/Caddyfile
       cd /root/wr-music-app && (docker compose exec -w /etc/caddy caddy caddy reload || docker restart wr-music-app-caddy-1 || echo 'AVISO: Caddy nao recarregado automaticamente (dominio ja configurado). Seguindo o deploy.')
     fi
 
