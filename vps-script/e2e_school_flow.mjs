@@ -3,7 +3,7 @@
 import { createTRPCProxyClient, httpBatchLink } from "@trpc/client";
 import superjson from "superjson";
 
-const BASE = "https://dancepro.wrmusicpro.com.br/api/trpc";
+const BASE = process.env.E2E_BASE || "https://dancepro.wrvsystems.com.br/api/trpc";
 const results = [];
 const ctxStore = {};
 
@@ -301,20 +301,27 @@ await step("Importar mensalidades em aberto (Alice com 4 meses)", async () => {
 await step("Dar baixa na mensalidade mais antiga (markPaid)", async () => {
   const overdueBefore = await admin.paymentDues.overdue.query();
   const aliceOverdue = overdueBefore.filter((d) => d.studentId === ctxStore.aliceId);
-  expect(aliceOverdue.length === 4, `atrasadas da Alice=${aliceOverdue.length}`);
+  // Data-agnóstico: em início de mês a fatura do mês corrente ainda não vence
+  // (4 importadas → 3 atrasadas + 1 futura). Exige ao menos 3 atrasadas.
+  expect(aliceOverdue.length >= 3, `atrasadas da Alice=${aliceOverdue.length}`);
+  const before = aliceOverdue.length;
   const oldest = aliceOverdue.sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate)))[0];
   await admin.paymentDues.markPaid.mutate({ id: oldest.id });
   const after = await admin.paymentDues.overdue.query();
   const stillThere = after.some((d) => d.id === oldest.id);
   expect(!stillThere, "fatura paga continua na inadimplência");
-  return `fatura #${oldest.id} baixada (atrasadas ${aliceOverdue.length} -> ${aliceOverdue.length - 1})`;
+  const afterCount = after.filter((d) => d.studentId === ctxStore.aliceId).length;
+  expect(afterCount === before - 1, `atrasadas não reduziram: ${before} -> ${afterCount}`);
+  return `fatura #${oldest.id} baixada (atrasadas ${before} -> ${afterCount})`;
 });
 await step("Inadimplência reflete só o que falta + dashboard", async () => {
   const overdue = await admin.paymentDues.overdue.query();
   const stats = await admin.dashboard.stats.query();
   const today = await admin.dashboard.todaySummary.query();
   const aliceOverdue = overdue.filter((d) => d.studentId === ctxStore.aliceId);
-  expect(aliceOverdue.length === 3, `atrasadas da Alice=${aliceOverdue.length} (esperado 3)`);
+  // Após a baixa do passo anterior, restam (importadas - 1 atrasadas pagas),
+  // podendo variar 2 ou 3 conforme o dia do mês. Exige < importadas (4).
+  expect(aliceOverdue.length >= 2 && aliceOverdue.length <= 3, `atrasadas da Alice=${aliceOverdue.length} (esperado 2-3)`);
   return `atrasadas(Alice)=${aliceOverdue.length} alunos=${stats.totalStudents} aulasHoje=${today?.aulasHoje}`;
 });
 
