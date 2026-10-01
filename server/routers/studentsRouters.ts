@@ -4,7 +4,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "../_core/cookies";
 import { systemRouter } from "../_core/systemRouter";
 import { fcmRouter } from "../fcmRouter";
-import { publicProcedure, protectedProcedure, professorProcedure, studentProcedure, router } from "../_core/trpc";
+import { publicProcedure, protectedProcedure, professorProcedure, studentProcedure, adminProcedure, router } from "../_core/trpc";
 import { slotAdvanceRouter } from "../slotAdvanceRouter";
 import {
   getDashboardStats,
@@ -1192,7 +1192,7 @@ export const studentsRouters = {
       const orgId = ctx.user.organizationId!;
       return getInstrumentsWithCount(orgId, isUserAdmin ? undefined : ctx.user.id);
     }),
-    create: protectedProcedure.input(z.object({
+    create: adminProcedure.input(z.object({
       name: z.string().min(2),
       category: z.string().min(2),
       color: z.string().optional(),

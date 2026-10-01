@@ -1538,7 +1538,7 @@ export const lessonsRouters = {
   }),
 
   attendance: router({
-    generateToken: protectedProcedure
+    generateToken: professorProcedure
       .mutation(async ({ ctx }) => {
         try {
           const db = await getDb();
@@ -1574,7 +1574,7 @@ export const lessonsRouters = {
         }
       }),
 
-    getActiveToken: protectedProcedure
+    getActiveToken: professorProcedure
       .query(async ({ ctx }) => {
         const db = await getDb();
         if (!db) return null;
@@ -1816,14 +1816,14 @@ export const lessonsRouters = {
         .where(and(eq(rescheduleRequests.organizationId, orgId), eq(students.professorId, ctx.user.id), eq(rescheduleRequests.status, 'pendente')));
       return result?.count || 0;
     }),
-    respond: protectedProcedure.input(z.object({ id: z.number(), status: z.enum(['aprovada', 'recusada']) })).mutation(async ({ ctx, input }) => {
+    respond: professorProcedure.input(z.object({ id: z.number(), status: z.enum(['aprovada', 'recusada']) })).mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
       const orgId = ctx.user.organizationId!;
       await db.update(rescheduleRequests).set({ status: input.status }).where(and(eq(rescheduleRequests.id, input.id), eq(rescheduleRequests.organizationId, orgId)));
       return { success: true };
     }),
-    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    delete: professorProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
       const orgId = ctx.user.organizationId!;
@@ -1865,7 +1865,7 @@ export const lessonsRouters = {
         .where(and(eq(extraLessonRequests.organizationId, orgId), eq(students.professorId, ctx.user.id), eq(extraLessonRequests.status, 'pendente')));
       return result?.count || 0;
     }),
-    respond: protectedProcedure.input(z.object({ id: z.number(), status: z.enum(['aprovada', 'recusada']) })).mutation(async ({ ctx, input }) => {
+    respond: professorProcedure.input(z.object({ id: z.number(), status: z.enum(['aprovada', 'recusada']) })).mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
       const orgId = ctx.user.organizationId!;
@@ -1909,7 +1909,7 @@ export const lessonsRouters = {
 
       return { success: true };
     }),
-    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    delete: professorProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
       const orgId = ctx.user.organizationId!;

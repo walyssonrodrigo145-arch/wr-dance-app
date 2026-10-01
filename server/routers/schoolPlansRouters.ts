@@ -4,7 +4,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { and, asc, eq, sql } from "drizzle-orm";
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, adminProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { schoolPlans, students } from "../../drizzle/schema";
 import { ENV } from "../_core/env";
@@ -71,7 +71,7 @@ export const schoolPlansRouter = router({
       .orderBy(asc(schoolPlans.aulasPorSemana), asc(schoolPlans.duracaoMeses));
   }),
 
-  create: protectedProcedure.input(planInput).mutation(async ({ ctx, input }) => {
+  create: adminProcedure.input(planInput).mutation(async ({ ctx, input }) => {
     assertStaff(ctx);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
@@ -94,7 +94,7 @@ export const schoolPlansRouter = router({
     return { success: true, id: created.id };
   }),
 
-  update: protectedProcedure.input(z.object({ id: z.number() }).extend(planInput.shape)).mutation(async ({ ctx, input }) => {
+  update: adminProcedure.input(z.object({ id: z.number() }).extend(planInput.shape)).mutation(async ({ ctx, input }) => {
     assertStaff(ctx);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
@@ -120,7 +120,7 @@ export const schoolPlansRouter = router({
   }),
 
   /** Exclui apenas planos sem alunos vinculados; caso contrário arquivar via update ativo=false. */
-  delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+  delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
     assertStaff(ctx);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });

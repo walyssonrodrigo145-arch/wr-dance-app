@@ -57,7 +57,31 @@ export const plataformaRouters = {
   settings: router({
     get: protectedProcedure.query(async ({ ctx }) => {
       const orgId = ctx.user.organizationId!;
-      return getSettingsByUserId(orgId, ctx.user.id);
+      const row = await getSettingsByUserId(orgId, ctx.user.id);
+      if (!row) return row;
+      // AUDITORIA P0-01: nunca devolver segredos ao client (nem para admin).
+      // O client recebe flags "hasX" para exibir placeholders e só reenvia
+      // a chave quando o usuário digita uma nova.
+      const {
+        asaasApiKey,
+        mpAccessToken,
+        infinitepayApiKey,
+        geminiApiKey,
+        groqApiKey,
+        opencodeApiKey,
+        whatsappBotToken,
+        ...safe
+      } = row as typeof row & Record<string, unknown>;
+      return {
+        ...safe,
+        hasAsaasApiKey: !!asaasApiKey,
+        hasMpAccessToken: !!mpAccessToken,
+        hasInfinitepayApiKey: !!infinitepayApiKey,
+        hasGeminiApiKey: !!geminiApiKey,
+        hasGroqApiKey: !!groqApiKey,
+        hasOpencodeApiKey: !!opencodeApiKey,
+        hasWhatsappBotToken: !!whatsappBotToken,
+      };
     }),
 
     updateProfile: protectedProcedure.input(z.object({
@@ -69,6 +93,29 @@ export const plataformaRouters = {
     })).mutation(async ({ ctx, input }) => {
       const orgId = ctx.user.organizationId!;
       const { name, email, phone, bio, pixKey } = input;
+
+      // AUDITORIA P0-02: impede escalada de privilégio via troca de e-mail.
+      if (email && email.toLowerCase().trim() !== (ctx.user.email || "").toLowerCase().trim()) {
+        const newEmail = email.toLowerCase().trim();
+        if (isReservedSuperAdminEmail(newEmail)) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Este e-mail é reservado para a administração da plataforma.",
+          });
+        }
+        const db = await getDb();
+        if (db) {
+          const [existing] = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.email, newEmail))
+            .limit(1);
+          if (existing && existing.id !== ctx.user.id) {
+            throw new TRPCError({ code: "CONFLICT", message: "Este e-mail já está em uso." });
+          }
+        }
+      }
+
       const userFields = { name, email };
       if (userFields.name || userFields.email) {
         await updateUserProfile(orgId, ctx.user.id, userFields);
@@ -573,13 +620,16 @@ export const plataformaRouters = {
       whatsappBotToken: z.string().optional(),
       whatsappAutoSend: z.boolean().optional(),
     })).mutation(async ({ ctx, input }) => {
-      const urlToUse = input.whatsappBotUrl?.trim() || process.env.EVOLUTION_API_URL || "http://179.197.76.174:8080";
-      const tokenToUse = input.whatsappBotToken?.trim() || process.env.EVOLUTION_API_KEY || "minha_chave_secreta_123";
-      await upsertSettings(ctx.user.organizationId!, ctx.user.id, {
-        whatsappBotUrl: urlToUse,
-        whatsappBotToken: tokenToUse,
+      // AUDITORIA P0-01: nunca sobrescrever segredos com defaults/valores vazios.
+      // Só grava URL/token quando o usuário realmente informou algo.
+      const patch: Record<string, unknown> = {
         whatsappAutoSend: input.whatsappAutoSend !== undefined ? (input.whatsappAutoSend ? 1 : 0) : undefined,
-      });
+      };
+      const url = input.whatsappBotUrl?.trim();
+      const token = input.whatsappBotToken?.trim();
+      if (url) patch.whatsappBotUrl = url;
+      if (token) patch.whatsappBotToken = token;
+      await upsertSettings(ctx.user.organizationId!, ctx.user.id, patch as any);
       return { success: true };
     }),
 
@@ -605,12 +655,13 @@ export const plataformaRouters = {
         }
       }
       await upsertSettings(ctx.user.organizationId!, ctx.user.id, {
-        asaasApiKey: input.asaasApiKey ?? null,
+        // AUDITORIA P0-01: undefined = não mexe; string vazia explícita = limpar.
+        asaasApiKey: input.asaasApiKey === undefined ? undefined : (input.asaasApiKey.trim() || null),
         asaasEnabled: input.asaasEnabled !== undefined ? (input.asaasEnabled ? 1 : 0) : undefined,
         paymentGateway: input.paymentGateway,
-        mpAccessToken: input.mpAccessToken ?? null,
+        mpAccessToken: input.mpAccessToken === undefined ? undefined : (input.mpAccessToken.trim() || null),
         infinitepayHandle: normalizedHandle,
-        infinitepayApiKey: input.infinitepayApiKey ?? null, // upsertSettings criptografa (BYOK)
+        infinitepayApiKey: input.infinitepayApiKey === undefined ? undefined : (input.infinitepayApiKey.trim() || null), // upsertSettings criptografa (BYOK)
         infinitepayEnabled: input.infinitepayEnabled !== undefined ? (input.infinitepayEnabled ? 1 : 0) : undefined,
       });
       return { success: true };

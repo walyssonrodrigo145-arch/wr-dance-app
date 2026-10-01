@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, protectedProcedure, adminProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb, getSettingsByUserId } from "./db";
 import {
@@ -318,7 +318,7 @@ export const advancedAiRouter = router({
   /**
    * Aplica a grade otimizada aprovada pelo usuário no banco de dados.
    */
-  applySmartSchedule: protectedProcedure
+  applySmartSchedule: adminProcedure
     .input(z.object({ logId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();

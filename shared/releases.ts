@@ -26,6 +26,19 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.10.01.19",
+    date: "2026-10-01",
+    title: "Segurança reforçada em todo o sistema",
+    summary: "Auditoria completa de permissões: ações administrativas agora são restritas de verdade no servidor, chaves de integração nunca chegam ao navegador e os pagamentos por webhook ficaram à prova de falha.",
+    items: [
+      { type: "correcao", title: "Permissões reforçadas no servidor", description: "Alunos e professores não conseguem mais executar ações administrativas (financeiro, comunicados, contratos, salas, planos) por chamadas diretas à API — inclusive quando o botão está escondido na tela." },
+      { type: "correcao", title: "Suas chaves de integração ficaram invisíveis no navegador", description: "Chaves de Asaas, Mercado Pago, InfinitePay, IA e WhatsApp não são mais enviadas para o navegador. A tela indica \"configurada\" e você só digita uma nova chave se quiser trocar." },
+      { type: "correcao", title: "Pagamento via InfinitePay nunca mais se perde", description: "Se a InfinitePay demorar para confirmar, o sistema tenta de novo automaticamente em vez de descartar a notificação — a baixa da mensalidade não fica presa." },
+      { type: "correcao", title: "Notificações em tempo real protegidas", description: "O aviso de \"pagamento recebido\" em tempo real só chega para os administradores da própria escola." },
+      { type: "correcao", title: "E-mail do perfil protegido", description: "Não é mais possível trocar o e-mail do perfil por um e-mail reservado ou já usado por outra conta." },
+    ],
+  },
+  {
     version: "2026.09.29.18",
     date: "2026-09-29",
     title: "Logo DancePro em todo o sistema",

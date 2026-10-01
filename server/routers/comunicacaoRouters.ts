@@ -4,7 +4,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "../_core/cookies";
 import { systemRouter } from "../_core/systemRouter";
 import { fcmRouter } from "../fcmRouter";
-import { publicProcedure, protectedProcedure, professorProcedure, studentProcedure, router } from "../_core/trpc";
+import { publicProcedure, protectedProcedure, professorProcedure, studentProcedure, adminProcedure, router } from "../_core/trpc";
 import { slotAdvanceRouter } from "../slotAdvanceRouter";
 import {
   getDashboardStats,
@@ -57,7 +57,7 @@ export const comunicacaoRouters = {
   reminders: router({
 
     // ─ Listar com filtros ─────────────────────────────────────────────────────────────
-    list: protectedProcedure
+    list: professorProcedure
       .input(z.object({
         studentId: z.number().nullable().optional(),
         type: z.enum(["aula", "cobranca", "inadimplencia", "manual"]).optional(),
@@ -125,7 +125,7 @@ export const comunicacaoRouters = {
       }),
 
     // ─ Contadores para dashboard ──────────────────────────────────────────────────
-    pendingCount: protectedProcedure.query(async ({ ctx }) => {
+    pendingCount: professorProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       if (!db) return 0;
       const orgId = ctx.user.organizationId!;
@@ -136,7 +136,7 @@ export const comunicacaoRouters = {
     }),
 
     // ─ Geração automática de lembretes de AULA (24h antes, semana atual) ───────────────
-    generateLessonReminders: protectedProcedure.mutation(async ({ ctx }) => {
+    generateLessonReminders: professorProcedure.mutation(async ({ ctx }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
@@ -276,7 +276,7 @@ export const comunicacaoRouters = {
     }),
 
     // ─ Geração automática de lembretes de MENSALIDADE (3 dias antes, mês atual) ───────
-    generatePaymentReminders: protectedProcedure.mutation(async ({ ctx }) => {
+    generatePaymentReminders: professorProcedure.mutation(async ({ ctx }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
@@ -576,7 +576,7 @@ export const comunicacaoRouters = {
     }),
 
     // ─ Criar lembrete manual ────────────────────────────────────────────────────────────
-    create: protectedProcedure
+    create: professorProcedure
       .input(z.object({
         studentId: z.number().nullable().optional(),
         type: z.enum(["aula", "cobranca", "inadimplencia", "manual"]),
@@ -603,7 +603,7 @@ export const comunicacaoRouters = {
       }),
 
     // ─ Marcar como enviado ───────────────────────────────────────────────────────────
-    markSent: protectedProcedure
+    markSent: professorProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -616,7 +616,7 @@ export const comunicacaoRouters = {
       }),
 
     // ─ Disparar via Robô Fly.io ─────────────────────────────────────────────────────
-    sendViaBot: protectedProcedure
+    sendViaBot: professorProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -693,7 +693,7 @@ export const comunicacaoRouters = {
       }),
 
     // ─ Cancelar lembrete ────────────────────────────────────────────────────────────
-    cancel: protectedProcedure
+    cancel: professorProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -706,7 +706,7 @@ export const comunicacaoRouters = {
       }),
 
     // ─ Excluir lembrete ────────────────────────────────────────────────────────────
-    delete: protectedProcedure
+    delete: professorProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -720,7 +720,7 @@ export const comunicacaoRouters = {
       }),
 
     // ─ Concluir todos os lembretes pendentes acumulados (evita disparo em massa) ──
-    completeAllPending: protectedProcedure
+    completeAllPending: professorProcedure
       .input(z.object({
         targetStatus: z.enum(["enviado", "cancelado"]).default("enviado"),
       }).optional())
@@ -754,7 +754,7 @@ export const comunicacaoRouters = {
       }),
 
     // ─ Cancelar lembrete quando aula é cancelada ────────────────────────────────
-    syncLessonCancelled: protectedProcedure
+    syncLessonCancelled: professorProcedure
       .input(z.object({ lessonId: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -773,7 +773,7 @@ export const comunicacaoRouters = {
       }),
 
     // ─ Cancelar lembrete quando mensalidade é paga ─────────────────────────────
-    syncPaymentPaid: protectedProcedure
+    syncPaymentPaid: professorProcedure
       .input(z.object({ paymentDueId: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -791,7 +791,7 @@ export const comunicacaoRouters = {
         return { success: true };
       }),
 
-    testNotification: protectedProcedure
+    testNotification: professorProcedure
       .input(z.object({ title: z.string(), content: z.string() }))
       .mutation(async ({ input }) => {
         const ok = await notifyOwner(input);
@@ -806,7 +806,7 @@ export const comunicacaoRouters = {
   }),
 
   whatsapp: router({
-    startSession: protectedProcedure
+    startSession: adminProcedure
       .input(z.object({ 
         phoneNumber: z.string().optional(),
         mode: z.enum(["QR_CODE", "PAIRING_CODE"]).optional(),
@@ -843,7 +843,7 @@ export const comunicacaoRouters = {
         return result;
       }),
 
-    getStatus: protectedProcedure
+    getStatus: adminProcedure
       .query(async ({ ctx }) => {
         const db = await getDb();
         if (!db) throw new Error("Database not available");
@@ -872,7 +872,7 @@ export const comunicacaoRouters = {
         }
       }),
 
-    logout: protectedProcedure
+    logout: adminProcedure
       .mutation(async ({ ctx }) => {
         const db = await getDb();
         if (!db) throw new Error("Database not available");
@@ -894,7 +894,7 @@ export const comunicacaoRouters = {
         });
       }),
 
-    testConnection: protectedProcedure
+    testConnection: adminProcedure
       .mutation(async ({ ctx }) => {
         const db = await getDb();
         if (!db) throw new Error("Database not available");
@@ -927,7 +927,7 @@ export const comunicacaoRouters = {
   }),
 
   reminderTemplates: router({
-    list: protectedProcedure.query(async ({ ctx }) => {
+    list: professorProcedure.query(async ({ ctx }) => {
       const orgId = ctx.user.organizationId!;
       const db = await getDb();
       if (!db) return [];
@@ -936,7 +936,7 @@ export const comunicacaoRouters = {
         .orderBy(asc(reminderTemplates.type));
     }),
 
-    create: protectedProcedure
+    create: professorProcedure
       .input(z.object({
         name: z.string().min(1).max(100),
         type: z.enum(["aula", "cobranca", "inadimplencia", "manual"]),
@@ -973,7 +973,7 @@ export const comunicacaoRouters = {
         }
       }),
 
-    update: protectedProcedure
+    update: professorProcedure
       .input(z.object({
         id: z.number(),
         name: z.string().min(1).max(100).optional(),
@@ -1008,7 +1008,7 @@ export const comunicacaoRouters = {
         }
       }),
 
-    delete: protectedProcedure
+    delete: professorProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         try {
@@ -1025,7 +1025,7 @@ export const comunicacaoRouters = {
   }),
 
   announcements: router({
-    list: protectedProcedure.query(async ({ ctx }) => {
+    list: professorProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
       const orgId = ctx.user.organizationId!;
@@ -1043,7 +1043,7 @@ export const comunicacaoRouters = {
       .where(and(eq(announcements.organizationId, orgId), eq(announcements.userId, ctx.user.id)))
       .orderBy(desc(announcements.createdAt));
     }),
-    create: protectedProcedure.input(z.object({
+    create: professorProcedure.input(z.object({
       title: z.string(),
       content: z.string(),
       important: z.boolean().default(false),
@@ -1138,7 +1138,7 @@ export const comunicacaoRouters = {
 
       return { success: true };
     }),
-    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    delete: professorProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
       const orgId = ctx.user.organizationId!;
@@ -1149,7 +1149,7 @@ export const comunicacaoRouters = {
 
   automations: router({
     // List all automation rules for the current user/org
-    list: protectedProcedure.query(async ({ ctx }) => {
+    list: adminProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       if (!db) return [];
       const { messageAutomationRules } = await import("../../drizzle/schema");
@@ -1170,7 +1170,7 @@ export const comunicacaoRouters = {
     }),
 
     // Create a new custom automation rule
-    create: protectedProcedure
+    create: adminProcedure
       .input(
         z.object({
           name: z.string().min(1),
@@ -1238,7 +1238,7 @@ export const comunicacaoRouters = {
       }),
 
     // Update an existing automation rule (name, template, timing, etc.)
-    update: protectedProcedure
+    update: adminProcedure
       .input(
         z.object({
           id: z.number(),
@@ -1301,7 +1301,7 @@ export const comunicacaoRouters = {
       }),
 
     // Toggle active/inactive
-    toggle: protectedProcedure
+    toggle: adminProcedure
       .input(z.object({ id: z.number(), isActive: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -1324,7 +1324,7 @@ export const comunicacaoRouters = {
       }),
 
     // Delete a custom rule (system rules cannot be deleted)
-    delete: protectedProcedure
+    delete: adminProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -1364,7 +1364,7 @@ export const comunicacaoRouters = {
       }),
 
     // Get execution history (reminders generated by a specific rule)
-    history: protectedProcedure
+    history: adminProcedure
       .input(z.object({ ruleId: z.number(), limit: z.number().default(50) }))
       .query(async ({ ctx, input }) => {
         const db = await getDb();
@@ -1398,7 +1398,7 @@ export const comunicacaoRouters = {
       }),
 
     // Dashboard stats
-    stats: protectedProcedure.query(async ({ ctx }) => {
+    stats: adminProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       if (!db) return { totalSent: 0, activeRules: 0, deliveryRate: 0, topRule: null };
       const { messageAutomationRules } = await import("../../drizzle/schema");
@@ -1461,7 +1461,7 @@ export const comunicacaoRouters = {
     }),
 
     // Seed default system rules for the current user if they don't exist yet
-    seedDefaults: protectedProcedure.mutation(async ({ ctx }) => {
+    seedDefaults: adminProcedure.mutation(async ({ ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { messageAutomationRules } = await import("../../drizzle/schema");

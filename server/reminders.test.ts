@@ -23,7 +23,7 @@ function makeCtx(): TrpcContext {
     email: "prof@musicpro.com",
     name: "Professor Teste",
     loginMethod: "manus",
-    role: "user",
+    role: "professor",
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),

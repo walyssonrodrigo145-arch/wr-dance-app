@@ -254,21 +254,23 @@ export default function Configuracoes() {
       setNotifyWeekly(settings.notifyWeeklyReport === 1);
       setHiddenTabs(settings.hiddenTabs ? settings.hiddenTabs.split(",") : []);
       setWhatsappBotUrl(settings.whatsappBotUrl ?? "");
-      setWhatsappBotToken(settings.whatsappBotToken ?? "");
+      // AUDITORIA P0-01: segredos nunca chegam ao client; campo começa vazio
+      // (placeholder indica "configurado") e só é enviado se o usuário digitar.
+      setWhatsappBotToken("");
       setWhatsappAutoSend(settings.whatsappAutoSend === 1);
       setChatbotEnabled((settings as any).chatbotEnabled === 1);
       setAutoAdvanceSlotsEnabled((settings as any).autoAdvanceSlotsEnabled === 1);
-      setAsaasApiKey(settings.asaasApiKey ?? "");
+      setAsaasApiKey("");
       setAsaasEnabled(settings.asaasEnabled === 1);
       setPaymentGateway((settings.paymentGateway as "asaas" | "mercadopago" | "infinitepay") || "asaas");
-      setMpAccessToken(settings.mpAccessToken ?? "");
+      setMpAccessToken("");
       setInfinitepayHandle((settings as any).infinitepayHandle ?? "");
-      setInfinitepayApiKey((settings as any).infinitepayApiKey ?? "");
+      setInfinitepayApiKey("");
       setInfinitepayEnabled((settings as any).infinitepayEnabled === 1);
       setAiProvider(settings.aiProvider ?? "gemini");
-      setGeminiApiKey(settings.geminiApiKey ?? "");
+      setGeminiApiKey("");
       setGeminiModel(settings.geminiModel ?? "gemini-3.6-flash");
-      setGroqApiKey(settings.groqApiKey ?? "");
+      setGroqApiKey("");
       const LEGACY_GROQ = ["llama3-70b-8192", "llama3-8b-8192", "llama-3.3-70b-specdec"];
       const savedModel = settings.groqModel ?? "llama-3.3-70b-versatile";
       setGroqModel(LEGACY_GROQ.includes(savedModel) ? "llama-3.3-70b-versatile" : savedModel);
@@ -482,19 +484,19 @@ export default function Configuracoes() {
     
     updateWhatsAppMutation.mutate({
       whatsappBotUrl: whatsappBotUrl.trim(),
-      whatsappBotToken: whatsappBotToken.trim(),
+      ...(whatsappBotToken.trim() ? { whatsappBotToken: whatsappBotToken.trim() } : {}),
       whatsappAutoSend,
     });
   };
 
   const handleSaveAsaas = () => {
     updateAsaasMutation.mutate({
-      asaasApiKey,
+      ...(asaasApiKey.trim() ? { asaasApiKey: asaasApiKey.trim() } : {}),
       asaasEnabled,
       paymentGateway,
-      mpAccessToken,
+      ...(mpAccessToken.trim() ? { mpAccessToken: mpAccessToken.trim() } : {}),
       infinitepayHandle,
-      infinitepayApiKey,
+      ...(infinitepayApiKey.trim() ? { infinitepayApiKey: infinitepayApiKey.trim() } : {}),
       infinitepayEnabled,
     });
   };
@@ -502,11 +504,11 @@ export default function Configuracoes() {
   const handleSaveIA = () => {
     updateIAMutation.mutate({
       aiProvider,
-      geminiApiKey,
+      ...(geminiApiKey.trim() ? { geminiApiKey: geminiApiKey.trim() } : {}),
       geminiModel,
-      groqApiKey,
+      ...(groqApiKey.trim() ? { groqApiKey: groqApiKey.trim() } : {}),
       groqModel,
-      opencodeApiKey,
+      ...(opencodeApiKey.trim() ? { opencodeApiKey: opencodeApiKey.trim() } : {}),
       opencodeModel,
       opencodeApiUrl,
       conversationalMode,
@@ -2122,7 +2124,7 @@ export default function Configuracoes() {
                           type="password"
                           value={asaasApiKey}
                           onChange={(e: any) => setAsaasApiKey(e.target.value)}
-                          placeholder="$aact_..."
+                          placeholder={(settings as any)?.hasAsaasApiKey ? "•••••••• (configurada — digite para substituir)" : "$aact_..."}
                           className="h-12 bg-muted/50 border-border/50 rounded-xl px-4 font-mono text-sm"
                         />
                       </Field>
@@ -2160,7 +2162,7 @@ export default function Configuracoes() {
                           type="password"
                           value={infinitepayApiKey}
                           onChange={(e: any) => setInfinitepayApiKey(e.target.value)}
-                          placeholder="Deixe vazio se não tiver chave"
+                          placeholder={(settings as any)?.hasInfinitepayApiKey ? "•••••••• (configurada — digite para substituir)" : "Deixe vazio se não tiver chave"}
                           className="h-12 bg-muted/50 border-border/50 rounded-xl px-4 font-mono text-sm"
                         />
                       </Field>
@@ -2191,7 +2193,7 @@ export default function Configuracoes() {
                           type="password"
                           value={mpAccessToken}
                           onChange={(e: any) => setMpAccessToken(e.target.value)}
-                          placeholder="APP_USR-..."
+                          placeholder={(settings as any)?.hasMpAccessToken ? "•••••••• (configurado — digite para substituir)" : "APP_USR-..."}
                           className="h-12 bg-muted/50 border-border/50 rounded-xl px-4 font-mono text-sm"
                         />
                       </Field>
@@ -2260,7 +2262,7 @@ export default function Configuracoes() {
                         type="password"
                         value={geminiApiKey}
                         onChange={(e: any) => setGeminiApiKey(e.target.value)}
-                        placeholder="AIzaSy..."
+                        placeholder={(settings as any)?.hasGeminiApiKey ? "•••••••• (configurada — digite para substituir)" : "AIzaSy..."}
                         className="h-12 bg-muted/50 border-border/50 rounded-xl px-4 font-mono text-sm"
                       />
                     </Field>
@@ -2297,7 +2299,7 @@ export default function Configuracoes() {
                         type="password"
                         value={groqApiKey}
                         onChange={(e: any) => setGroqApiKey(e.target.value)}
-                        placeholder="gsk_..."
+                        placeholder={(settings as any)?.hasGroqApiKey ? "•••••••• (configurada — digite para substituir)" : "gsk_..."}
                         className="h-12 bg-muted/50 border-border/50 rounded-xl px-4 font-mono text-sm"
                       />
                     </Field>
@@ -2337,7 +2339,7 @@ export default function Configuracoes() {
                         type="password"
                         value={opencodeApiKey}
                         onChange={(e: any) => setOpencodeApiKey(e.target.value)}
-                        placeholder="opencode-... ou sk-..."
+                        placeholder={(settings as any)?.hasOpencodeApiKey ? "•••••••• (configurada — digite para substituir)" : "opencode-... ou sk-..."}
                         className="h-12 bg-muted/50 border-border/50 rounded-xl px-4 font-mono text-sm"
                       />
                     </Field>
@@ -2402,9 +2404,9 @@ export default function Configuracoes() {
                   <Button
                     variant="outline"
                     disabled={
-                      (aiProvider==="gemini" && !geminiApiKey.trim()) ||
-                      (aiProvider==="groq" && !groqApiKey.trim()) ||
-                      (aiProvider==="opencode" && !opencodeApiKey.trim()) ||
+                      (aiProvider==="gemini" && !geminiApiKey.trim() && !(settings as any)?.hasGeminiApiKey) ||
+                      (aiProvider==="groq" && !groqApiKey.trim() && !(settings as any)?.hasGroqApiKey) ||
+                      (aiProvider==="opencode" && !opencodeApiKey.trim() && !(settings as any)?.hasOpencodeApiKey) ||
                       (testAiMutation as any).isPending
                     }
                     onClick={() => {

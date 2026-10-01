@@ -253,9 +253,8 @@ async function answerWithSchoolKnowledge(
 router.post("/", async (req, res) => {
   try {
     // AUDIT-P0 FIX: autenticação do webhook.
-    // Se WHATSAPP_WEBHOOK_TOKEN estiver definido no ambiente, TODA requisição deve
-    // apresentá-lo (header X-Webhook-Token ou query ?token=). Sem o env configurado
-    // o endpoint continua aberto (compatibilidade) — um alerta é logado no boot.
+    // Em PRODUÇÃO o token é obrigatório (sem ele o endpoint recusa tudo).
+    // Em desenvolvimento, sem token configurado, segue aberto para testes locais.
     if (ENV.whatsappWebhookToken) {
       const provided =
         (req.headers["x-webhook-token"] as string) ||
@@ -264,6 +263,9 @@ router.post("/", async (req, res) => {
       if (!provided || !safeEqualStr(provided, ENV.whatsappWebhookToken)) {
         return res.status(401).json({ error: "Unauthorized" });
       }
+    } else if (process.env.NODE_ENV === "production") {
+      console.error("[WhatsApp Webhook] WHATSAPP_WEBHOOK_TOKEN ausente em produção — requisição recusada.");
+      return res.status(503).json({ error: "Webhook not configured" });
     }
 
     const payload = req.body;
@@ -303,11 +305,30 @@ router.post("/", async (req, res) => {
     if (!db) return res.status(500).json({ error: "DB offline" });
 
     // ── Identificar professor pela instância Evolution API ──
-    let professorUserId = 1;
+    // AUDITORIA P0-12: nunca usar fallback fixo (professorUserId = 1) — isso
+    // atribuía mensagens de qualquer instância à primeira escola. A instância
+    // precisa ser prof_<userId> de um usuário real; caso contrário é ignorada.
+    let professorUserId: number | null = null;
     const instanceName = payload.instance || "";
     if (instanceName.startsWith("prof_")) {
       const parsedId = parseInt(instanceName.split("_")[1], 10);
       if (!isNaN(parsedId)) professorUserId = parsedId;
+    }
+    if (!professorUserId) {
+      console.warn(`[WhatsApp Webhook] Instância desconhecida/inválida: "${instanceName}" — evento ignorado.`);
+      return res.status(200).json({ ok: true, ignored: "unknown-instance" });
+    }
+    {
+      const { users: usersTable } = await import("../../drizzle/schema");
+      const [owner] = await db
+        .select({ id: usersTable.id })
+        .from(usersTable)
+        .where(eq(usersTable.id, professorUserId))
+        .limit(1);
+      if (!owner) {
+        console.warn(`[WhatsApp Webhook] Instância ${instanceName} aponta para usuário inexistente — evento ignorado.`);
+        return res.status(200).json({ ok: true, ignored: "unknown-user" });
+      }
     }
 
     // ── Verificar se o chatbot está habilitado ──

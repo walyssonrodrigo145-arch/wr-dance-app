@@ -413,15 +413,7 @@ async function startServer() {
         if (sale.status !== "pendente") return res.status(200).json({ ok: true, already: true });
 
         const { registerWebhookEventOnce } = await import("../routers/helpers");
-        const saleEventId = transactionNsu || `${invoiceSlug || "noslug"}_${orderNsu || "nonsu"}`;
-        const saleDedup = await registerWebhookEventOnce(saleDb, "infinitepay", saleEventId, "payment.paid", sale.organizationId ?? undefined, {
-          transaction_nsu: transactionNsu,
-          invoice_slug: invoiceSlug,
-          order_nsu: orderNsu,
-          receipt_url: receiptUrl,
-          sale_id: sale.id,
-        });
-        if (saleDedup.isDuplicate) return res.status(200).json({ ok: true });
+        // (AUDITORIA P0-08) Dedup movido para depois da confirmação via payment_check.
 
         const [saleSettings] = await saleDb.select({ handle: settings.infinitepayHandle, apiKey: settings.infinitepayApiKey })
           .from(settings).where(eq(settings.organizationId, sale.organizationId!)).limit(1);
@@ -457,6 +449,17 @@ async function startServer() {
           return res.status(400).json({ ok: false, decision: saleDecision });
         }
 
+        // Idempotência só depois do pagamento confirmado (evita perder baixa em retry).
+        const saleEventId = transactionNsu || `${invoiceSlug || "noslug"}_${orderNsu || "nonsu"}`;
+        const saleDedup = await registerWebhookEventOnce(saleDb, "infinitepay", saleEventId, "payment.paid", sale.organizationId ?? undefined, {
+          transaction_nsu: transactionNsu,
+          invoice_slug: invoiceSlug,
+          order_nsu: orderNsu,
+          receipt_url: receiptUrl,
+          sale_id: sale.id,
+        });
+        if (saleDedup.isDuplicate) return res.status(200).json({ ok: true });
+
         await saleDb.update(costumeSales).set({ status: "pago", paidAt: new Date(), updatedAt: new Date() })
           .where(and(eq(costumeSales.id, sale.id), eq(costumeSales.organizationId, sale.organizationId!)));
         debugLog(`[InfinitePay Webhook] Venda da Loja marcada como PAGA (${transactionNsu}) — sale ${sale.id}`);
@@ -488,19 +491,7 @@ async function startServer() {
         return res.status(200).json({ ok: true });
       }
 
-      // ── Idempotência: dedup por transaction_nsu (padrão registerWebhookEventOnce) ──
-      const gatewayEventId = transactionNsu || `${invoiceSlug || "noslug"}_${orderNsu || "nonsu"}`;
-      const { registerWebhookEventOnce } = await import("../routers/helpers");
-      const dedup = await registerWebhookEventOnce(db, "infinitepay", gatewayEventId, "payment.paid", due.organizationId ?? undefined, {
-        transaction_nsu: transactionNsu,
-        invoice_slug: invoiceSlug,
-        order_nsu: orderNsu,
-        receipt_url: receiptUrl,
-      });
-      if (dedup.isDuplicate) {
-        debugLog(`[InfinitePay Webhook] Evento duplicado ignorado: ${gatewayEventId}`);
-        return res.status(200).json({ ok: true });
-      }
+      // (AUDITORIA P0-08) Idempotência movida para depois da confirmação via payment_check.
 
       // ── Camada 2: revalidação server-to-server (payment_check) ──
       const [profSettings] = await db
@@ -539,6 +530,20 @@ async function startServer() {
         // Não confirmado via payment_check — retry via 400 (InfinitePay reenvia)
         debugLog(`[InfinitePay Webhook] Pagamento não confirmado via payment_check (due ${dueId}) — solicitando retry.`);
         return res.status(400).json({ ok: false, decision });
+      }
+
+      // Idempotência só depois do pagamento confirmado (evita perder baixa em retry).
+      const gatewayEventId = transactionNsu || `${invoiceSlug || "noslug"}_${orderNsu || "nonsu"}`;
+      const { registerWebhookEventOnce } = await import("../routers/helpers");
+      const dedup = await registerWebhookEventOnce(db, "infinitepay", gatewayEventId, "payment.paid", due.organizationId ?? undefined, {
+        transaction_nsu: transactionNsu,
+        invoice_slug: invoiceSlug,
+        order_nsu: orderNsu,
+        receipt_url: receiptUrl,
+      });
+      if (dedup.isDuplicate) {
+        debugLog(`[InfinitePay Webhook] Evento duplicado ignorado: ${gatewayEventId}`);
+        return res.status(200).json({ ok: true });
       }
 
       if (due.status === "pago") {
@@ -590,7 +595,7 @@ async function startServer() {
         studentName: paymentDetails?.studentName,
         amount: valor,
         message: contentStr,
-      });
+      }, due.organizationId ?? null);
 
       const [profWhats] = await db
         .select({
@@ -825,7 +830,7 @@ async function startServer() {
           studentName: paymentDetails.studentName,
           amount: valor,
           message: contentStr,
-        });
+        }, paymentDetails.organizationId ?? null);
 
         // Notificação WhatsApp
         const [profSettings] = await db.select({ 

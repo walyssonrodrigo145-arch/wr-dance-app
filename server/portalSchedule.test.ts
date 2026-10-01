@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
+import { organizations } from "../drizzle/schema";
 // AGENDA FIX — testes da remarcação pelo portal do aluno:
 // 1. getTeacherSchedule usa professor efetivo + fallback de horários quando a
 //    escola não configurou "Horário de Funcionamento" (remarcação morta antes);
@@ -58,7 +59,20 @@ function makeFakeDb() {
       return c;
     }),
     delete: vi.fn(() => makeChain([])),
-    select: vi.fn(() => makeChain([], true)),
+    select: vi.fn(() => {
+      const c = makeChain([], true);
+      const origFrom = c.from;
+      c.from = (table: any) => {
+        // Guard de assinatura (AUDITORIA P0-11): o middleware consulta a tabela
+        // `organizations` no início de toda procedure autenticada. O Drizzle
+        // passa a tabela no `.from()` (não no `select()`).
+        if (table === organizations) {
+          return makeChain([{ subscriptionStatus: "active", trialEndsAt: null }]);
+        }
+        return origFrom(table);
+      };
+      return c;
+    }),
     execute: vi.fn().mockResolvedValue({ rows: [] }),
   };
 }

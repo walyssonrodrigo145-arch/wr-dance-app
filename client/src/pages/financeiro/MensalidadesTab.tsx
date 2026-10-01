@@ -595,11 +595,11 @@ export default function MensalidadesTab({ viewMonth, viewYear, payments, isLoadi
   const { data: settings } = trpc.settings.get.useQuery();
   const paymentGateway = (settings?.paymentGateway as "asaas" | "mercadopago" | "infinitepay") || "asaas";
   const isGatewayEnabled = paymentGateway === "mercadopago"
-    ? !!settings?.mpAccessToken
+    ? !!(settings as any)?.hasMpAccessToken
     : paymentGateway === "infinitepay"
       ? (settings?.infinitepayEnabled === 1 && !!settings?.infinitepayHandle)
       : settings?.asaasEnabled === 1;
-  const isWhatsAppEnabled = settings?.whatsappBotUrl && settings?.whatsappBotToken;
+  const isWhatsAppEnabled = settings?.whatsappBotUrl && (settings as any)?.hasWhatsappBotToken;
 
   // Dias de vencimento configurados no perfil da escola (usados no cadastro de nova mensalidade)
   const dueDaysFromSettings = useMemo(() => {

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { protectedProcedure, router } from "./_core/trpc";
+import { protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
 import { studioRooms, lessons, students } from "../drizzle/schema";
 import { eq, and, sql, gte, lte, asc, desc } from "drizzle-orm";
@@ -227,7 +227,7 @@ export const studioRoomsRouter = router({
     };
   }),
 
-  create: protectedProcedure
+  create: adminProcedure
     .input(
       z.object({
         name: z.string().min(1, "Nome da sala é obrigatório"),
@@ -269,7 +269,7 @@ export const studioRoomsRouter = router({
       return newRoom;
     }),
 
-  update: protectedProcedure
+  update: adminProcedure
     .input(
       z.object({
         id: z.number(),
@@ -314,7 +314,7 @@ export const studioRoomsRouter = router({
       return updated;
     }),
 
-  delete: protectedProcedure
+  delete: adminProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();

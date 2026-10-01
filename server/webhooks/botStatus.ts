@@ -10,14 +10,28 @@ import { ENV } from "../_core/env";
 const router = Router();
 
 // ─── SSE (Server-Sent Events) para notificações em tempo real no browser ─────
-// Armazena todos os clientes SSE conectados (abas abertas no navegador)
-const sseClients = new Set<Response>();
+// AUDITORIA P0-09: conexão agora é autenticada e os eventos sensíveis
+// (pagamentos) só são entregues para ADMINS da escola dona do evento.
+type SseClient = { res: Response; organizationId: number | null; role: string };
+const sseClients = new Map<Response, SseClient>();
 
 /**
  * GET /api/webhooks/bot-status/sse
  * O frontend se conecta aqui para receber eventos em tempo real via SSE.
  */
-router.get("/sse", (req, res) => {
+router.get("/sse", async (req, res) => {
+  // Autenticação: EventSource envia o cookie de sessão automaticamente.
+  let user: { organizationId?: number | null; role?: string } | null = null;
+  try {
+    const { sdk } = await import("../_core/sdk");
+    user = (await sdk.authenticateRequest(req)) as any;
+  } catch {
+    user = null;
+  }
+  if (!user) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
@@ -29,8 +43,13 @@ router.get("/sse", (req, res) => {
     res.write(": keep-alive\n\n");
   }, 25_000);
 
-  sseClients.add(res);
-  debugLog(`[BotStatusSSE] Cliente conectado. Total: ${sseClients.size}`);
+  const client: SseClient = {
+    res,
+    organizationId: user.organizationId ?? null,
+    role: user.role ?? "aluno",
+  };
+  sseClients.set(res, client);
+  debugLog(`[BotStatusSSE] Cliente conectado (${client.role}). Total: ${sseClients.size}`);
 
   req.on("close", () => {
     clearInterval(keepAlive);
@@ -40,15 +59,19 @@ router.get("/sse", (req, res) => {
 });
 
 /**
- * Envia um evento SSE para TODOS os clientes conectados.
+ * Envia um evento SSE para os clientes conectados.
+ * - organizationId informado: entrega apenas a admins daquela escola.
+ * - sem organizationId: entrega apenas a admins (qualquer escola).
  */
-function broadcastSSE(eventName: string, data: object) {
+function broadcastSSE(eventName: string, data: object, organizationId?: number | null) {
   const payload = `event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
-  sseClients.forEach(client => {
+  sseClients.forEach((client, res) => {
     try {
-      client.write(payload);
+      if (client.role !== "admin") return;
+      if (organizationId != null && client.organizationId !== organizationId) return;
+      res.write(payload);
     } catch {
-      sseClients.delete(client);
+      sseClients.delete(res);
     }
   });
 }

@@ -53,7 +53,7 @@ import { FiscalService } from "../services/fiscal/FiscalService";
 import { loginAttempts, safeEqualStr, isReservedSuperAdminEmail, getOrgPlanLimits, syncOrgAsaasSubscription, reconcileOrgAsaasCharges, runCreateAssinafyContract } from "./helpers";
 export const contratosRouters = {
   contracts: router({
-    list: protectedProcedure
+    list: professorProcedure
       .input(z.object({
         studentId: z.number().optional(),
       }))
@@ -84,7 +84,7 @@ export const contratosRouters = {
 
     // ── contracts.create foi migrado para contracts.createAssinafy (Assinafy BYOK) ──
     // Este endpoint é mantido apenas para compatibilidade com clientes desatualizados.
-    create: protectedProcedure
+    create: professorProcedure
       .input(z.object({ studentId: z.number() }))
       .mutation(async () => {
         throw new TRPCError({
@@ -95,7 +95,7 @@ export const contratosRouters = {
 
     // ─── CONTRATOS DIGITAIS (Assinafy — BYOK) ────────────────────────────────
 
-    details: protectedProcedure
+    details: professorProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
         const db = await getDb();
@@ -116,7 +116,7 @@ export const contratosRouters = {
         return { contract, events };
       }),
 
-    createAssinafy: protectedProcedure
+    createAssinafy: professorProcedure
       .input(z.object({
         studentId: z.number(),
         templateId: z.number(),
@@ -135,7 +135,7 @@ export const contratosRouters = {
       }),
 
     // 🔍 Gera o PDF do contrato SEM enviar para assinatura (pré-visualização)
-    previewPdf: protectedProcedure
+    previewPdf: professorProcedure
       .input(z.object({
         studentId: z.number(),
         templateId: z.number(),
@@ -162,7 +162,7 @@ export const contratosRouters = {
       }),
 
     // 🔄 Renovação/reemissão: novo contrato a partir de um existente (mesmo aluno/modelo/valores)
-    renew: protectedProcedure
+    renew: professorProcedure
       .input(z.object({
         contractId: z.number(),
         startDate: z.string().optional(),
@@ -307,7 +307,7 @@ export const contratosRouters = {
         return { success: true, contract: result.contract, signUrl: result.signUrl };
       }),
 
-    refreshStatus: protectedProcedure
+    refreshStatus: professorProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -362,7 +362,7 @@ export const contratosRouters = {
         }
       }),
 
-    cancel: protectedProcedure
+    cancel: professorProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -422,7 +422,7 @@ export const contratosRouters = {
         return { success: true };
       }),
 
-    resend: protectedProcedure
+    resend: professorProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -456,7 +456,7 @@ export const contratosRouters = {
         return { success: true };
       }),
 
-    downloadSigned: protectedProcedure
+    downloadSigned: professorProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
         const db = await getDb();
@@ -468,8 +468,17 @@ export const contratosRouters = {
           .where(and(eq(contracts.id, input.id), eq(contracts.organizationId, orgId)))
           .limit(1);
         if (!contract) throw new TRPCError({ code: "NOT_FOUND", message: "Contrato não encontrado" });
-        if (ctx.user.role === "aluno" && ctx.user.studentId && contract.studentId !== ctx.user.studentId) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Você não tem permissão para acessar este contrato." });
+        if (ctx.user.role === "aluno") {
+          // AUDITORIA P0-05: nunca pular a checagem quando studentId está nulo.
+          let myStudentId = ctx.user.studentId ?? null;
+          if (!myStudentId) {
+            const [me] = await db.select({ id: students.id }).from(students)
+              .where(and(eq(students.organizationId, orgId), eq(students.studentUserId, ctx.user.id))).limit(1);
+            myStudentId = me?.id ?? null;
+          }
+          if (!myStudentId || contract.studentId !== myStudentId) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Você não tem permissão para acessar este contrato." });
+          }
         }
         if (!contract.assinafyDocId || contract.status !== "assinado") {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Contrato ainda não assinado." });
@@ -493,8 +502,17 @@ export const contratosRouters = {
       .query(async ({ ctx }) => {
         const db = await getDb();
         if (!db) return [];
-        if (ctx.user.role !== "aluno" || !ctx.user.studentId) return [];
+        if (ctx.user.role !== "aluno") return [];
         const orgId = ctx.user.organizationId!;
+        // AUDITORIA: resolve o studentId mesmo quando users.studentId está nulo
+        // (vínculo feito por students.studentUserId).
+        let myStudentId = ctx.user.studentId ?? null;
+        if (!myStudentId) {
+          const [me] = await db.select({ id: students.id }).from(students)
+            .where(and(eq(students.organizationId, orgId), eq(students.studentUserId, ctx.user.id))).limit(1);
+          myStudentId = me?.id ?? null;
+        }
+        if (!myStudentId) return [];
 
         const list = await db.select({
           contract: contracts,
@@ -503,7 +521,7 @@ export const contratosRouters = {
           .from(contracts)
           .innerJoin(students, eq(students.id, contracts.studentId))
           .where(and(
-            eq(contracts.studentId, ctx.user.studentId),
+            eq(contracts.studentId, myStudentId),
             eq(contracts.provider, "assinafy"),
             eq(contracts.organizationId, orgId),
           ))
@@ -520,7 +538,7 @@ export const contratosRouters = {
         const pendingRenewal = list.some((l: any) => l.contract.status === "aguardando_assinatura");
         // Plano do aluno (preview de vigência/valor da renovação)
         const [studentRow] = await db.select({ schoolPlanId: students.schoolPlanId }).from(students)
-          .where(and(eq(students.id, ctx.user.studentId), eq(students.organizationId, orgId))).limit(1);
+          .where(and(eq(students.id, myStudentId), eq(students.organizationId, orgId))).limit(1);
         const planForStudent = studentRow?.schoolPlanId
           ? (await db.select({ duracaoMeses: schoolPlans.duracaoMeses, valorMensal: schoolPlans.valorMensal, ativo: schoolPlans.ativo })
               .from(schoolPlans)
@@ -575,7 +593,7 @@ export const contratosRouters = {
   }),
 
   signatureIntegrations: router({
-    getStatus: protectedProcedure.query(async ({ ctx }) => {
+    getStatus: professorProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       if (!db) return null;
       const orgId = ctx.user.organizationId!;
@@ -673,7 +691,7 @@ export const contratosRouters = {
         return { success: true, message: "Conexão realizada com sucesso." };
       }),
 
-    testConnection: protectedProcedure.mutation(async ({ ctx }) => {
+    testConnection: professorProcedure.mutation(async ({ ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB indisponível" });
       const orgId = ctx.user.organizationId!;
@@ -768,7 +786,7 @@ export const contratosRouters = {
   }),
 
   contractTemplates: router({
-    list: protectedProcedure.query(async ({ ctx }) => {
+    list: professorProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       if (!db) return [];
       const orgId = ctx.user.organizationId!;
@@ -816,7 +834,7 @@ export const contratosRouters = {
       return templates;
     }),
 
-    listAssinafyTemplates: protectedProcedure.query(async ({ ctx }) => {
+    listAssinafyTemplates: professorProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       if (!db) return [];
       const orgId = ctx.user.organizationId!;
@@ -844,7 +862,7 @@ export const contratosRouters = {
       return [];
     }),
 
-    autoInsertVariables: protectedProcedure
+    autoInsertVariables: professorProcedure
       .input(z.object({ content: z.string() }))
       .mutation(async ({ input }) => {
         let text = input.content;
@@ -873,7 +891,7 @@ export const contratosRouters = {
         return { content: text };
       }),
 
-    getById: protectedProcedure
+    getById: professorProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
         const db = await getDb();
@@ -889,7 +907,7 @@ export const contratosRouters = {
         return tpl;
       }),
 
-    create: protectedProcedure
+    create: adminProcedure
       .input(z.object({
         name: z.string().min(1, "O nome do modelo é obrigatório"),
         description: z.string().optional(),
@@ -916,7 +934,7 @@ export const contratosRouters = {
         return created;
       }),
 
-    update: protectedProcedure
+    update: adminProcedure
       .input(z.object({
         id: z.number(),
         name: z.string().min(1, "O nome do modelo é obrigatório"),
@@ -944,7 +962,7 @@ export const contratosRouters = {
         return updated;
       }),
 
-    delete: protectedProcedure
+    delete: adminProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();

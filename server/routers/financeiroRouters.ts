@@ -1426,7 +1426,7 @@ export const financeiroRouters = {
   }),
 
   expenses: router({
-    list: protectedProcedure
+    list: adminProcedure
       .input(z.object({
         // BUG#2 FIX: month:-1 era passado para EXTRACT(MONTH) = -1, retornando sempre 0 linhas
         // Agora: undefined = sem filtro de mês (retorna todos); número válido = filtra pelo mês
@@ -1456,7 +1456,7 @@ export const financeiroRouters = {
           .orderBy(desc(expenses.date));
       }),
       
-    create: protectedProcedure
+    create: adminProcedure
       .input(z.object({
         description: z.string(),
         supplier: z.string().optional(),
@@ -1495,7 +1495,7 @@ export const financeiroRouters = {
         }
       }),
 
-    update: protectedProcedure
+    update: adminProcedure
       .input(z.object({
         id: z.number(),
         description: z.string().optional(),
@@ -1533,7 +1533,7 @@ export const financeiroRouters = {
         }
       }),
       
-    delete: protectedProcedure
+    delete: adminProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         try {
@@ -1552,7 +1552,7 @@ export const financeiroRouters = {
         }
       }),
       
-    markPaid: protectedProcedure
+    markPaid: adminProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         try {
@@ -1573,7 +1573,7 @@ export const financeiroRouters = {
         }
       }),
 
-    generateRecurring: protectedProcedure
+    generateRecurring: adminProcedure
       .input(z.object({
         startMonth: z.number(),
         startYear: z.number(),
@@ -1656,7 +1656,7 @@ export const financeiroRouters = {
         }
       }),
 
-    uploadReceipt: protectedProcedure
+    uploadReceipt: adminProcedure
       .input(z.object({
         expenseId: z.number(),
         fileData: z.string(),
@@ -1720,7 +1720,7 @@ export const financeiroRouters = {
         }));
       }),
 
-    getHistory: protectedProcedure
+    getHistory: adminProcedure
       .input(z.object({
         year: z.number().optional(),
       }))
@@ -1946,7 +1946,7 @@ export const financeiroRouters = {
         }
       }),
 
-    getDetails: protectedProcedure
+    getDetails: adminProcedure
       .input(z.object({ paymentId: z.number() }))
       .query(async ({ ctx, input }) => {
         const db = await getDb();

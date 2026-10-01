@@ -417,6 +417,8 @@ describe("rankings — portal do aluno", () => {
   it("myRankings retorna participações do aluno (ativo com posição derivada)", async () => {
     const ctx = makeStudentContext();
     const caller = appRouter.createCaller(ctx);
+    // 0. guard de assinatura (org ativa)
+    enqueueSelectResult([{ subscriptionStatus: "active", trialEndsAt: null }]);
     // 1. participations join rankings
     enqueueSelectResult([{
       rankingId: 1, name: "Desafio de Agosto", status: "ativo", visibility: "publico",
