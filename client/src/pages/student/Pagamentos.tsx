@@ -17,6 +17,7 @@ import {
   QrCode,
   UploadCloud,
   Sparkles,
+  Clock,
   Loader2,
   XCircle
 } from "lucide-react";
@@ -122,6 +123,10 @@ export default function StudentPayments() {
 
   const totalPaid = payments?.filter(p => p.status === 'pago').reduce((acc, curr) => acc + Number(curr.amount), 0) || 0;
   const nextPayment = payments?.filter(p => p.status !== 'pago').sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0];
+  // AUDITORIA Fase 2: status real da conta (antes era fixo "Em Dia ✅").
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const hasOverdue = (payments ?? []).some(p => p.status !== 'pago' && new Date(p.dueDate) < todayStart);
   const nextValue = nextPayment ? Number(nextPayment.amount) : 0;
 
   return (
@@ -134,10 +139,12 @@ export default function StudentPayments() {
         <div className="flex items-center gap-3">
            <div className="text-right hidden sm:block">
               <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Status da Conta</p>
-              <p className="text-sm font-black text-green-500 uppercase tracking-tight">Em Dia ✅</p>
+              <p className={`text-sm font-black uppercase tracking-tight ${hasOverdue ? "text-amber-500" : "text-green-500"}`}>
+                {hasOverdue ? "Atenção" : "Em Dia ✅"}
+              </p>
            </div>
-           <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500">
-             <ShieldCheck size={20} />
+           <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${hasOverdue ? "bg-amber-500/10 text-amber-500" : "bg-green-500/10 text-green-500"}`}>
+             {hasOverdue ? <Clock size={20} /> : <ShieldCheck size={20} />}
            </div>
         </div>
       </div>

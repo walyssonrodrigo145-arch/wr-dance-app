@@ -29,17 +29,6 @@ const DEFAULT_STAGES = [
   { key: "fechado", label: "Matriculado (Ganho)", color: "bg-emerald-500", text: "text-emerald-400", bgLight: "bg-emerald-500/10", border: "border-emerald-500/30" },
 ];
 
-// Dados ricos para visualização e demonstração completa do sistema
-const SAMPLE_LEADS = [
-  { id: 101, name: "Mariana Silva", phone: "(11) 98765-4321", email: "mariana.silva@email.com", instrument: "Ballet", modality: "Presencial", level: "Iniciante", value: "320.00", stage: "novo", temperature: "quente", source: "Instagram", createdAt: new Date() },
-  { id: 102, name: "Gabriel Santos", phone: "(11) 97711-2233", email: "gabriel.forro@email.com", instrument: "Forró", modality: "Presencial", level: "Intermediário", value: "380.00", stage: "contato", temperature: "quente", source: "WhatsApp", createdAt: new Date() },
-  { id: 103, name: "Bruno Mendes", phone: "(19) 99888-7766", email: "bruno.dance@email.com", instrument: "Zumba", modality: "Híbrido", level: "Avançado", value: "350.00", stage: "aula_experimental", temperature: "quente", source: "Google", createdAt: new Date() },
-  { id: 104, name: "Julia Lima", phone: "(21) 98123-4567", email: "julia.canto@email.com", instrument: "Canto / Técnica Vocal", modality: "Online", level: "Iniciante", value: "290.00", stage: "fez_aula", temperature: "morno", source: "Indicação", createdAt: new Date() },
-  { id: 105, name: "Pedro Rocha", phone: "(31) 99234-5678", email: "pedro.salsa@email.com", instrument: "Salsa", modality: "Presencial", level: "Iniciante", value: "420.00", stage: "proposta", temperature: "quente", source: "Instagram", createdAt: new Date() },
-  { id: 106, name: "Lucas Ferreira", phone: "(41) 98877-6655", email: "lucas.hiphop@email.com", instrument: "Hip-Hop", modality: "Presencial", level: "Iniciante", value: "360.00", stage: "fechado", temperature: "ganho", source: "Site", createdAt: new Date() },
-  { id: 107, name: "Camila Ribeiro", phone: "(51) 97654-3210", email: "camila.violino@email.com", instrument: "Violino", modality: "Presencial", level: "Iniciante", value: "390.00", stage: "fechado", temperature: "ganho", source: "WhatsApp", createdAt: new Date() },
-];
-
 export default function LeadsApp() {
   const utils = trpc.useUtils();
   const { user } = useAuth();
@@ -106,7 +95,7 @@ export default function LeadsApp() {
 
   // Amostragem inteligente
   const leadsDisplayList = useMemo(() => {
-    const base = dbLeads.length > 0 ? dbLeads : SAMPLE_LEADS;
+    const base = dbLeads;
     return base.filter((lead: any) => {
       if (searchTerm.trim() !== "") {
         const q = searchTerm.toLowerCase();
@@ -131,6 +120,71 @@ export default function LeadsApp() {
   const closedCount = leadsDisplayList.filter((l: any) => l.stage === "fechado" || l.stage === "matriculado").length;
   const conversionRate = totalLeadsCount > 0 ? ((closedCount / totalLeadsCount) * 100).toFixed(1) : "0.0";
   const totalPipelineRevenue = leadsDisplayList.reduce((acc: number, l: any) => acc + (parseFloat(String(l.value || "0")) || 0), 0);
+
+  // AUDITORIA Fase 5: KPIs reais derivados dos leads (antes números fixos de demonstração).
+  const crmStats = useMemo(() => {
+    const leads = dbLeads as any[];
+    const isClosed = (l: any) => l.stage === "fechado" || l.stage === "matriculado";
+    const closed = leads.filter(isClosed);
+    const proposed = leads.filter((l) => l.stage === "proposta");
+    const demos = leads.filter((l) => l.stage === "aula_experimental" || l.stage === "fez_aula");
+    const avgTicket = closed.length > 0 ? closed.reduce((a, l) => a + Number(l.value || 0), 0) / closed.length : 0;
+    const conv = leads.length > 0 ? Math.round((closed.length / leads.length) * 100) : 0;
+    const bySource = new Map<string, { count: number; closed: number; value: number }>();
+    for (const l of leads) {
+      const src = l.source || "Outros";
+      const e = bySource.get(src) ?? { count: 0, closed: 0, value: 0 };
+      e.count++;
+      if (isClosed(l)) { e.closed++; e.value += Number(l.value || 0); }
+      bySource.set(src, e);
+    }
+    const byCourse = new Map<string, number>();
+    for (const l of leads) {
+      const c = l.instrument || l.productService || "Dança";
+      byCourse.set(c, (byCourse.get(c) || 0) + 1);
+    }
+    return { closed, proposed, demos, avgTicket, conv, bySource, byCourse, total: leads.length };
+  }, [dbLeads, leadsDisplayList]);
+
+  const followUpStats = useMemo(() => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+    const week = new Date(start.getTime() + 7 * 86400000);
+    let today = 0, next7 = 0, done = 0;
+    for (const item of followUps as any[]) {
+      const f = item.followUp ?? item;
+      const due = new Date(f.dueDate);
+      if (f.completed) {
+        if (due.getMonth() === now.getMonth() && due.getFullYear() === now.getFullYear()) done++;
+        continue;
+      }
+      if (due >= start && due <= end) today++;
+      else if (due > end && due <= week) next7++;
+    }
+    return { today, next7, done };
+  }, [followUps]);
+
+  const completeFollowUpMutation = trpc.crm.completeFollowUp.useMutation({
+    onSuccess: () => {
+      toast.success("Follow-up concluído!");
+      utils.crm.listFollowUps.invalidate();
+      utils.crm.getDashboardMetrics.invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const { data: crmSettingsData } = trpc.crm.getSettings.useQuery();
+  const [originsInput, setOriginsInput] = useState("");
+  const updateSettingsMutation = trpc.crm.updateSettings.useMutation({
+    onSuccess: () => {
+      toast.success("Configurações salvas!");
+      utils.crm.getSettings.invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const { data: goals } = trpc.crm.getGoals.useQuery();
 
   const getPriorityBadge = (temp?: string | null) => {
     switch (temp) {
@@ -680,42 +734,45 @@ export default function LeadsApp() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="p-4 rounded-xl bg-[#0B091A] border border-indigo-950/50 space-y-2">
                     <p className="text-xs font-bold text-slate-400 uppercase">Hoje</p>
-                    <p className="text-2xl font-black font-outfit text-cyan-400">2 Pendentes</p>
+                    <p className="text-2xl font-black font-outfit text-cyan-400">{followUpStats.today} Pendentes</p>
                   </div>
                   <div className="p-4 rounded-xl bg-[#0B091A] border border-indigo-950/50 space-y-2">
                     <p className="text-xs font-bold text-slate-400 uppercase">Próximos 7 Dias</p>
-                    <p className="text-2xl font-black font-outfit text-purple-400">5 Agendados</p>
+                    <p className="text-2xl font-black font-outfit text-purple-400">{followUpStats.next7} Agendados</p>
                   </div>
                   <div className="p-4 rounded-xl bg-[#0B091A] border border-indigo-950/50 space-y-2">
                     <p className="text-xs font-bold text-slate-400 uppercase">Concluídos este Mês</p>
-                    <p className="text-2xl font-black font-outfit text-emerald-400">18 Realizados</p>
+                    <p className="text-2xl font-black font-outfit text-emerald-400">{followUpStats.done} Realizados</p>
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  {[
-                    { id: 1, lead: "Mariana Silva (Ballet)", task: "Ligar para confirmar presença na aula experimental de sábado", time: "Hoje, 14:00", type: "ligacao" },
-                    { id: 2, lead: "Gabriel Santos (Forró)", task: "Enviar proposta com desconto de matrícula via WhatsApp", time: "Hoje, 16:30", type: "whatsapp" },
-                    { id: 3, lead: "Bruno Mendes (Zumba)", task: "Acompanhamento pós-aula experimental (Feedback)", time: "Amanhã, 10:00", type: "whatsapp" },
-                  ].map((item) => (
-                    <div key={item.id} className="flex items-center justify-between p-4 rounded-xl bg-[#0B091A] border border-indigo-950/50 hover:border-cyan-500/40 transition-all">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center border border-cyan-500/20">
-                          {item.type === "whatsapp" ? <MessageSquare size={16} /> : <PhoneCall size={16} />}
+                  {(followUps as any[]).filter((entry) => !(entry.followUp ?? entry).completed).slice(0, 8).map((entry) => {
+                    const f = entry.followUp ?? entry;
+                    return (
+                      <div key={f.id} className="flex items-center justify-between p-4 rounded-xl bg-[#0B091A] border border-indigo-950/50 hover:border-cyan-500/40 transition-all">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center border border-cyan-500/20">
+                            {f.contactType === "whatsapp" ? <MessageSquare size={16} /> : <PhoneCall size={16} />}
+                          </div>
+                          <div>
+                            <p className="font-bold text-xs text-white">{f.title}</p>
+                            <p className="text-[11px] text-slate-400">{entry.leadName || "Lead"} • <span className="text-cyan-400 font-bold">{new Date(f.dueDate).toLocaleDateString("pt-BR")}{(f.dueTime ? " às " + f.dueTime : "")}</span></p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-bold text-xs text-white">{item.task}</p>
-                          <p className="text-[11px] text-slate-400">{item.lead} • <span className="text-cyan-400 font-bold">{item.time}</span></p>
-                        </div>
+                        <Button
+                          onClick={() => completeFollowUpMutation.mutate({ followUpId: f.id })}
+                          disabled={completeFollowUpMutation.isPending}
+                          className="h-8 px-3 text-xs bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white font-bold rounded-lg gap-1"
+                        >
+                          <Check size={14} /> Concluir
+                        </Button>
                       </div>
-                      <Button
-                        onClick={() => toast.success("Follow-up marcado como concluído!")}
-                        className="h-8 px-3 text-xs bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white font-bold rounded-lg gap-1"
-                      >
-                        <Check size={14} /> Concluir
-                      </Button>
-                    </div>
-                  ))}
+                    );
+                  })}
+                  {(followUps as any[]).filter((entry) => !(entry.followUp ?? entry).completed).length === 0 && (
+                    <p className="text-xs text-slate-500 text-center py-6">Nenhum follow-up pendente. Crie um novo acima.</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -730,41 +787,47 @@ export default function LeadsApp() {
                     <h3 className="font-bold text-base font-outfit text-white">Propostas Comerciais & Fechamentos</h3>
                     <p className="text-xs text-slate-400">Acompanhe orçamentos enviados e links de contratos digitais.</p>
                   </div>
-                  <Button onClick={() => toast.success("Nova Proposta Comercial gerada com sucesso!")} className="h-9 px-3 text-xs bg-blue-600 hover:bg-blue-700 font-bold rounded-xl gap-1.5 text-white">
-                    <Plus size={14} /> Gerar Proposta
-                  </Button>
+                  <span className="text-[11px] text-slate-400 font-bold bg-[#0B091A] px-3 py-2 rounded-xl border border-indigo-950/60">
+                    Mova um lead para a etapa "Proposta" no funil
+                  </span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {[
-                    { id: 201, lead: "Pedro Rocha", inst: "Salsa", plan: "Plano Mensal Individual (1x/sem)", value: "R$ 420,00/mês", status: "Aguardando Assinatura", date: "Enviado há 1 dia" },
-                    { id: 202, lead: "Julia Lima", inst: "Canto", plan: "Plano Trimestral VIP", value: "R$ 350,00/mês", status: "Em Análise", date: "Enviado há 2 dias" },
-                    { id: 203, lead: "Lucas Ferreira", inst: "Hip-Hop", plan: "Plano Anual DancePro", value: "R$ 360,00/mês", status: "Aprovada e Matriculado", date: "Fechado Hoje" },
-                  ].map((prop) => (
-                    <div key={prop.id} className="p-5 rounded-2xl bg-[#0B091A] border border-indigo-950/60 space-y-4">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h4 className="font-bold text-sm text-white font-outfit">{prop.lead}</h4>
-                          <p className="text-[11px] text-indigo-300 font-bold mt-0.5">💃 {prop.inst}</p>
+                {crmStats.proposed.length === 0 ? (
+                  <p className="text-xs text-slate-500 text-center py-8">Nenhuma proposta em aberto. Mova um lead para a etapa "Proposta" no funil.</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {crmStats.proposed.map((lead: any) => (
+                      <div key={lead.id} className="p-5 rounded-2xl bg-[#0B091A] border border-indigo-950/60 space-y-4">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h4 className="font-bold text-sm text-white font-outfit">{lead.name}</h4>
+                            <p className="text-[11px] text-indigo-300 font-bold mt-0.5">{lead.instrument || lead.productService || "Dança"}</p>
+                          </div>
+                          <Badge className="bg-blue-500/10 text-blue-300 border-blue-500/20 text-[9px]">Proposta enviada</Badge>
                         </div>
-                        <Badge className="bg-blue-500/10 text-blue-300 border-blue-500/20 text-[9px]">{prop.status}</Badge>
-                      </div>
 
-                      <div className="space-y-1 bg-[#13102B] p-3 rounded-xl border border-indigo-950/80 text-xs">
-                        <p className="text-slate-400 text-[10px] font-bold uppercase">Plano Selecionado</p>
-                        <p className="font-bold text-white">{prop.plan}</p>
-                        <p className="text-emerald-400 font-black text-sm pt-1">{prop.value}</p>
-                      </div>
+                        <div className="space-y-1 bg-[#13102B] p-3 rounded-xl border border-indigo-950/80 text-xs">
+                          <p className="text-slate-400 text-[10px] font-bold uppercase">Mensalidade proposta</p>
+                          <p className="text-emerald-400 font-black text-sm pt-1">R$ {Number(lead.value || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/mês</p>
+                        </div>
 
-                      <div className="flex items-center justify-between pt-2 border-t border-indigo-950/50 text-xs">
-                        <span className="text-[11px] text-slate-500">{prop.date}</span>
-                        <Button onClick={() => toast.success("Link do Contrato ZapSign reenviado via WhatsApp!")} className="h-7 px-2 text-[11px] bg-indigo-600 hover:bg-indigo-700 font-bold rounded-lg">
-                          Reenviar Contrato
-                        </Button>
+                        <div className="flex items-center justify-between pt-2 border-t border-indigo-950/50 text-xs">
+                          <span className="text-[11px] text-slate-500">{lead.updatedAt ? "Atualizado " + new Date(lead.updatedAt).toLocaleDateString("pt-BR") : ""}</span>
+                          <Button
+                            onClick={() => {
+                              const digits = String(lead.phone || "").replace(/\D/g, "");
+                              if (!digits) { toast.error("Lead sem telefone cadastrado."); return; }
+                              window.open("https://wa.me/55" + digits, "_blank");
+                            }}
+                            className="h-7 px-2 text-[11px] bg-indigo-600 hover:bg-indigo-700 font-bold rounded-lg"
+                          >
+                            Falar no WhatsApp
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -784,49 +847,34 @@ export default function LeadsApp() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-[#0B091A] p-5 rounded-2xl border border-indigo-950/50 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-300">Novas Matrículas</span>
-                      <span className="text-xs font-black text-emerald-400">11 de 15 alunos (73%)</span>
-                    </div>
-                    <div className="w-full bg-[#13102B] h-3 rounded-full overflow-hidden border border-indigo-950/60">
-                      <div className="bg-gradient-to-r from-indigo-500 to-emerald-500 h-full rounded-full w-[73%]" />
-                    </div>
-                    <p className="text-[11px] text-slate-400">Faltam apenas 4 matrículas para bater a meta mensal.</p>
-                  </div>
-
-                  <div className="bg-[#0B091A] p-5 rounded-2xl border border-indigo-950/50 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-300">Aulas Experimentais Agendadas</span>
-                      <span className="text-xs font-black text-cyan-400">18 de 25 aulas (72%)</span>
-                    </div>
-                    <div className="w-full bg-[#13102B] h-3 rounded-full overflow-hidden border border-indigo-950/60">
-                      <div className="bg-gradient-to-r from-cyan-500 to-blue-500 h-full rounded-full w-[72%]" />
-                    </div>
-                    <p className="text-[11px] text-slate-400">Ótimo volume de degustação de cursos neste mês.</p>
-                  </div>
-
-                  <div className="bg-[#0B091A] p-5 rounded-2xl border border-indigo-950/50 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-300">Propostas Comerciais Enviadas</span>
-                      <span className="text-xs font-black text-purple-400">14 de 20 propostas (70%)</span>
-                    </div>
-                    <div className="w-full bg-[#13102B] h-3 rounded-full overflow-hidden border border-indigo-950/60">
-                      <div className="bg-gradient-to-r from-purple-500 to-rose-500 h-full rounded-full w-[70%]" />
-                    </div>
-                    <p className="text-[11px] text-slate-400">Conversão de propostas em fechamento em 78%.</p>
-                  </div>
-
-                  <div className="bg-[#0B091A] p-5 rounded-2xl border border-indigo-950/50 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-300">Nova Receita Recorrente (MRR)</span>
-                      <span className="text-xs font-black text-emerald-400">R$ 3.840 de R$ 5.000 (76%)</span>
-                    </div>
-                    <div className="w-full bg-[#13102B] h-3 rounded-full overflow-hidden border border-indigo-950/60">
-                      <div className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full w-[76%]" />
-                    </div>
-                    <p className="text-[11px] text-slate-400">Incremento garantido em mensalidades recorrentes ativas.</p>
-                  </div>
+                  {[
+                    { label: "Novas Matrículas", actual: crmStats.closed.length, target: Number(goals?.targetNewStudents ?? 0), color: "from-indigo-500 to-emerald-500", text: "text-emerald-400" as const, money: false },
+                    { label: "Aulas Experimentais", actual: crmStats.demos.length, target: Number(goals?.targetDemos ?? 0), color: "from-cyan-500 to-blue-500", text: "text-cyan-400" as const, money: false },
+                    { label: "Propostas Comerciais Enviadas", actual: crmStats.proposed.length, target: Number(goals?.targetProposals ?? 0), color: "from-purple-500 to-rose-500", text: "text-purple-400" as const, money: false },
+                    { label: "Nova Receita Recorrente (MRR)", actual: crmStats.closed.reduce((a: number, l: any) => a + Number(l.value || 0), 0), target: Number(goals?.targetMrr ?? 0), color: "from-emerald-500 to-teal-400", text: "text-emerald-400" as const, money: true },
+                  ].map((meta) => {
+                    const pct = meta.target > 0 ? Math.min(100, Math.round((meta.actual / meta.target) * 100)) : 0;
+                    const progressLabel = meta.money
+                      ? "R$ " + meta.actual.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) + " de R$ " + meta.target.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) + " (" + pct + "%)"
+                      : meta.actual + " de " + meta.target + " (" + pct + "%)";
+                    const hint = meta.target === 0
+                      ? "Defina uma meta em Ajustar Metas."
+                      : (pct >= 100 ? "Meta batida!" : "Faltam " + (meta.money
+                          ? "R$ " + (meta.target - meta.actual).toLocaleString("pt-BR", { minimumFractionDigits: 2 })
+                          : Math.max(0, meta.target - meta.actual)) + " para a meta mensal.");
+                    return (
+                      <div key={meta.label} className="bg-[#0B091A] p-5 rounded-2xl border border-indigo-950/50 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-300">{meta.label}</span>
+                          <span className={"text-xs font-black " + meta.text}>{progressLabel}</span>
+                        </div>
+                        <div className="w-full bg-[#13102B] h-3 rounded-full overflow-hidden border border-indigo-950/60">
+                          <div className={"bg-gradient-to-r " + meta.color + " h-full rounded-full"} style={{ width: pct + "%" }} />
+                        </div>
+                        <p className="text-[11px] text-slate-400">{hint}</p>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -899,16 +947,22 @@ export default function LeadsApp() {
                   </div>
                 </div>
 
+                {crmStats.closed.length === 0 && (
+                  <p className="text-xs text-slate-500 text-center py-8">Nenhum aluno matriculado pelo CRM ainda. Feche um lead no funil para iniciar o onboarding.</p>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {[
-                    { id: "106", name: "Lucas Ferreira", inst: "Hip-Hop", start: "Início: 18/08" },
-                    { id: "107", name: "Camila Ribeiro", inst: "Violino", start: "Início: 20/08" },
-                  ].map((std) => (
+                  {crmStats.closed.map((lead: any) => ({
+                    id: String(lead.id),
+                    name: lead.name,
+                    phone: lead.phone,
+                    inst: lead.instrument || lead.productService || "Dança",
+                    start: lead.updatedAt ? "Fechado em " + new Date(lead.updatedAt).toLocaleDateString("pt-BR") : "Matriculado",
+                  })).map((std: any) => (
                     <div key={std.id} className="bg-[#0B091A] border border-indigo-950/50 p-5 rounded-2xl space-y-4">
                       <div className="flex items-center justify-between">
                         <div>
                           <h4 className="font-bold text-sm text-white font-outfit">{std.name}</h4>
-                          <p className="text-xs text-indigo-400 font-bold mt-0.5">💃 Curso de {std.inst} • {std.start}</p>
+                          <p className="text-xs text-indigo-400 font-bold mt-0.5">Curso de {std.inst} • {std.start}</p>
                         </div>
                         <Badge className="bg-amber-500/10 text-amber-300 border-amber-500/20 text-[10px]">Em Onboarding</Badge>
                       </div>
@@ -951,7 +1005,15 @@ export default function LeadsApp() {
                         </label>
                       </div>
 
-                      <Button onClick={() => toast.success("Mensagem de boas-vindas enviada para o aluno!")} className="w-full h-8 text-xs bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600 hover:text-white font-bold rounded-xl gap-2">
+                      <Button
+                        onClick={() => {
+                          const digits = String(std.phone || "").replace(/\D/g, "");
+                          if (!digits) { toast.error("Aluno sem telefone cadastrado."); return; }
+                          const msg = encodeURIComponent("Olá " + std.name + "! Seja bem-vinda(o) à escola! 💃 Qualquer dúvida sobre horários, app do aluno ou materiais, é só chamar por aqui.");
+                          window.open("https://wa.me/55" + digits + "?text=" + msg, "_blank");
+                        }}
+                        className="w-full h-8 text-xs bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600 hover:text-white font-bold rounded-xl gap-2"
+                      >
                         <Send size={13} /> Enviar Mensagem de Boas-Vindas
                       </Button>
                     </div>
@@ -972,26 +1034,10 @@ export default function LeadsApp() {
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  {[
-                    { id: 1, lead: "Mariana Silva", msg: "Vocês possuem turma de violão para o período da noite?", time: "Há 10 min", channel: "WhatsApp" },
-                    { id: 2, lead: "Roberto Nunes", msg: "Qual a idade mínima para começar as aulas de bateria infantil?", time: "Há 45 min", channel: "Instagram" },
-                    { id: 3, lead: "Aline Castro", msg: "A aula experimental de canto precisa levar algum material?", time: "Há 2 horas", channel: "Site" },
-                  ].map((atend) => (
-                    <div key={atend.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-xl bg-[#0B091A] border border-indigo-950/50 gap-3">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-xs text-white">{atend.lead}</span>
-                          <Badge className="bg-purple-500/10 text-purple-300 border-purple-500/20 text-[9px]">{atend.channel}</Badge>
-                          <span className="text-[10px] text-slate-500">{atend.time}</span>
-                        </div>
-                        <p className="text-xs text-slate-300 italic">"{atend.msg}"</p>
-                      </div>
-                      <Button onClick={() => toast.success("Conversa aberta no WhatsApp Web!")} className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg gap-1.5 shrink-0">
-                        <MessageCircle size={14} /> Responder no WhatsApp
-                      </Button>
-                    </div>
-                  ))}
+                <div className="text-center py-10 space-y-2">
+                  <MessageCircle size={28} className="mx-auto text-emerald-500/60" />
+                  <p className="text-xs text-slate-400 font-bold">As conversas de WhatsApp ficam centralizadas no seu número conectado.</p>
+                  <p className="text-[11px] text-slate-500">Use o perfil do lead (botão de WhatsApp) para iniciar uma conversa ou configure o robô em Configurações &gt; Meu WhatsApp.</p>
                 </div>
               </div>
             </div>
@@ -1010,21 +1056,21 @@ export default function LeadsApp() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                   <div className="bg-[#0B091A] p-5 rounded-2xl border border-indigo-950/50 space-y-2">
-                    <p className="text-xs font-bold text-slate-400 uppercase">Ciclo Médio de Venda</p>
-                    <p className="text-3xl font-black font-outfit text-white">3.2 dias</p>
-                    <p className="text-[11px] text-emerald-400 font-bold">↓ 0.5 dias comparado ao mês anterior</p>
+                    <p className="text-xs font-bold text-slate-400 uppercase">Leads no Funil</p>
+                    <p className="text-3xl font-black font-outfit text-white">{crmStats.total - crmStats.closed.length}</p>
+                    <p className="text-[11px] text-slate-400 font-bold">Oportunidades em andamento</p>
                   </div>
 
                   <div className="bg-[#0B091A] p-5 rounded-2xl border border-indigo-950/50 space-y-2">
-                    <p className="text-xs font-bold text-slate-400 uppercase">Taxa de Conversão Experimental</p>
-                    <p className="text-3xl font-black font-outfit text-white">78.5%</p>
-                    <p className="text-[11px] text-indigo-400 font-bold">Alunos que fazem aula e matriculam</p>
+                    <p className="text-xs font-bold text-slate-400 uppercase">Taxa de Conversão</p>
+                    <p className="text-3xl font-black font-outfit text-white">{crmStats.conv}%</p>
+                    <p className="text-[11px] text-indigo-400 font-bold">Leads que fecharam matrícula</p>
                   </div>
 
                   <div className="bg-[#0B091A] p-5 rounded-2xl border border-indigo-950/50 space-y-2">
                     <p className="text-xs font-bold text-slate-400 uppercase">Ticket Médio de Mensalidade</p>
-                    <p className="text-3xl font-black font-outfit text-white">R$ 349,00</p>
-                    <p className="text-[11px] text-purple-400 font-bold">Por aluno ativo</p>
+                    <p className="text-3xl font-black font-outfit text-white">R$ {crmStats.avgTicket.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    <p className="text-[11px] text-purple-400 font-bold">Média dos alunos fechados</p>
                   </div>
                 </div>
 
@@ -1032,23 +1078,28 @@ export default function LeadsApp() {
                 <div className="bg-[#0B091A] p-5 rounded-2xl border border-indigo-950/50 space-y-4">
                   <h4 className="font-bold text-xs text-white uppercase tracking-wider">Cursos Mais Procurados no CRM</h4>
                   <div className="space-y-3">
-                    {[
-                      { inst: "Violão / Guitarra", count: "18 leads", pct: "38%" },
-                      { inst: "Forró", count: "12 leads", pct: "25%" },
-                      { inst: "Canto / Técnica Vocal", count: "9 leads", pct: "19%" },
-                      { inst: "Hip-Hop", count: "6 leads", pct: "12%" },
-                      { inst: "Outros (Sax, Violino, Baixo)", count: "3 leads", pct: "6%" },
-                    ].map((row, i) => (
-                      <div key={i} className="space-y-1.5">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-bold text-slate-300">{row.inst}</span>
-                          <span className="text-slate-400 font-bold">{row.count} ({row.pct})</span>
-                        </div>
-                        <div className="w-full bg-[#13102B] h-2 rounded-full overflow-hidden">
-                          <div className="bg-indigo-500 h-full rounded-full" style={{ width: row.pct }} />
-                        </div>
-                      </div>
-                    ))}
+                    {Array.from(crmStats.byCourse.entries())
+                      .sort((a, b) => b[1] - a[1])
+                      .slice(0, 5)
+                      .map((entry) => {
+                        const inst = entry[0];
+                        const count = entry[1];
+                        const pct = crmStats.total > 0 ? Math.round((count / crmStats.total) * 100) : 0;
+                        return (
+                          <div key={inst} className="space-y-1.5">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-slate-300">{inst}</span>
+                              <span className="text-slate-400 font-bold">{count} leads ({pct}%)</span>
+                            </div>
+                            <div className="w-full bg-[#13102B] h-2 rounded-full overflow-hidden">
+                              <div className="bg-indigo-500 h-full rounded-full" style={{ width: pct + "%" }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    {crmStats.total === 0 && (
+                      <p className="text-xs text-slate-500 text-center py-4">Sem leads cadastrados ainda.</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1066,21 +1117,28 @@ export default function LeadsApp() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {[
-                    { source: "Instagram Ads", count: "18 leads", val: "R$ 6.120/mês", conv: "32% conversão" },
-                    { source: "WhatsApp Orgânico", count: "14 leads", val: "R$ 4.760/mês", conv: "45% conversão" },
-                    { source: "Google Search", count: "9 leads", val: "R$ 3.060/mês", conv: "28% conversão" },
-                    { source: "Indicação de Alunos", count: "7 leads", val: "R$ 2.450/mês", conv: "71% conversão" },
-                  ].map((src, i) => (
-                    <div key={i} className="bg-[#0B091A] p-5 rounded-2xl border border-indigo-950/50 space-y-3">
-                      <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">{src.source}</span>
-                      <p className="text-2xl font-black font-outfit text-white">{src.count}</p>
-                      <p className="text-xs font-bold text-emerald-400">{src.val}</p>
-                      <p className="text-[11px] text-slate-400 border-t border-indigo-950/50 pt-2">{src.conv}</p>
-                    </div>
-                  ))}
-                </div>
+                {crmStats.bySource.size === 0 ? (
+                  <p className="text-xs text-slate-500 text-center py-8">Sem leads cadastrados ainda.</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {Array.from(crmStats.bySource.entries())
+                      .sort((a, b) => b[1].count - a[1].count)
+                      .map((entry) => {
+                        const source = entry[0];
+                        const stats = entry[1];
+                        return (
+                          <div key={source} className="bg-[#0B091A] p-5 rounded-2xl border border-indigo-950/50 space-y-3">
+                            <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">{source}</span>
+                            <p className="text-2xl font-black font-outfit text-white">{stats.count} leads</p>
+                            <p className="text-xs font-bold text-emerald-400">R$ {stats.value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/mês em matrículas</p>
+                            <p className="text-[11px] text-slate-400 border-t border-indigo-950/50 pt-2">
+                              {stats.count > 0 ? Math.round((stats.closed / stats.count) * 100) : 0}% de conversão ({stats.closed} fechados)
+                            </p>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1094,8 +1152,17 @@ export default function LeadsApp() {
                     <h3 className="font-bold text-base font-outfit text-white">Configurações do Funil & CRM</h3>
                     <p className="text-xs text-slate-400">Personalize canais de captação, tags de classificação e regras de negócios.</p>
                   </div>
-                  <Button onClick={() => toast.success("Configurações salvas com sucesso!")} className="h-9 px-4 text-xs bg-indigo-600 hover:bg-indigo-700 font-bold rounded-xl text-white">
-                    Salvar Alterações
+                  <Button
+                    onClick={() => updateSettingsMutation.mutate({
+                      customOrigins: (originsInput || (crmSettingsData?.customOrigins || []).join(", "))
+                        .split(",").map((s) => s.trim()).filter(Boolean),
+                      customLossReasons: crmSettingsData?.customLossReasons || [],
+                      customTags: crmSettingsData?.customTags || [],
+                    })}
+                    disabled={updateSettingsMutation.isPending}
+                    className="h-9 px-4 text-xs bg-indigo-600 hover:bg-indigo-700 font-bold rounded-xl text-white"
+                  >
+                    {updateSettingsMutation.isPending ? "Salvando..." : "Salvar Alterações"}
                   </Button>
                 </div>
 
@@ -1103,13 +1170,21 @@ export default function LeadsApp() {
                   <div className="space-y-2 bg-[#0B091A] p-4 rounded-xl border border-indigo-950/50">
                     <label className="font-bold text-white">Canais de Origem Personalizados</label>
                     <p className="text-[11px] text-slate-400">Separados por vírgula</p>
-                    <Input defaultValue="Instagram, WhatsApp, Google, Indicação, Site, Evento Local" className="bg-[#13102B] border-indigo-950 text-white" />
+                    <Input
+                      value={originsInput || (crmSettingsData?.customOrigins || []).join(", ")}
+                      onChange={(e) => setOriginsInput(e.target.value)}
+                      className="bg-[#13102B] border-indigo-950 text-white"
+                    />
                   </div>
 
                   <div className="space-y-2 bg-[#0B091A] p-4 rounded-xl border border-indigo-950/50">
                     <label className="font-bold text-white">Motivos de Perda Cadastrados</label>
                     <p className="text-[11px] text-slate-400">Opções para quando um lead desistir</p>
-                    <Input defaultValue="Horário incompatível, Preço/Orçamento, Distância da escola, Optou por concorrente" className="bg-[#13102B] border-indigo-950 text-white" />
+                    <Input
+                      value={(crmSettingsData?.customLossReasons || []).join(", ")}
+                      readOnly
+                      className="bg-[#13102B] border-indigo-950 text-slate-400"
+                    />
                   </div>
                 </div>
               </div>
@@ -1401,9 +1476,20 @@ function ConvertToStudentModal({ lead, open, onClose }: any) {
 // ── MODAL: CRIAR FOLLOW-UP ──
 function CreateFollowUpModal({ open, onClose }: any) {
   const utils = trpc.useUtils();
+  const { data: dbLeads = [] } = trpc.crm.listLeads.useQuery({});
+  const [leadId, setLeadId] = useState<string>("");
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState(new Date().toISOString().slice(0, 10));
   const [contactType, setContactType] = useState<"whatsapp" | "ligacao">("whatsapp");
+  const createMutation = trpc.crm.createFollowUp.useMutation({
+    onSuccess: () => {
+      toast.success("Follow-up agendado!");
+      utils.crm.listFollowUps.invalidate();
+      utils.crm.getDashboardMetrics.invalidate();
+      onClose();
+    },
+    onError: (err) => toast.error(err.message),
+  });
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -1417,11 +1503,30 @@ function CreateFollowUpModal({ open, onClose }: any) {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            toast.success("Follow-up agendado com sucesso!");
-            onClose();
+            if (!leadId) { toast.error("Selecione o lead do follow-up."); return; }
+            createMutation.mutate({
+              leadId: Number(leadId),
+              title,
+              dueDate,
+              contactType,
+            });
           }}
           className="space-y-3 py-2"
         >
+          <div className="space-y-1">
+            <label className="font-bold text-slate-400">Lead</label>
+            <select
+              value={leadId}
+              onChange={(e) => setLeadId(e.target.value)}
+              required
+              className="w-full h-9 rounded-md bg-[#0B091A] border border-indigo-950 px-2.5 text-xs text-white focus:outline-none"
+            >
+              <option value="">Selecione o lead...</option>
+              {(dbLeads as any[]).map((l) => (
+                <option key={l.id} value={String(l.id)}>{l.name}</option>
+              ))}
+            </select>
+          </div>
           <div className="space-y-1">
             <label className="font-bold text-slate-400">Descrição da Tarefa</label>
             <Input placeholder="Ex: Enviar proposta de violão" value={title} onChange={(e) => setTitle(e.target.value)} required className="h-9 text-xs bg-[#0B091A] border-indigo-950 text-white" />
@@ -1447,7 +1552,9 @@ function CreateFollowUpModal({ open, onClose }: any) {
 
           <DialogFooter className="pt-3">
             <Button type="button" variant="outline" onClick={onClose} className="h-9 text-xs border-indigo-950 text-slate-300">Cancelar</Button>
-            <Button type="submit" className="h-9 text-xs bg-cyan-600 hover:bg-cyan-700 text-white font-bold">Agendar</Button>
+            <Button type="submit" disabled={createMutation.isPending} className="h-9 text-xs bg-cyan-600 hover:bg-cyan-700 text-white font-bold">
+              {createMutation.isPending ? "Agendando..." : "Agendar"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -1457,9 +1564,19 @@ function CreateFollowUpModal({ open, onClose }: any) {
 
 // ── MODAL: AJUSTAR METAS COMERCIAIS ──
 function GoalsModal({ open, onClose }: any) {
-  const [studentsGoal, setStudentsGoal] = useState("15");
-  const [demosGoal, setDemosGoal] = useState("25");
-  const [mrrGoal, setMrrGoal] = useState("5000");
+  const utils = trpc.useUtils();
+  const { data: goals } = trpc.crm.getGoals.useQuery();
+  const [studentsGoal, setStudentsGoal] = useState("");
+  const [demosGoal, setDemosGoal] = useState("");
+  const [mrrGoal, setMrrGoal] = useState("");
+  const saveGoalMutation = trpc.crm.saveGoal.useMutation({
+    onSuccess: () => {
+      toast.success("Metas salvas!");
+      utils.crm.getGoals.invalidate();
+      onClose();
+    },
+    onError: (err) => toast.error(err.message),
+  });
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -1473,29 +1590,36 @@ function GoalsModal({ open, onClose }: any) {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            toast.success("Metas mensais salvas com sucesso!");
-            onClose();
+            saveGoalMutation.mutate({
+              targetNewStudents: Number(studentsGoal || goals?.targetNewStudents || 0),
+              targetDemos: Number(demosGoal || goals?.targetDemos || 0),
+              targetProposals: Number(goals?.targetProposals || 0),
+              targetDeals: Number(goals?.targetDeals || 0),
+              targetMrr: String(mrrGoal || goals?.targetMrr || "0"),
+            });
           }}
           className="space-y-3.5 py-2"
         >
           <div className="space-y-1">
             <label className="font-bold text-slate-400">Meta de Novas Matrículas (Alunos)</label>
-            <Input type="number" value={studentsGoal} onChange={(e) => setStudentsGoal(e.target.value)} className="h-9 text-xs bg-[#0B091A] border-indigo-950 text-white" />
+            <Input type="number" placeholder={String(goals?.targetNewStudents ?? 10)} value={studentsGoal} onChange={(e) => setStudentsGoal(e.target.value)} className="h-9 text-xs bg-[#0B091A] border-indigo-950 text-white" />
           </div>
 
           <div className="space-y-1">
             <label className="font-bold text-slate-400">Meta de Aulas Experimentais</label>
-            <Input type="number" value={demosGoal} onChange={(e) => setDemosGoal(e.target.value)} className="h-9 text-xs bg-[#0B091A] border-indigo-950 text-white" />
+            <Input type="number" placeholder={String(goals?.targetDemos ?? 25)} value={demosGoal} onChange={(e) => setDemosGoal(e.target.value)} className="h-9 text-xs bg-[#0B091A] border-indigo-950 text-white" />
           </div>
 
           <div className="space-y-1">
             <label className="font-bold text-slate-400">Meta de Novo MRR em R$</label>
-            <Input type="number" value={mrrGoal} onChange={(e) => setMrrGoal(e.target.value)} className="h-9 text-xs bg-[#0B091A] border-indigo-950 text-white" />
+            <Input type="number" placeholder={String(goals?.targetMrr ?? "2000")} value={mrrGoal} onChange={(e) => setMrrGoal(e.target.value)} className="h-9 text-xs bg-[#0B091A] border-indigo-950 text-white" />
           </div>
 
           <DialogFooter className="pt-3">
             <Button type="button" variant="outline" onClick={onClose} className="h-9 text-xs border-indigo-950 text-slate-300">Cancelar</Button>
-            <Button type="submit" className="h-9 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold">Salvar Metas</Button>
+            <Button type="submit" disabled={saveGoalMutation.isPending} className="h-9 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold">
+              {saveGoalMutation.isPending ? "Salvando..." : "Salvar Metas"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -1506,7 +1630,7 @@ function GoalsModal({ open, onClose }: any) {
 // ── MODAL: PERFIL DO LEAD ──
 function LeadProfileModal({ leadId, open, onClose, onDelete }: any) {
   const { data: dbLeads = [] } = trpc.crm.listLeads.useQuery({});
-  const allLeads = dbLeads.length > 0 ? dbLeads : SAMPLE_LEADS;
+  const allLeads = dbLeads;
   const lead = (allLeads as any[]).find((l: any) => l.id === leadId);
 
   if (!lead) return null;

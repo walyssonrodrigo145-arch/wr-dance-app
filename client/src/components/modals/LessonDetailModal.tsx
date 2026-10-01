@@ -17,6 +17,7 @@ import {
   Users,
   Loader2,
   Check,
+  ClipboardCheck,
   LayoutList
 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -28,6 +29,7 @@ import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { LESSON_STATUS_CONFIG, type LessonStatus } from "@/lib/status";
 import RepositionModal from "@/components/aulas/RepositionModal";
+import { TurmaAttendanceModal } from "@/components/turmas/TurmaAttendanceModal";
 
 interface LessonDetailModalProps {
   lesson: any;
@@ -50,8 +52,11 @@ export default function LessonDetailModal({
   const [newDate, setNewDate] = useState("");
   const [newTime, setNewTime] = useState("");
   const [isRepositionOpen, setIsRepositionOpen] = useState(false);
+  const [isAttendanceOpen, setIsAttendanceOpen] = useState(false);
 
   const isTurma = lesson?.lessonType === 'turma';
+  // AUDITORIA Fase 3: sessão de grade (turmaId) usa a Chamada da turma por aluna.
+  const isGridSession = !!(lesson as any)?.turmaId;
   const utils = trpc.useUtils();
   const [localStatuses, setLocalStatuses] = useState<Record<number, string>>({});
 
@@ -218,7 +223,22 @@ export default function LessonDetailModal({
         </div>
 
         {/* Lista de Alunos se for Turma */}
-        {isTurma && (
+        {isTurma && isGridSession && (
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => setIsAttendanceOpen(true)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-primary/10 hover:bg-primary/20 text-primary font-black text-xs uppercase tracking-widest transition-all active:scale-[0.99]"
+            >
+              <ClipboardCheck size={16} /> Abrir chamada da turma (por aluna)
+            </button>
+            <p className="text-[10px] font-bold text-muted-foreground text-center">
+              A presença por aluna é registrada na chamada da turma — mantém o relatório de frequência correto.
+            </p>
+          </div>
+        )}
+
+        {isTurma && !isGridSession && (
           <div className="space-y-2">
             <div className="flex items-center justify-between px-1">
               <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
@@ -480,6 +500,15 @@ export default function LessonDetailModal({
           </div>
         </div>
       </div>
+
+      {isGridSession && (
+        <TurmaAttendanceModal
+          turmaId={(lesson as any)?.turmaId ?? null}
+          turmaName={lesson?.title}
+          open={isAttendanceOpen}
+          onOpenChange={setIsAttendanceOpen}
+        />
+      )}
     </ResponsiveDialog>
   );
 }

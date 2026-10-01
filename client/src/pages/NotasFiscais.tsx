@@ -389,44 +389,17 @@ export default function NotasFiscais() {
           </div>
         </div>
 
-        {/* Consumo Fiscal */}
+        {/* Consumo Fiscal — AUDITORIA Fase 4: contagem real (sem cota simulada) */}
         <div className="p-5 rounded-2xl border border-border bg-card shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Consumo Fiscal do Plano</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Notas emitidas</p>
               <p className="text-lg font-black text-foreground mt-0.5">
-                {stats?.consumo.utilizado ?? 0} <span className="text-xs font-medium text-muted-foreground">/ {stats?.consumo.total ?? 4000} notas</span>
+                {stats?.consumo.utilizado ?? 0} <span className="text-xs font-medium text-muted-foreground">notas fiscais</span>
               </p>
             </div>
-            <span
-              className={cn(
-                "text-xs font-black px-2.5 py-1 rounded-xl",
-                (stats?.consumo.percentual ?? 0) >= 95
-                  ? "bg-rose-500/20 text-rose-500"
-                  : (stats?.consumo.percentual ?? 0) >= 80
-                  ? "bg-amber-500/20 text-amber-500"
-                  : "bg-emerald-500/20 text-emerald-500"
-              )}
-            >
-              {stats?.consumo.percentual ?? 0}% utilizado
-            </span>
           </div>
-
-          {/* Barra de Progresso */}
-          <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
-            <div
-              className={cn(
-                "h-full rounded-full transition-all duration-500",
-                (stats?.consumo.percentual ?? 0) >= 95
-                  ? "bg-rose-500"
-                  : (stats?.consumo.percentual ?? 0) >= 80
-                  ? "bg-amber-500"
-                  : "bg-emerald-500"
-              )}
-              style={{ width: `${stats?.consumo.percentual ?? 0}%` }}
-            />
-          </div>
-          <p className="text-[10px] text-muted-foreground mt-2">Cota mensal de emissões via Focus NFe</p>
+          <p className="text-[10px] text-muted-foreground mt-2">Emissões via Focus NFe (histórico completo em Notas Fiscais)</p>
         </div>
       </div>
 

@@ -576,22 +576,13 @@ export function ConfigFiscalTab() {
             </Select>
           </div>
 
-          {/* FIX: layout do card de certificado — flex-wrap para não transbordar */}
-          <div className="p-3.5 rounded-2xl bg-muted/30 border border-border flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2.5 flex-1 min-w-0">
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-              <div className="min-w-0">
-                <p className="font-bold text-xs">Certificado Digital A1</p>
-                <p className="text-[10px] text-muted-foreground">Focus NFe Cloud / Conectado</p>
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-xl text-xs font-bold h-8 border-border shrink-0"
-            >
-              Atualizar Certificado
-            </Button>
+          {/* AUDITORIA Fase 4: status/atalho fake de certificado removidos — o
+              certificado A1 é gerenciado no painel da Focus NFe. */}
+          <div className="p-3.5 rounded-2xl bg-muted/30 border border-border">
+            <p className="font-bold text-xs">Certificado Digital A1</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              Gerenciado no painel da Focus NFe (aba Certificados). O DancePro usa o certificado configurado lá para emitir as notas desta escola.
+            </p>
           </div>
         </div>
       </div>

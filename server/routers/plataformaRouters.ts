@@ -818,7 +818,8 @@ export const plataformaRouters = {
     }),
     checkout: adminProcedure
       .input(z.object({
-        planType: z.enum(["MONTHLY", "YEARLY"])
+        planType: z.enum(["MONTHLY", "YEARLY"]),
+        couponCode: z.string().max(50).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -848,6 +849,31 @@ export const plataformaRouters = {
             ? (input.planType === "YEARLY" ? Number(planInfo.priceYearly) : Number(planInfo.priceMonthly))
             : (input.planType === "YEARLY" ? 59.90 * 10 : 59.90);
 
+          // AUDITORIA Fase 4: cupons aplicam desconto de verdade no checkout
+          // (antes a aba Cupons não afetava nenhuma cobrança).
+          let baseValueWithCoupon = baseValue;
+          let appliedCouponId: number | null = null;
+          if (input.couponCode?.trim()) {
+            const { systemCoupons } = await import("../../drizzle/schema");
+            const code = input.couponCode.trim().toUpperCase();
+            const [coupon] = await db.select().from(systemCoupons)
+              .where(and(eq(systemCoupons.code, code), eq(systemCoupons.isActive, true)))
+              .limit(1);
+            if (!coupon) throw new TRPCError({ code: "BAD_REQUEST", message: "Cupom inválido ou inativo." });
+            if (coupon.validUntil && new Date(coupon.validUntil) < new Date()) {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "Este cupom expirou." });
+            }
+            if (coupon.maxUses != null && coupon.currentUses >= coupon.maxUses) {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "Este cupom atingiu o limite de utilizações." });
+            }
+            const discountValue = Number(coupon.discountValue);
+            baseValueWithCoupon = coupon.discountType === "PERCENTAGE"
+              ? baseValue * (1 - discountValue / 100)
+              : Math.max(0, baseValue - discountValue);
+            baseValueWithCoupon = Number(baseValueWithCoupon.toFixed(2));
+            appliedCouponId = coupon.id;
+          }
+
           // Cálculo de Alunos Excedentes
           const activeStudentsCountObj = await db.select({ count: sql<number>`count(*)` })
             .from(students)
@@ -859,7 +885,7 @@ export const plataformaRouters = {
           const extraPrice = Number(planInfo?.extraStudentPrice ?? 1.49);
           const excessCount = Math.max(0, activeStudentsCount - maxStudents);
           const excessFee = (allowExtra && excessCount > 0) ? excessCount * extraPrice : 0;
-          const totalValue = baseValue + excessFee;
+          const totalValue = baseValueWithCoupon + excessFee;
 
           // AUDITORIA: plano sem cobrança (ex.: parceiro/ilimitado) não gera assinatura.
           if (!Number.isFinite(totalValue) || totalValue <= 0) {
@@ -891,6 +917,18 @@ export const plataformaRouters = {
             subscriptionStatus: "pending",
             updatedAt: new Date(),
           }).where(eq(organizations.id, orgId));
+
+          // AUDITORIA Fase 4: consome o cupom utilizado (limite de usos).
+          if (appliedCouponId != null) {
+            try {
+              const { systemCoupons } = await import("../../drizzle/schema");
+              await db.update(systemCoupons)
+                .set({ currentUses: sql`${systemCoupons.currentUses} + 1` })
+                .where(eq(systemCoupons.id, appliedCouponId));
+            } catch (e) {
+              console.warn("[checkout] Falha ao incrementar uso do cupom:", e);
+            }
+          }
         }
 
         const payments = await getAsaasSubscriptionPayments(subId);

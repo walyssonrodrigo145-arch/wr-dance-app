@@ -9,8 +9,15 @@ import { ptBR } from "date-fns/locale";
 export default function Checkout() {
   const { user, logout, refresh } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<"MONTHLY" | "YEARLY">("MONTHLY");
+  const [couponCode, setCouponCode] = useState("");
 
   const { data: pendingInvoice, isLoading: isLoadingInvoice } = trpc.platform.getPendingInvoice.useQuery();
+  const { data: publicPlans = [] } = trpc.platform.getPublicPlans.useQuery();
+  // AUDITORIA Fase 4: preço exibido vem dos planos cadastrados (antes R$ 49/499 fixos).
+  const basePlan = (publicPlans as any[]).find(p => selectedPlan === "YEARLY"
+    ? Number(p.priceYearly) > 0
+    : Number(p.priceMonthly) > 0) ?? null;
+  const displayPrice = ((selectedPlan === "YEARLY" ? basePlan?.priceYearly : basePlan?.priceMonthly) as number | undefined) ?? (selectedPlan === "YEARLY" ? 499 : 49);
 
   const checkoutMutation = trpc.platform.checkout.useMutation({
     onSuccess: (data) => {
@@ -145,12 +152,21 @@ export default function Checkout() {
               </div>
 
               <div className="text-center py-6">
-                <span className="text-5xl font-black text-foreground">R$ {selectedPlan === "YEARLY" ? "499" : "49"}</span>
+                <span className="text-5xl font-black text-foreground">R$ {displayPrice.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
                 <span className="text-muted-foreground font-bold">/{selectedPlan === "YEARLY" ? "ano" : "mês"}</span>
               </div>
 
+              {/* AUDITORIA Fase 4: cupom aplicado de verdade na cobrança */}
+              <input
+                type="text"
+                value={couponCode}
+                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                placeholder="Cupom de desconto (opcional)"
+                className="w-full h-11 rounded-xl border border-border bg-muted/40 px-4 text-sm font-bold tracking-wider placeholder:font-medium placeholder:tracking-normal focus:outline-none focus:ring-2 focus:ring-primary/40"
+              />
+
               <button 
-                onClick={() => checkoutMutation.mutate({ planType: selectedPlan })}
+                onClick={() => checkoutMutation.mutate({ planType: selectedPlan, couponCode: couponCode.trim() || undefined })}
                 disabled={checkoutMutation.isPending}
                 className="w-full py-4 bg-foreground text-background font-black rounded-2xl uppercase tracking-[0.2em] hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >

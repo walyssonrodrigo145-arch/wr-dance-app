@@ -327,6 +327,14 @@ async function startServer() {
           .where(and(eq(paymentDues.id, due.id), eq(paymentDues.organizationId, due.organizationId!), ne(paymentDues.status, "pago")));
         debugLog(`[Mercado Pago Webhook] Mensalidade marcada como paga. org=${due.organizationId}`);
 
+        // AUDITORIA Fase 2: efeitos únicos da baixa (lembretes + NFS-e + comprovante).
+        const { afterPaymentConfirmed } = await import("../services/paymentEffects");
+        await afterPaymentConfirmed(db, {
+          organizationId: due.organizationId!,
+          dueId: due.id,
+          source: "webhook",
+        });
+
         const { sendWhatsAppMessage } = await import("../utils/whatsapp");
         const valorStr = Number(due.amount).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
         
@@ -570,6 +578,15 @@ async function startServer() {
         .where(and(eq(paymentDues.id, due.id), eq(paymentDues.organizationId, due.organizationId!)));
       debugLog(`[InfinitePay Webhook] Mensalidade marcada como PAGA (due ${dueId}) — org ${due.organizationId}`);
 
+      // AUDITORIA Fase 2: efeitos únicos da baixa (lembretes + NFS-e + comprovante).
+      const { afterPaymentConfirmed: afterPaymentConfirmedIp } = await import("../services/paymentEffects");
+      await afterPaymentConfirmedIp(db, {
+        organizationId: due.organizationId!,
+        dueId: due.id,
+        source: "webhook",
+        receiptUrl: receiptUrl || null,
+      });
+
       // ── Notificações (paridade webhook Asaas) ──
       const [paymentDetails] = await db
         .select({
@@ -812,6 +829,15 @@ async function startServer() {
           })
           .where(and(eq(paymentDues.id, paymentDetails.id), eq(paymentDues.organizationId, paymentDetails.organizationId!), ne(paymentDues.status, "pago")));
         debugLog(`[Asaas Webhook] Mensalidade marcada como PAGA (${payment.id}) — org ${paymentDetails.organizationId}`);
+
+        // AUDITORIA Fase 2: efeitos únicos da baixa (lembretes + NFS-e + comprovante).
+        const { afterPaymentConfirmed } = await import("../services/paymentEffects");
+        await afterPaymentConfirmed(db, {
+          organizationId: paymentDetails.organizationId!,
+          dueId: paymentDetails.id,
+          source: "webhook",
+          receiptUrl: (payment as any)?.transactionReceiptUrl || null,
+        });
 
         // NOTA: NÃO inserir em analyticsRevenue aqui — esta é uma mensalidade escolar (aluno→escola),
         // não receita SaaS da plataforma MusicPro. analyticsRevenue deve conter apenas cobranças de planos.

@@ -75,6 +75,17 @@ function acquireGatewayChargeLock(paymentDueId: number) {
   }
 }
 
+/**
+ * AUDITORIA Fase 2: admin/owner opera qualquer fatura da escola; professor só
+ * as faturas de alunos vinculados a ele. Faturas criadas pelo admin/importação
+ * deixam de "desaparecer" para o professor.
+ */
+function duesOwnershipFilter(ctx: any, orgId: number) {
+  const isAdmin = ctx.user.role === 'admin' || ctx.user.openId === ENV.ownerOpenId;
+  if (isAdmin) return undefined;
+  return sql`${paymentDues.studentId} IN (SELECT s.id FROM students s WHERE s."professorId" = ${ctx.user.id} AND s."organizationId" = ${orgId})`;
+}
+
 export const financeiroRouters = {
   billingEngine: router({
     calculateInvoice: protectedProcedure
@@ -142,7 +153,7 @@ export const financeiroRouters = {
             eq(paymentDues.organizationId, orgId),
             eq(paymentDues.month, m), 
             eq(paymentDues.year, y), 
-            (ctx.user.role === 'admin' || ctx.user.openId === ENV.ownerOpenId) ? undefined : eq(paymentDues.userId, ctx.user.id)
+            duesOwnershipFilter(ctx, orgId)
           ))
           .orderBy(asc(paymentDues.dueDate));
 
@@ -535,7 +546,11 @@ export const financeiroRouters = {
             // Atualizar cadastro do aluno
             await db.update(students)
               .set({ dueDay: newDay, updatedAt: new Date() })
-              .where(and(eq(students.id, currentPayment.studentId), eq(students.organizationId, orgId), eq(students.professorId, ctx.user.id)));
+              .where(and(
+                eq(students.id, currentPayment.studentId),
+                eq(students.organizationId, orgId),
+                (ctx.user.role === 'admin' || ctx.user.openId === ENV.ownerOpenId) ? undefined : eq(students.professorId, ctx.user.id),
+              ));
 
             // Atualizar futuras cobranças pendentes
             const unpaidPayments = await db.select()
@@ -543,7 +558,7 @@ export const financeiroRouters = {
               .where(and(
                 eq(paymentDues.organizationId, orgId),
                 eq(paymentDues.studentId, currentPayment.studentId),
-                eq(paymentDues.userId, ctx.user.id),
+                duesOwnershipFilter(ctx, orgId),
                 ne(paymentDues.status, "pago"),
                 ne(paymentDues.id, id) // não mexer na que acabamos de atualizar
               ));
@@ -730,7 +745,7 @@ export const financeiroRouters = {
             .where(and(
               eq(paymentDues.id, input.paymentDueId), 
               eq(paymentDues.organizationId, orgId), 
-              eq(paymentDues.userId, ctx.user.id)
+              duesOwnershipFilter(ctx, orgId)
             ));
             
           return { success: true, url };
@@ -1037,7 +1052,7 @@ export const financeiroRouters = {
         .leftJoin(students, and(eq(paymentDues.studentId, students.id), eq(paymentDues.organizationId, orgId)))
         .where(and(
           eq(paymentDues.organizationId, orgId),
-          eq(paymentDues.userId, ctx.user.id),
+          duesOwnershipFilter(ctx, orgId),
           sql`${paymentDues.dueDate} < ${today}`,
           sql`${paymentDues.status} != 'pago'`
         ))
@@ -1064,7 +1079,7 @@ export const financeiroRouters = {
           year: paymentDues.year,
           notes: paymentDues.notes,
         }).from(paymentDues)
-          .where(and(eq(paymentDues.studentId, input.studentId), eq(paymentDues.organizationId, orgId), eq(paymentDues.userId, ctx.user.id)))
+          .where(and(eq(paymentDues.studentId, input.studentId), eq(paymentDues.organizationId, orgId), duesOwnershipFilter(ctx, orgId)))
           .orderBy(asc(paymentDues.year), asc(paymentDues.month));
 
         const today = getTodayBR();
@@ -1085,22 +1100,22 @@ export const financeiroRouters = {
         const professorId = ctx.user.id;
         acquireGatewayChargeLock(input.paymentDueId);
 
+        // AUDITORIA Fase 2: admin opera qualquer fatura; professor só as dos seus
+        // alunos. As credenciais vêm da conta dona da fatura.
+        const [due] = await db.select().from(paymentDues)
+          .where(and(eq(paymentDues.id, input.paymentDueId), eq(paymentDues.organizationId, orgId), duesOwnershipFilter(ctx, orgId)))
+          .limit(1);
+        if (!due) throw new TRPCError({ code: "NOT_FOUND", message: "Mensalidade não encontrada" });
+        if (due.asaasId) throw new TRPCError({ code: "BAD_REQUEST", message: "Esta mensalidade já possui uma cobrança gerada no Asaas" });
+
         // Security Lock
         const { createAsaasCustomer, createAsaasCharge, getAsaasPixQrCode } = await import('../utils/asaas');
-        const [settingsData] = await db.select({ asaasEnabled: settings.asaasEnabled, asaasApiKey: settings.asaasApiKey }).from(settings).where(eq(settings.userId, professorId)).limit(1);
+        const [settingsData] = await db.select({ asaasEnabled: settings.asaasEnabled, asaasApiKey: settings.asaasApiKey }).from(settings).where(eq(settings.userId, due.userId ?? professorId)).limit(1);
         if (!settingsData || settingsData.asaasEnabled !== 1 || !settingsData.asaasApiKey) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Geração via Asaas não está disponível para esta conta. Configure a Chave da API." });
         }
         // BUG FIX: decifrar a chave (select cru traz v1:...) antes de usar na API do Asaas
         const apiKey = decryptSecret(settingsData.asaasApiKey);
-
-        // Fetch payment due
-        const [due] = await db.select().from(paymentDues)
-          .where(and(eq(paymentDues.id, input.paymentDueId), eq(paymentDues.userId, professorId), eq(paymentDues.organizationId, orgId)))
-          .limit(1);
-
-        if (!due) throw new TRPCError({ code: "NOT_FOUND", message: "Mensalidade não encontrada" });
-        if (due.asaasId) throw new TRPCError({ code: "BAD_REQUEST", message: "Esta mensalidade já possui uma cobrança gerada no Asaas" });
 
         // Fetch student
         const [student] = await db.select().from(students)
@@ -1199,11 +1214,18 @@ export const financeiroRouters = {
         const professorId = ctx.user.id;
         acquireGatewayChargeLock(input.paymentDueId);
 
+        // AUDITORIA Fase 2: admin opera qualquer fatura; professor só as dos seus alunos.
+        const [due] = await db.select().from(paymentDues)
+          .where(and(eq(paymentDues.id, input.paymentDueId), eq(paymentDues.organizationId, orgId), duesOwnershipFilter(ctx, orgId)))
+          .limit(1);
+        if (!due) throw new TRPCError({ code: "NOT_FOUND", message: "Mensalidade não encontrada" });
+        if (due.mpPaymentId) throw new TRPCError({ code: "BAD_REQUEST", message: "Esta mensalidade já possui uma cobrança gerada no Mercado Pago" });
+
         const { createMPPreference } = await import('../utils/mercadopago');
         const [settingsData] = await db.select({ 
           mpAccessToken: settings.mpAccessToken,
           paymentGateway: settings.paymentGateway
-        }).from(settings).where(eq(settings.userId, professorId)).limit(1);
+        }).from(settings).where(eq(settings.userId, due.userId ?? professorId)).limit(1);
         
         if (!settingsData || settingsData.paymentGateway !== 'mercadopago' || !settingsData.mpAccessToken) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Geração via Mercado Pago não está configurada para esta conta." });
@@ -1213,13 +1235,6 @@ export const financeiroRouters = {
         // e ele era enviado cru como Bearer — o MP rejeita com 403 PolicyAgent.
         // Decifrar antes de usar (decryptSecret é idempotente para texto puro legado).
         const accessToken = decryptSecret(settingsData.mpAccessToken);
-
-        const [due] = await db.select().from(paymentDues)
-          .where(and(eq(paymentDues.id, input.paymentDueId), eq(paymentDues.userId, professorId)))
-          .limit(1);
-
-        if (!due) throw new TRPCError({ code: "NOT_FOUND", message: "Mensalidade não encontrada" });
-        if (due.mpPaymentId) throw new TRPCError({ code: "BAD_REQUEST", message: "Esta mensalidade já possui uma cobrança gerada no Mercado Pago" });
 
         const [student] = await db.select().from(students)
           .where(and(eq(students.id, due.studentId), eq(students.organizationId, orgId)))
@@ -1273,7 +1288,7 @@ export const financeiroRouters = {
         const orgId = ctx.user.organizationId!;
 
         const [due] = await db.select().from(paymentDues)
-          .where(and(eq(paymentDues.id, input.paymentDueId), eq(paymentDues.userId, ctx.user.id), eq(paymentDues.organizationId, orgId)))
+          .where(and(eq(paymentDues.id, input.paymentDueId), eq(paymentDues.organizationId, orgId), duesOwnershipFilter(ctx, orgId)))
           .limit(1);
 
         if (!due) throw new TRPCError({ code: "NOT_FOUND", message: "Mensalidade não encontrada" });
@@ -1282,7 +1297,7 @@ export const financeiroRouters = {
         const [settingsData] = await db
           .select({ asaasApiKey: settings.asaasApiKey })
           .from(settings)
-          .where(eq(settings.userId, ctx.user.id))
+          .where(eq(settings.userId, due.userId ?? ctx.user.id))
           .limit(1);
         await deleteAsaasCharge(due.asaasId, settingsData?.asaasApiKey ? decryptSecret(settingsData.asaasApiKey) : undefined);
 
@@ -1298,9 +1313,10 @@ export const financeiroRouters = {
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+        const orgId = ctx.user.organizationId!;
 
         const [due] = await db.select().from(paymentDues)
-          .where(and(eq(paymentDues.id, input.paymentDueId), eq(paymentDues.userId, ctx.user.id)))
+          .where(and(eq(paymentDues.id, input.paymentDueId), eq(paymentDues.organizationId, orgId), duesOwnershipFilter(ctx, orgId)))
           .limit(1);
 
         if (!due) throw new TRPCError({ code: "NOT_FOUND", message: "Mensalidade não encontrada" });
@@ -1324,6 +1340,14 @@ export const financeiroRouters = {
         const professorId = ctx.user.id;
         acquireGatewayChargeLock(input.paymentDueId);
 
+        // AUDITORIA Fase 2: admin opera qualquer fatura; professor só as dos seus alunos.
+        const [due] = await db.select().from(paymentDues)
+          .where(and(eq(paymentDues.id, input.paymentDueId), eq(paymentDues.organizationId, orgId), duesOwnershipFilter(ctx, orgId)))
+          .limit(1);
+        if (!due) throw new TRPCError({ code: "NOT_FOUND", message: "Mensalidade não encontrada" });
+        if (due.status === "pago") throw new TRPCError({ code: "BAD_REQUEST", message: "Esta mensalidade já está paga" });
+        if (due.infinitepayPaymentLink) throw new TRPCError({ code: "BAD_REQUEST", message: "Esta mensalidade já possui uma cobrança gerada no InfinitePay" });
+
         const { createInfinitePayLink, buildInfinitePayWebhookUrl, brlToCents, resolveInfinitePayApiKey } = await import('../utils/infinitepay');
         const { createPaymentShortLink } = await import('../utils/shortlinks');
         const [settingsData] = await db.select({
@@ -1331,21 +1355,13 @@ export const financeiroRouters = {
           infinitepayApiKey: settings.infinitepayApiKey,
           infinitepayEnabled: settings.infinitepayEnabled,
           paymentGateway: settings.paymentGateway,
-        }).from(settings).where(eq(settings.userId, professorId)).limit(1);
+        }).from(settings).where(eq(settings.userId, due.userId ?? professorId)).limit(1);
 
         if (!settingsData || settingsData.paymentGateway !== 'infinitepay' || settingsData.infinitepayEnabled !== 1 || !settingsData.infinitepayHandle) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Geração via InfinitePay não está configurada para esta conta. Configure a InfiniteTag nas integrações." });
         }
         const handle = settingsData.infinitepayHandle;
         const apiKey = resolveInfinitePayApiKey(settingsData.infinitepayApiKey);
-
-        const [due] = await db.select().from(paymentDues)
-          .where(and(eq(paymentDues.id, input.paymentDueId), eq(paymentDues.userId, professorId)))
-          .limit(1);
-
-        if (!due) throw new TRPCError({ code: "NOT_FOUND", message: "Mensalidade não encontrada" });
-        if (due.status === "pago") throw new TRPCError({ code: "BAD_REQUEST", message: "Esta mensalidade já está paga" });
-        if (due.infinitepayPaymentLink) throw new TRPCError({ code: "BAD_REQUEST", message: "Esta mensalidade já possui uma cobrança gerada no InfinitePay" });
 
         const [student] = await db.select().from(students)
           .where(and(eq(students.id, due.studentId), eq(students.organizationId, orgId)))
@@ -1407,9 +1423,10 @@ export const financeiroRouters = {
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+        const orgId = ctx.user.organizationId!;
 
         const [due] = await db.select().from(paymentDues)
-          .where(and(eq(paymentDues.id, input.paymentDueId), eq(paymentDues.userId, ctx.user.id)))
+          .where(and(eq(paymentDues.id, input.paymentDueId), eq(paymentDues.organizationId, orgId), duesOwnershipFilter(ctx, orgId)))
           .limit(1);
 
         if (!due) throw new TRPCError({ code: "NOT_FOUND", message: "Mensalidade não encontrada" });

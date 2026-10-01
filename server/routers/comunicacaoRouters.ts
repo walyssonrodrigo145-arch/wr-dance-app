@@ -190,13 +190,14 @@ export const comunicacaoRouters = {
         // Só gera se a janela de 24h já chegou (1 dia antes da aula)
         if (reminderTime > now) { skipped++; continue; }
 
-        // ✅ TRAVA PRINCIPAL: Se já existe QUALQUER lembrete 'enviado' ou 'cancelado' para esta aula
-        // (independente do refId), não criar novo. Isso impede regeneração após "Concluir" ou "Cancelar".
+        // ✅ TRAVA PRINCIPAL: só bloqueia se o lembrete já foi ENVIADO.
+        // AUDITORIA Fase 3: lembretes cancelados PODEM ser regenerados — antes uma
+        // remarcação/cancelamento deixava a aula sem lembrete para sempre.
         const alreadySent = await db.select({ id: reminders.id }).from(reminders)
           .where(and(
             eq(reminders.organizationId, orgId),
             eq(reminders.lessonId, lesson.id),
-            or(eq(reminders.status, "enviado"), eq(reminders.status, "cancelado"))
+            eq(reminders.status, "enviado")
           )).limit(1);
         if (alreadySent.length > 0) { skipped++; continue; }
 
@@ -204,11 +205,12 @@ export const comunicacaoRouters = {
         const dateStr = lessonDate.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
         const refId = `lesson-${lesson.id}-${dateStr}`;
 
-        // Verificar duplicidade por refId (qualquer status: pendente, cancelado)
+        // Verificar duplicidade por refId (apenas pendentes — cancelado pode renascer)
         const existing = await db.select({ id: reminders.id }).from(reminders)
           .where(
             and(
               eq(reminders.organizationId, orgId),
+              eq(reminders.status, "pendente"),
               or(
                 eq(reminders.refId, refId),
                 eq(reminders.refId, `lesson-24h-${lesson.id}-${dateStr}`),

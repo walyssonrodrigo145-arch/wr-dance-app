@@ -256,37 +256,16 @@ export default function StudentProfile() {
                   </h3>
                   <div className="flex items-center gap-2">
                      <Star size={16} className="text-yellow-500 fill-yellow-500" />
-                     <span className="text-sm font-black text-foreground">Nível Bronze</span>
+                     <span className="text-sm font-black text-foreground capitalize">{(profile as any)?.level || "—"}</span>
                   </div>
                </div>
 
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
-                  <div className="space-y-4">
-                     <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Frequência das Aulas</span>
-                        <span className="text-sm font-black text-green-600">95%</span>
-                     </div>
-                     <div className="h-3 w-full bg-muted rounded-full overflow-hidden shadow-inner">
-                        <div className="h-full bg-green-500 w-[95%] shadow-[0_0_10px_rgba(34,197,94,0.4)]" />
-                     </div>
-                  </div>
-                  <div className="space-y-4">
-                     <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Teoria e Prática</span>
-                        <span className="text-sm font-black text-blue-600">82%</span>
-                     </div>
-                     <div className="h-3 w-full bg-muted rounded-full overflow-hidden shadow-inner">
-                        <div className="h-full bg-blue-500 w-[82%] shadow-[0_0_10px_rgba(59,130,246,0.4)]" />
-                     </div>
-                  </div>
-               </div>
-
-               <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-6">
+               <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-6">
                   {[
-                     { icon: Trophy, label: "Técnica", value: profile?.level || "Iniciante" },
-                     { icon: Clock, label: "Prática Total", value: "---" },
-                     { icon: PersonStanding, label: "Coreografias", value: "---" },
-                     { icon: Trophy, label: "Nível Atual", value: profile?.level || "Iniciante" },
+                     { icon: Trophy, label: "Técnica", value: (profile as any)?.level || "Iniciante" },
+                     { icon: Clock, label: "Medalhas", value: String(badges.length) },
+                     { icon: PersonStanding, label: "Rankings", value: String(myRankings.length) },
+                     { icon: Trophy, label: "Nível Atual", value: (profile as any)?.level || "Iniciante" },
                   ].map((item, i) => (
                      <div key={i} className="text-center p-6 rounded-3xl bg-muted/30 border border-border group hover:border-primary/40 hover:bg-card transition-all cursor-default">
                         <div className="w-10 h-10 rounded-2xl bg-white dark:bg-slate-800 flex items-center justify-center mx-auto mb-4 shadow-sm group-hover:scale-110 group-hover:rotate-6 transition-transform">

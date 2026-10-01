@@ -26,6 +26,23 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.10.01.21",
+    date: "2026-10-01",
+    title: "Financeiro, aulas e portal mais confiáveis",
+    summary: "Pagamento confirmado agora dispara todos os efeitos (recibo, lembretes, NFS-e), o professor vê as turmas dele, o aluno vê as presenças e o CRM parou de mostrar dados de exemplo.",
+    items: [
+      { type: "correcao", title: "Pagamento confirmado completo em todos os canais", description: "Webhooks (Asaas/Mercado Pago/InfinitePay) e o comprovante por IA agora cancelam lembretes de cobrança, salvam o recibo e emitem a NFS-e automática — e o comprovante cancela o link do gateway para ninguém pagar duas vezes." },
+      { type: "correcao", title: "Professor vê as cobranças e as aulas das turmas dele", description: "Administradores operam qualquer fatura da escola; professores enxergam as dos seus alunos. As sessões de turma entram no dashboard do professor." },
+      { type: "novo", title: "Aluno vê a frequência das turmas", description: "A chamada de turma aparece no portal: presenças recentes na Agenda e nos números do início (aulas feitas/frequência)." },
+      { type: "correcao", title: "Um único jeito de fazer chamada", description: "Aula de turma só é marcada na Chamada da turma (por aluna) — acabou a duplicidade entre agenda e chamada; cancelar série cancela os lembretes." },
+      { type: "correcao", title: "Excluir turma não deixa aula fantasma", description: "Sessões futuras são canceladas junto com a turma e exceções/presenças são limpas." },
+      { type: "novo", title: "Loja pode cobrar junto com a mensalidade", description: "Vendas da Loja no modo \"junto com a mensalidade\" somam o valor na fatura aberta do aluno." },
+      { type: "correcao", title: "CRM e Painel Comercial com dados reais", description: "Follow-ups, metas, propostas, performance e origens agora vêm dos seus leads de verdade (antes mostravam exemplos fixos). Relatórios exportam CSV de verdade." },
+      { type: "correcao", title: "Super Admin e cupons", description: "Trial do Super Admin não bloqueia mais a escola, excluir escola cancela a assinatura no Asaas e limpa todos os dados, e cupons aplicam desconto real no checkout." },
+      { type: "melhoria", title: "Fiscal em dia", description: "CNPJ validado de verdade, contagem real de notas emitidas e status do certificado honesto (gerenciado na Focus NFe)." },
+    ],
+  },
+  {
     version: "2026.10.01.20",
     date: "2026-10-01",
     title: "Eventos & Espetáculos: convites, programa e confirmações",

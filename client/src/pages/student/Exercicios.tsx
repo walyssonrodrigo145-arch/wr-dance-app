@@ -66,6 +66,10 @@ export default function StudentExercises() {
 
   const pending = exercises?.filter(e => e.status === 'pendente') || [];
   const completed = exercises?.filter(e => e.status === 'concluida') || [];
+  // AUDITORIA Fase 2: percentual real (antes era "85% Concluído" fixo).
+  const completionPct = (pending.length + completed.length) > 0
+    ? Math.round((completed.length / (pending.length + completed.length)) * 100)
+    : 0;
 
   const ExerciseCard = ({ exercise, isCompleted }: { exercise: any, isCompleted?: boolean }) => (
     <motion.div variants={item}>
@@ -102,7 +106,7 @@ export default function StudentExercises() {
             <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
               {isCompleted ? (
                 <div className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-green-50 dark:bg-green-500/5 text-green-600 font-black text-[10px] uppercase tracking-widest border border-green-100 dark:border-green-500/10">
-                   <Trophy size={14} /> Nota: 9.5
+                   <Trophy size={14} /> Concluída
                 </div>
               ) : (
                 <button 
@@ -136,8 +140,8 @@ export default function StudentExercises() {
         </div>
         <div className="flex items-center gap-4 p-4 rounded-2xl bg-primary/5 border border-primary/10">
            <div className="text-right">
-             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Sua Evolução</p>
-             <p className="text-sm font-black text-primary">85% Concluído</p>
+              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Sua Evolução</p>
+              <p className="text-sm font-black text-primary">{completionPct}% Concluído</p>
            </div>
            <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20">
              <Star size={16} fill="currentColor" />
@@ -242,9 +246,9 @@ export default function StudentExercises() {
                     <div className="p-4 rounded-2xl bg-green-500/5 border border-green-500/20 space-y-1">
                       <div className="flex items-center gap-2 text-green-600">
                         <Trophy size={14} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Nota</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest">Status</span>
                       </div>
-                      <p className="font-bold text-green-600">9.5</p>
+                      <p className="font-bold text-green-600">Atividade concluída</p>
                     </div>
                   )}
                 </div>

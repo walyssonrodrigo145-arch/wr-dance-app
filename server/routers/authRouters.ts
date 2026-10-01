@@ -84,8 +84,16 @@ export const authRouters = {
       startOfMonth.setDate(1);
       startOfMonth.setHours(0, 0, 0, 0);
 
-      const [schoolsRow] = await db.select({ value: sql<number>`CAST(COUNT(*) AS INT)` }).from(organizations);
-      const [studentsRow] = await db.select({ value: sql<number>`CAST(COUNT(*) AS INT)` }).from(students);
+      // AUDITORIA Fase 4: números da landing não inflam mais — conta apenas
+      // alunos ATIVOS de escolas em uso (ativas/trial), não escolas de teste vazias.
+      const [schoolsRow] = await db
+        .select({ value: sql<number>`CAST(COUNT(*) AS INT)` })
+        .from(organizations)
+        .where(sql`${organizations.subscriptionStatus} IN ('active','trialing')`);
+      const [studentsRow] = await db
+        .select({ value: sql<number>`CAST(COUNT(*) AS INT)` })
+        .from(students)
+        .where(sql`${students.status} = 'ativo'`);
       const [modalitiesRow] = await db.select({ value: sql<number>`CAST(COUNT(*) AS INT)` }).from(instruments);
       const [lessonsRow] = await db
         .select({ value: sql<number>`CAST(COUNT(*) AS INT)` })

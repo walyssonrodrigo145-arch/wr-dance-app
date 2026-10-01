@@ -7,6 +7,7 @@ import crypto from "crypto";
 import { createAsaasCustomer, createAsaasCharge, getAsaasPixQrCode, getAsaasChargeStatus, getAsaasCharge } from "./utils/asaas";
 import { createMPPreference, verifyMPPayment } from "./utils/mercadopago";
 import { assertCanManageStudents } from "./routers/helpers";
+import { assertStudentQuota } from "./routers/helpers";
 import { createInfinitePayLink, checkInfinitePayPayment, brlToCents, resolveInfinitePayApiKey } from "./utils/infinitepay";
 import { createPaymentShortLink } from "./utils/shortlinks";
 import { decryptSecret } from "./utils/integrationCrypto";
@@ -952,6 +953,8 @@ export const enrollmentRouter = router({
       }
 
       // Cadastra o Aluno (curso principal = 1º selecionado; mensalidade = soma dos cursos)
+      // AUDITORIA Fase 4: cota do plano também vale na matrícula pública.
+      await assertStudentQuota(db, orgId);
       const firstCourse = enrichedCourses[0];
       const firstTeacher = teacherByCourse.get(firstCourse.instrumentId)!;
       const brtDay = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })).getDay();

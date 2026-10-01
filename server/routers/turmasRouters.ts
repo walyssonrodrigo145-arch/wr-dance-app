@@ -6,7 +6,7 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, eq, gte, ilike, inArray, lte, ne, sql } from "drizzle-orm";
 import { protectedProcedure, studentProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { instruments, lessons, paymentDues, schoolPlans, studentEnrollments, students, studioRooms, turmaAlunos, turmas, users } from "../../drizzle/schema";
+import { instruments, lessons, lessonAttendance, lessonOverrides, paymentDues, schoolPlans, studentEnrollments, students, studioRooms, turmaAlunos, turmas, users } from "../../drizzle/schema";
 import { ENV } from "../_core/env";
 import { previewTurmaLessons, generateTurmaLessons, cancelFutureTurmaLessons, todayBR, addMonthsISO } from "../services/TurmaScheduleService";
 import { buildDueDateSeries } from "./helpers";
@@ -37,6 +37,7 @@ async function resolveStudentId(db: any, ctx: { user: { id: number; studentId?: 
  *  Pula (sem remover) quem tiver conflito de horário com outra matrícula/turma. */
 async function promoteNextFromWaitlist(db: any, turmaId: number, orgId: number) {
   const [turma] = await db.select({
+    name: turmas.name,
     weekdays: turmas.weekdays,
     timeStr: turmas.timeStr,
     durationMinutes: turmas.durationMinutes,
@@ -58,6 +59,20 @@ async function promoteNextFromWaitlist(db: any, turmaId: number, orgId: number) 
     }
     await db.update(turmaAlunos).set({ status: "ativa", position: 0, updatedAt: new Date() })
       .where(eq(turmaAlunos.id, next.id));
+
+    // AUDITORIA Fase 3: avisa o aluno promovido da fila (antes subia em silêncio).
+    try {
+      const [promoted] = await db.select({ studentUserId: students.studentUserId }).from(students)
+        .where(and(eq(students.id, next.studentId), eq(students.organizationId, orgId))).limit(1);
+      if (promoted?.studentUserId) {
+        const { notifyUser } = await import("../_core/notification");
+        await notifyUser(promoted.studentUserId, {
+          title: "Você saiu da fila de espera!",
+          content: `Abriu uma vaga e sua matrícula na turma "${(turma as any)?.name ?? "de dança"}" foi ativada. Confira na sua agenda.`,
+        });
+      }
+    } catch { /* notificação não bloqueia a promoção */ }
+
     return next;
   }
   return null;
@@ -420,9 +435,28 @@ export const turmasRouters = {
         .where(and(eq(turmas.id, input.id), eq(turmas.organizationId, orgId))).limit(1);
       if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Turma não encontrada." });
 
+      // AUDITORIA Fase 3: excluir a turma NÃO pode deixar aulas fantasmas.
+      // Cancela as sessões futuras (e seus lembretes), limpa chamadas/exceções
+      // futuras e desvincula a turma das sessões (histórico permanece na agenda).
+      const { cancelled } = await cancelFutureTurmaLessons(db, orgId, input.id);
+      const futureSessions = await db.select({ id: lessons.id }).from(lessons)
+        .where(and(
+          eq(lessons.organizationId, orgId),
+          eq(lessons.turmaId, input.id),
+          eq(lessons.status, "cancelada"),
+          gte(lessons.scheduledAt, new Date()),
+        ));
+      const futureIds = futureSessions.map((l: any) => l.id);
+      if (futureIds.length > 0) {
+        await db.delete(lessonAttendance).where(inArray(lessonAttendance.lessonId, futureIds));
+        await db.delete(lessonOverrides).where(inArray(lessonOverrides.lessonId, futureIds));
+      }
+      await db.update(lessons).set({ turmaId: null, updatedAt: new Date() })
+        .where(and(eq(lessons.organizationId, orgId), eq(lessons.turmaId, input.id)));
+
       await db.delete(turmaAlunos).where(eq(turmaAlunos.turmaId, input.id));
       await db.delete(turmas).where(eq(turmas.id, input.id));
-      return { success: true };
+      return { success: true, cancelledLessons: cancelled };
     }),
 
     /** Matricula o aluno: com vaga entra como ativa; sem vaga, entra na fila. */

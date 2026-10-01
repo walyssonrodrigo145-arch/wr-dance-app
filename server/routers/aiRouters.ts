@@ -51,7 +51,7 @@ import { chatbotFlowRouter } from "../chatbotFlowRouter";
 import { schoolAiRouter } from "../schoolAiRouter";
 import { fiscalRouter } from "../fiscalRouter";
 import { FiscalService } from "../services/fiscal/FiscalService";
-import { loginAttempts, safeEqualStr, isReservedSuperAdminEmail, getOrgPlanLimits, syncOrgAsaasSubscription, reconcileOrgAsaasCharges, runCreateAssinafyContract } from "./helpers";
+import { loginAttempts, safeEqualStr, isReservedSuperAdminEmail, getOrgPlanLimits, syncOrgAsaasSubscription, reconcileOrgAsaasCharges, runCreateAssinafyContract, assertStudentQuota } from "./helpers";
 export const aiRouters = {
   ai: router({
     newConversation: protectedProcedure
@@ -430,6 +430,8 @@ Texto original para reescrever:
               const actionData = JSON.parse(jsonStr);
 
               // Executar o cadastro do aluno sem exigir campos extras
+              // AUDITORIA Fase 4: cota do plano aplicada também via IA.
+              await assertStudentQuota(db, orgId);
               const [newStudent] = await db.insert(students).values({
                 organizationId: orgId,
                 professorId: ctx.user.id,

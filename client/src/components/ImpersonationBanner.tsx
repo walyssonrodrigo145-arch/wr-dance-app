@@ -19,7 +19,7 @@ export function ImpersonationBanner() {
       const res = await stopImpersonation.mutateAsync();
       toast.success("Sessão de suporte finalizada. Retornando ao Super Admin...");
       setTimeout(() => {
-        window.location.href = res.redirectUrl || "/super-admin";
+        window.location.href = res.redirectUrl || "/master-panel";
       }, 500);
     } catch (err: any) {
       toast.error(err.message || "Erro ao encerrar modo suporte");

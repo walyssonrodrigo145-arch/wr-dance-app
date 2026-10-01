@@ -37,6 +37,14 @@ export default function StudentAgenda() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewType, setViewType] = useState<"mes" | "semana" | "dia">("semana");
   const { data: lessons, isLoading } = trpc.studentPortal.getSchedule.useQuery();
+  // AUDITORIA Fase 3: presenças de turma visíveis para o aluno (antes não existiam no portal).
+  const { data: myAttendance = [] } = trpc.studentPortal.getMyAttendance.useQuery();
+  const [showAttendance, setShowAttendance] = useState(false);
+  const attendanceMeta: Record<string, { label: string; cls: string }> = {
+    presente: { label: "Presente", cls: "text-emerald-600 bg-emerald-500/10" },
+    ausente: { label: "Ausente", cls: "text-rose-600 bg-rose-500/10" },
+    justificado: { label: "Justificada", cls: "text-amber-600 bg-amber-500/10" },
+  };
 
   const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
   const startDateWeek = startOfWeek(currentDate, { weekStartsOn: 0 });
@@ -72,6 +80,43 @@ export default function StudentAgenda() {
     <div className="space-y-10 pb-10 max-w-[1400px] mx-auto">
       {/* Banner de Antecipação Inteligente de Horário por Falta */}
       <EarlySlotBanner />
+
+      {/* Minhas presenças (chamada de turma) */}
+      {myAttendance.length > 0 && (
+        <div className="rounded-[2rem] border border-border bg-card/60 backdrop-blur-xl p-5">
+          <button
+            type="button"
+            onClick={() => setShowAttendance((v) => !v)}
+            className="w-full flex items-center justify-between gap-3"
+          >
+            <span className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-muted-foreground">
+              <CheckCircle2 size={14} className="text-emerald-500" /> Minhas presenças ({myAttendance.length})
+            </span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-primary">
+              {showAttendance ? "Ocultar" : "Ver"}
+            </span>
+          </button>
+          {showAttendance && (
+            <div className="mt-4 space-y-1.5 max-h-56 overflow-y-auto">
+              {myAttendance.map((a: any) => {
+                const meta = attendanceMeta[a.status] ?? { label: a.status, cls: "text-muted-foreground bg-muted" };
+                return (
+                  <div key={a.id} className="flex items-center justify-between gap-3 rounded-xl border border-border/60 px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-foreground truncate">
+                        {a.turmaName ? `${a.turmaName} · ` : ""}{format(new Date(a.scheduledAt), "dd/MM 'às' HH:mm")}
+                      </p>
+                    </div>
+                    <span className={cn("text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md shrink-0", meta.cls)}>
+                      {meta.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 p-8 md:p-10 rounded-[2.5rem] bg-card text-card-foreground border border-border shadow-sm relative overflow-hidden">
         <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-primary/5 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />

@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { getDb } from "../db";
 import { students, chatbotSessions, lessons, settings, paymentDues, notifications, fcmTokens, chatbotFlows, schoolKnowledgeBase, instruments, chatbotLogs } from "../../drizzle/schema";
 import { eq, and, gte, ilike } from "drizzle-orm";
+import { assertStudentQuota } from "../routers/helpers";
 import { sendWhatsAppMessage, isRecentBotMessage, canonicalizeWaPhone } from "../utils/whatsapp";
 import { parseToolActions, stripToolMarkers, executeChatbotTool, generateAvailableSlots, isSlotFree } from "../utils/chatbotTools";
 import { buildUserContext } from "../utils/aiContext";
@@ -1126,6 +1127,8 @@ router.post("/", async (req, res) => {
           const jsonStr = studentMatch[1];
           try {
             const actionData = JSON.parse(jsonStr);
+            // AUDITORIA Fase 4: cota do plano aplicada também no cadastro via WhatsApp.
+            await assertStudentQuota(db, profSettings.organizationId!);
             await db.insert(students).values({
               organizationId: profSettings.organizationId,
               professorId: professorUserId,

@@ -2,7 +2,7 @@
 // A turma gera AULAS (sessões) mesmo sem alunos; a presença por aluno é
 // registrada em lesson_attendance na chamada (professor ou recepção).
 import { and, eq, gte, inArray, lte, ne, or, sql, isNotNull } from "drizzle-orm";
-import { lessons, turmas, turmaAlunos, students, lessonAttendance, lessonOverrides } from "../../drizzle/schema";
+import { lessons, turmas, turmaAlunos, students, lessonAttendance, lessonOverrides, reminders } from "../../drizzle/schema";
 
 export interface TurmaGrade {
   id: number;
@@ -179,6 +179,19 @@ export async function cancelFutureTurmaLessons(db: any, organizationId: number, 
       gte(lessons.scheduledAt, new Date()),
     ))
     .returning({ id: lessons.id });
+
+  // AUDITORIA Fase 3: cancelar também os lembretes pendentes dessas sessões —
+  // antes o aluno continuava recebendo aviso de aula cancelada.
+  const ids = cancelled.map((l: any) => l.id);
+  if (ids.length > 0) {
+    await db.update(reminders)
+      .set({ status: "cancelado", cancelledAt: new Date(), updatedAt: new Date() })
+      .where(and(
+        eq(reminders.organizationId, organizationId),
+        inArray(reminders.lessonId, ids),
+        eq(reminders.status, "pendente"),
+      ));
+  }
   return { cancelled: cancelled.length };
 }
 

@@ -158,6 +158,9 @@ export function AppSidebar({ collapsed, onToggle, onNavigate }: AppSidebarProps)
       items: [
         { label: "Comunicados", href: "/comunicados", icon: Megaphone },
         { label: "Indique e Ganhe", href: "/indicacoes", icon: Gift },
+        // AUDITORIA Fase 5: CRM e Marketing tinham página sem menu (só por URL).
+        ...(user?.role === "admin" ? [{ label: "CRM Comercial", href: "/comercial", icon: Target }] : []),
+        ...(user?.role === "admin" ? [{ label: "Marketing", href: "/marketing", icon: Megaphone }] : []),
       ],
     },
     {

@@ -49,10 +49,44 @@ import {
   analyticsRevenue,
   analyticsSecurityLogs,
   crmLeads,
+  crmGoals,
+  crmActivities,
   studioRooms,
   enrollmentLinks,
   landingClients,
   landingHeroSlides,
+  schoolPlans,
+  turmas,
+  turmaAlunos,
+  lessonAttendance,
+  lessonOverrides,
+  lessonRepositions,
+  repositionEvents,
+  events,
+  eventChoreographies,
+  eventParticipants,
+  coreografias,
+  coreografiaAlunos,
+  costumes,
+  costumeSales,
+  costumeLoans,
+  referrals,
+  fiscalCompanies,
+  fiscalServices,
+  fiscalInvoices,
+  fiscalJobs,
+  fiscalLogs,
+  schoolIntegrations,
+  contractTemplates,
+  contractEvents,
+  rankings,
+  rankingParticipants,
+  rankingScores,
+  studentAchievements,
+  professorEvaluationPeriods,
+  professorEvaluations,
+  npsResponses,
+  supportTickets,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -230,6 +264,26 @@ export const superAdminRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Organização não encontrada." });
       }
 
+      // AUDITORIA Fase 4: cancelar a assinatura no Asaas ANTES de excluir — antes a
+      // cobrança da plataforma continuava viva para uma escola que não existia mais.
+      try {
+        const [orgFull] = await db.select({
+          asaasSubscriptionId: organizations.asaasSubscriptionId,
+        }).from(organizations).where(eq(organizations.id, orgId)).limit(1);
+        if (orgFull?.asaasSubscriptionId) {
+          const { deleteAsaasSubscription } = await import("./utils/asaas");
+          await deleteAsaasSubscription(orgFull.asaasSubscriptionId);
+          debugLog(`[SuperAdmin] Assinatura Asaas ${orgFull.asaasSubscriptionId} cancelada antes da exclusão.`);
+        }
+      } catch (e) {
+        console.warn("[SuperAdmin] Falha ao cancelar assinatura Asaas (seguindo com a exclusão):", e);
+      }
+
+      // AUDITORIA Fase 4: refletir o status para cancelado antes de apagar (auditoria
+      // de webhooks/relatórios) — a linha da org será removida no final.
+      await db.update(organizations).set({ subscriptionStatus: "canceled", updatedAt: new Date() })
+        .where(eq(organizations.id, orgId)).catch(() => {});
+
       // FIX: envolver em transação para garantir atomicidade
       // FIX: usar Drizzle delete tipado com schema oficial (evita erros de tabelas inexistentes como "messages")
       await db.transaction(async (tx) => {
@@ -285,6 +339,46 @@ export const superAdminRouter = router({
         await tx.delete(aiConversations).where(eq(aiConversations.organizationId, orgId));
         await tx.delete(chatbotSessions).where(eq(chatbotSessions.organizationId, orgId));
         await tx.delete(crmLeads).where(eq(crmLeads.organizationId, orgId));
+        // AUDITORIA Fase 4: tabelas org-scoped que ficavam órfãs na exclusão da escola.
+        await tx.delete(repositionEvents).where(eq(repositionEvents.organizationId, orgId));
+        await tx.delete(lessonRepositions).where(eq(lessonRepositions.organizationId, orgId));
+        await tx.delete(lessonOverrides).where(eq(lessonOverrides.organizationId, orgId));
+        await tx.delete(lessonAttendance).where(eq(lessonAttendance.organizationId, orgId));
+        await tx.delete(eventChoreographies).where(eq(eventChoreographies.organizationId, orgId));
+        await tx.delete(eventParticipants).where(eq(eventParticipants.organizationId, orgId));
+        await tx.delete(events).where(eq(events.organizationId, orgId));
+        await tx.delete(coreografiaAlunos).where(eq(coreografiaAlunos.organizationId, orgId));
+        await tx.delete(coreografias).where(eq(coreografias.organizationId, orgId));
+        await tx.delete(costumeSales).where(eq(costumeSales.organizationId, orgId));
+        await tx.delete(costumeLoans).where(eq(costumeLoans.organizationId, orgId));
+        await tx.delete(costumes).where(eq(costumes.organizationId, orgId));
+        await tx.delete(turmaAlunos).where(eq(turmaAlunos.organizationId, orgId));
+        await tx.delete(turmas).where(eq(turmas.organizationId, orgId));
+        await tx.delete(schoolPlans).where(eq(schoolPlans.organizationId, orgId));
+        await tx.delete(rankingScores).where(eq(rankingScores.organizationId, orgId));
+        await tx.delete(rankingParticipants).where(eq(rankingParticipants.organizationId, orgId));
+        await tx.delete(studentAchievements).where(eq(studentAchievements.organizationId, orgId));
+        await tx.delete(rankings).where(eq(rankings.organizationId, orgId));
+        await tx.delete(professorEvaluations).where(eq(professorEvaluations.organizationId, orgId));
+        await tx.delete(professorEvaluationPeriods).where(eq(professorEvaluationPeriods.organizationId, orgId));
+        await tx.delete(npsResponses).where(eq(npsResponses.organizationId, orgId));
+        await tx.delete(supportTickets).where(eq(supportTickets.organizationId, orgId));
+        await tx.delete(crmActivities).where(eq(crmActivities.organizationId, orgId));
+        await tx.delete(crmGoals).where(eq(crmGoals.organizationId, orgId));
+        await tx.delete(referrals).where(eq(referrals.referrerOrganizationId, orgId));
+        // contract_events não tem organizationId: apaga pelos contratos da escola.
+        const orgContractIds = await tx.select({ id: contracts.id }).from(contracts)
+          .where(eq(contracts.organizationId, orgId));
+        if (orgContractIds.length > 0) {
+          await tx.delete(contractEvents).where(inArray(contractEvents.contractId, orgContractIds.map((c) => c.id)));
+        }
+        await tx.delete(contractTemplates).where(eq(contractTemplates.organizationId, orgId));
+        await tx.delete(schoolIntegrations).where(eq(schoolIntegrations.organizationId, orgId));
+        await tx.delete(fiscalLogs).where(eq(fiscalLogs.organizationId, orgId));
+        await tx.delete(fiscalJobs).where(eq(fiscalJobs.organizationId, orgId));
+        await tx.delete(fiscalInvoices).where(eq(fiscalInvoices.organizationId, orgId));
+        await tx.delete(fiscalServices).where(eq(fiscalServices.organizationId, orgId));
+        await tx.delete(fiscalCompanies).where(eq(fiscalCompanies.organizationId, orgId));
         await tx.delete(studioRooms).where(eq(studioRooms.organizationId, orgId));
         await tx.delete(enrollmentLinks).where(eq(enrollmentLinks.organizationId, orgId));
 
@@ -445,6 +539,22 @@ export const superAdminRouter = router({
       await db.update(organizations)
         .set({ subscriptionStatus: input.subscriptionStatus, updatedAt: new Date() })
         .where(eq(organizations.id, input.orgId));
+
+      // AUDITORIA Fase 4: "trialing" sem data de fim BLOQUEAVA a escola (o guard de
+      // assinatura exige trialEndsAt válido). Garante 7 dias de trial ao ativar.
+      if (input.subscriptionStatus === "trialing") {
+        const [current] = await db
+          .select({ trialEndsAt: organizations.trialEndsAt })
+          .from(organizations)
+          .where(eq(organizations.id, input.orgId))
+          .limit(1);
+        const expired = !current?.trialEndsAt || new Date(current.trialEndsAt) < new Date();
+        if (expired) {
+          await db.update(organizations)
+            .set({ trialEndsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), updatedAt: new Date() })
+            .where(eq(organizations.id, input.orgId));
+        }
+      }
 
       debugLog(`[SuperAdmin] Status da org #${input.orgId} alterado para "${input.subscriptionStatus}".`);
       return { success: true };
@@ -772,7 +882,7 @@ export const superAdminRouter = router({
 
       return {
         success: true,
-        redirectUrl: "/super-admin",
+        redirectUrl: "/master-panel",
       };
     }),
 });

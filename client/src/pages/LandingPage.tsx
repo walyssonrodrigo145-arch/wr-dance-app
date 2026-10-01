@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 import { 
   Music, 
   Users, 
@@ -216,6 +217,10 @@ const SignupModal = ({ plan, onClose }: { plan: string; onClose: () => void }) =
           // Redirecionar diretamente para o checkout do Asaas
           window.open(result.invoiceUrl, '_blank');
           setInvoiceUrl(result.invoiceUrl);
+        } else {
+          // AUDITORIA Fase 4: sem link imediato, avisa o caminho real (antes prometia
+          // "assinatura em instantes" mesmo sem cobrança gerada).
+          toast.success('Cadastro concluído! A cobrança aparecerá no seu painel em instantes — você pode pagar em Assinatura.');
         }
         setStep('sucesso');
       } catch (err: any) {
@@ -264,7 +269,7 @@ const SignupModal = ({ plan, onClose }: { plan: string; onClose: () => void }) =
                 <Check size={36} className="text-white" strokeWidth={3} />
               </div>
               <h2 className="text-2xl font-black mb-1">Cadastro realizado!</h2>
-              <p className="text-blue-100 text-sm">Sua assinatura começará em instantes</p>
+              <p className="text-blue-100 text-sm">{invoiceUrl ? "Sua assinatura começará em instantes" : "Sua escola já está ativa no período de teste"}</p>
             </div>
           ) : (
             <>

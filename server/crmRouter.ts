@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 import { getDb } from "./db";
 import { crmLeads, crmActivities, crmFollowUps, crmSettings, students, users } from "../drizzle/schema";
 import { eq, and, desc, asc, gte, lte, sql } from "drizzle-orm";
+import { assertStudentQuota } from "./routers/helpers";
 
 export const crmRouter = router({
   // ── Listagem Geral de Leads com Filtros ──────────────────────────────────
@@ -477,6 +478,8 @@ export const crmRouter = router({
       const feeValue = input.monthlyFee > 0 ? input.monthlyFee : Number(lead.value) || 0;
 
       // Criar Aluno no banco do MusicPro
+      // AUDITORIA Fase 4: cota do plano aplicada também na conversão de lead.
+      await assertStudentQuota(db, orgId);
       const [student] = await db
         .insert(students)
         .values({

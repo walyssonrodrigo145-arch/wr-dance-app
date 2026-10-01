@@ -802,6 +802,10 @@ export const lessonsRouters = {
           }
 
           updateData.scheduledAt = newDate;
+          // AUDITORIA Fase 3: remarcar reabilita os alertas 1h/30min (antes ficavam
+          // suprimidos para sempre após o primeiro envio).
+          updateData.alertSent1h = false;
+          updateData.alertSent30m = false;
 
           // Cancelar lembretes pendentes da aula pois a data/hora mudou
           if (new Date(currentLesson.scheduledAt).getTime() !== newDate.getTime()) {
@@ -868,6 +872,26 @@ export const lessonsRouters = {
         ));
         // postgres-js RowList expõe `count` (linhas afetadas) para UPDATE sem RETURNING
         const updated = ((updateResult as any)?.count ?? 1) > 0;
+
+        // AUDITORIA Fase 3: avisa o ALUNO quando a aula é cancelada (antes só o
+        // professor era notificado em casos de falta; cancelamento era silencioso).
+        if (input.status === 'cancelada' && currentLesson.studentId && updated) {
+          try {
+            const [stu] = await db.select({ name: students.name, studentUserId: students.studentUserId }).from(students)
+              .where(and(eq(students.id, currentLesson.studentId), eq(students.organizationId, orgId))).limit(1);
+            if (stu?.studentUserId) {
+              const when = new Date(currentLesson.scheduledAt);
+              const whenStr = `${when.toLocaleDateString("pt-BR")} às ${when.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+              const { notifyUser } = await import("../_core/notification");
+              await notifyUser(stu.studentUserId, {
+                title: "Aula cancelada",
+                content: `Sua aula de ${whenStr} foi cancelada pela escola. Em caso de dúvida, fale com a recepção.`,
+              });
+            }
+          } catch (e) {
+            console.warn("[lessons.updateStatus] Falha ao notificar aluno sobre cancelamento:", e);
+          }
+        }
 
         // ── PRD Reposição (Caça-Bug): crédito órfão ──
         // Se a aula estava marcada como 'a_repor' e o professor mudou diretamente
@@ -1488,6 +1512,18 @@ export const lessonsRouters = {
           // org não podem ser alteradas por qualquer professor logado. Agora exige
           // que a aula pertença à organização do usuário.
           const whereClause = and(eq(lessons.id, item.lessonId), eq(lessons.organizationId, orgId));
+
+          // AUDITORIA Fase 3: chamada única — sessão de grade só pela Chamada da
+          // turma (evita status da sessão divergir da presença por aluno).
+          const [sessionCheck] = await db.select({ turmaId: lessons.turmaId }).from(lessons)
+            .where(whereClause).limit(1);
+          if (!sessionCheck) continue;
+          if (sessionCheck.turmaId) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Esta é uma aula de turma. Use a Chamada da turma (Turmas & Vagas → Chamada) para marcar presenças.",
+            });
+          }
 
           await db.update(lessons)
             .set({ status: item.status, updatedAt: new Date() })

@@ -216,8 +216,7 @@ export function isValidCNPJ(value: string | null | undefined): boolean {
 }
 
 // ─── Helper: busca limites do plano da organização no banco ──────────────────
-export async function getOrgPlanLimits(db: any, orgId: number) {
-  const { systemPlans } = await import("../../drizzle/schema");
+export async function getOrgPlanLimits(db: any, orgId: number) {  const { systemPlans } = await import("../../drizzle/schema");
   const [org] = await db.select({ planId: organizations.planId })
     .from(organizations).where(eq(organizations.id, orgId)).limit(1);
   
@@ -236,6 +235,28 @@ export async function getOrgPlanLimits(db: any, orgId: number) {
     planId: org.planId,
     planName: plan?.name ?? org.planId,
   };
+}
+
+// ─── Helper: valida cota de alunos do plano em qualquer porta de criação ─────
+/**
+ * AUDITORIA Fase 4: a checagem de limite existia só no cadastro manual. Esta
+ * função é usada também na matrícula pública, CRM, IA e WhatsApp para impedir
+ * que o limite do plano seja furado por outros caminhos.
+ */
+export async function assertStudentQuota(db: any, organizationId: number) {
+  const info = await getOrgPlanLimits(db, organizationId);
+  const [row] = await db
+    .select({ count: sql<number>`CAST(count(*) AS INT)` })
+    .from(students)
+    .where(and(eq(students.organizationId, organizationId), eq(students.status, "ativo")));
+  const active = Number(row?.count) || 0;
+  if (active >= info.maxStudents && !info.allowExtraStudents) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `Limite de alunos do plano atingido (${info.maxStudents}). Fale com o suporte para fazer upgrade.`,
+    });
+  }
+  return { active, ...info };
 }
 
 // ─── Helper: Sincroniza valor da assinatura no Asaas considerando Alunos Excedentes ──────

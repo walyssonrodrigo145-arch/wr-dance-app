@@ -6,7 +6,7 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import { protectedProcedure, studentProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { coreografias, costumeLoans, costumeSales, costumes, events, organizations, asaasCustomers, settings, students } from "../../drizzle/schema";
+import { coreografias, costumeLoans, costumeSales, costumes, events, organizations, asaasCustomers, paymentDues, settings, students } from "../../drizzle/schema";
 import { ENV } from "../_core/env";
 import { getStoreSalesRules, resolveOrgAsaasApiKey, resolveOrgMpAccessToken } from "./helpers";
 import { buildPixPayload } from "../utils/pix";
@@ -35,6 +35,83 @@ async function resolveStudentId(db: any, ctx: { user: { id: number; studentId?: 
     .where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!)))
     .limit(1);
   return found?.id ?? null;
+}
+
+/**
+ * AUDITORIA Fase 2 — "cobrar junto com a mensalidade": soma o valor da venda na
+ * fatura ABERTA do aluno. Prefere o mês atual; se a do mês já estiver paga (ou
+ * não existir), usa a do mês seguinte; se nenhuma existir, cria uma.
+ * Nunca lança erro (venda não pode falhar por causa disso).
+ */
+async function addSaleAmountToStudentDue(
+  db: any,
+  orgId: number,
+  studentId: number,
+  amount: number,
+  label: string,
+  actorUserId: number,
+): Promise<{ dueId: number; addedAmount: number } | null> {
+  try {
+    if (!Number.isFinite(amount) || amount <= 0) return null;
+
+    const [student] = await db.select({ dueDay: students.dueDay }).from(students)
+      .where(and(eq(students.id, studentId), eq(students.organizationId, orgId))).limit(1);
+    if (!student) return null;
+
+    const brNow = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+    const candidates: Array<{ month: number; year: number }> = [];
+    for (let offset = 0; offset <= 1; offset++) {
+      const d = new Date(brNow.getFullYear(), brNow.getMonth() + offset, 1);
+      candidates.push({ month: d.getMonth() + 1, year: d.getFullYear() });
+    }
+
+    for (const c of candidates) {
+      const [existing] = await db.select().from(paymentDues)
+        .where(and(
+          eq(paymentDues.organizationId, orgId),
+          eq(paymentDues.studentId, studentId),
+          eq(paymentDues.month, c.month),
+          eq(paymentDues.year, c.year),
+        )).limit(1);
+
+      if (existing) {
+        if (existing.status === "pago") continue; // tenta o próximo mês
+        const newAmount = Number(existing.amount) + amount;
+        const newOriginal = Number(existing.originalAmount ?? existing.amount) + amount;
+        const mergedNotes = [existing.notes, `${label} — R$ ${amount.toFixed(2)}`].filter(Boolean).join(" • ");
+        await db.update(paymentDues)
+          .set({
+            amount: newAmount.toFixed(2),
+            originalAmount: newOriginal.toFixed(2),
+            notes: mergedNotes,
+            updatedAt: new Date(),
+          })
+          .where(eq(paymentDues.id, existing.id));
+        return { dueId: existing.id, addedAmount: amount };
+      }
+    }
+
+    // Nenhuma fatura aberta nos próximos meses → cria uma no primeiro mês livre.
+    const target = candidates[candidates.length - 1];
+    const dueDay = Math.min(28, Math.max(1, Number(student.dueDay) || 10));
+    const dueDate = new Date(target.year, target.month - 1, dueDay);
+    const [created] = await db.insert(paymentDues).values({
+      organizationId: orgId,
+      userId: actorUserId,
+      studentId,
+      amount: amount.toFixed(2),
+      originalAmount: amount.toFixed(2),
+      dueDate,
+      status: "pendente",
+      month: target.month,
+      year: target.year,
+      notes: label,
+    }).returning({ id: paymentDues.id });
+    return created ? { dueId: created.id, addedAmount: amount } : null;
+  } catch (error) {
+    console.warn("[Loja] Falha ao somar venda na mensalidade:", error);
+    return null;
+  }
 }
 
 /** Configuração de cobrança da Loja (gateways disponíveis + PIX estático). */
@@ -599,9 +676,16 @@ export const figurinosRouters = {
         status: "pendente",
         notes: input.notes?.trim() || null,
         createdByUserId: ctx.user.id,
-      });
+      }).returning({ id: costumeSales.id });
 
-      return { success: true, unitPrice, totalPrice, quantity: input.quantity, madeToOrder };
+      // AUDITORIA Fase 2: modo "junto com a mensalidade" soma o valor na fatura
+      // aberta do aluno (antes a venda não entrava em nenhuma cobrança).
+      let addedToDue: { dueId: number; addedAmount: number } | null = null;
+      if (input.paymentMode === "mensalidade") {
+        addedToDue = await addSaleAmountToStudentDue(db, orgId, input.studentId, totalPrice, `Loja: ${costume.name} (x${input.quantity})`, ctx.user.id);
+      }
+
+      return { success: true, unitPrice, totalPrice, quantity: input.quantity, madeToOrder, addedToDue };
     }),
 
     /** Gateways disponíveis para cobrar uma venda da Loja. */

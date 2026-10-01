@@ -465,6 +465,13 @@ export default function StudentProgress() {
   const currentDayData = planData?.days[safeDayIndex];
   const isCurrentDayCompleted = planData ? Boolean(daysCompleted[safeDayIndex]) : false;
   const isPlanFinished = activePlan?.status === "inativo";
+  // AUDITORIA Fase 2: dados reais do dia (antes "20 MIN"/"AVANÇADO" fixos).
+  const dayExerciseList = ((currentDayData as any)?.exercises ?? []) as Array<{ duration?: string }>;
+  const dayExerciseCount = dayExerciseList.length;
+  const dayMinutes = dayExerciseList.reduce((acc, ex) => {
+    const min = parseInt(String(ex?.duration || "").replace(/[^0-9]/g, ""), 10);
+    return Number.isNaN(min) ? acc : acc + min;
+  }, 0);
 
   const handleStartTraining = () => {
     if (isPlanFinished || isCurrentDayCompleted) return;
@@ -601,17 +608,21 @@ export default function StudentProgress() {
                   </div>
                   
                   <div className="flex flex-col gap-1.5 shrink-0 items-end">
-                    <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-slate-500 bg-slate-50 px-2 py-1 rounded-md">
-                      <Timer size={10} /> 20 MIN
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
-                      <div className="flex gap-0.5 items-end h-2.5">
-                        <div className="w-1 h-1.5 bg-emerald-500 rounded-full" />
-                        <div className="w-1 h-2 bg-emerald-500 rounded-full" />
-                        <div className="w-1 h-2.5 bg-emerald-300 rounded-full" />
+                    {dayMinutes > 0 && (
+                      <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-slate-500 bg-slate-50 px-2 py-1 rounded-md">
+                        <Timer size={10} /> {dayMinutes} MIN
                       </div>
-                      AVANÇADO
-                    </div>
+                    )}
+                    {dayExerciseCount > 0 && (
+                      <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
+                        <div className="flex gap-0.5 items-end h-2.5">
+                          <div className="w-1 h-1.5 bg-emerald-500 rounded-full" />
+                          <div className="w-1 h-2 bg-emerald-500 rounded-full" />
+                          <div className="w-1 h-2.5 bg-emerald-300 rounded-full" />
+                        </div>
+                        {dayExerciseCount} EXERCÍCIOS
+                      </div>
+                    )}
                   </div>
                </div>
                

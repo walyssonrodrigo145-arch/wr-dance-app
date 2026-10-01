@@ -18,7 +18,7 @@ import {
   updateUserProfile,
   getExperimentalStats,
 } from "../db";
-import { organizations, users, students, lessons, instruments, reminders, reminderTemplates, paymentDues, asaasCustomers, settings, studentGoals, studentTimeline, studentFiles, announcements, chatMessages, rescheduleRequests, extraLessonRequests, studentEvolution, aiConversations, aiMessages, aiDocuments, expenses, dailyStudyPlans, notifications, professores, professorPayments, attendanceTokens, attendanceLogs, contracts, fileComments, studioRooms, schoolIntegrations, contractTemplates, contractEvents, crmLeads, crmGoals, crmActivities, fiscalCompanies, fiscalInvoices, fiscalServices, fiscalJobs, fiscalLogs, turmaAlunos } from "../../drizzle/schema";
+import { organizations, users, students, lessons, instruments, reminders, reminderTemplates, paymentDues, asaasCustomers, settings, studentGoals, studentTimeline, studentFiles, announcements, chatMessages, rescheduleRequests, extraLessonRequests, studentEvolution, aiConversations, aiMessages, aiDocuments, expenses, dailyStudyPlans, notifications, professores, professorPayments, attendanceTokens, attendanceLogs, contracts, fileComments, studioRooms, schoolIntegrations, contractTemplates, contractEvents, crmLeads, crmGoals, crmActivities, fiscalCompanies, fiscalInvoices, fiscalServices, fiscalJobs, fiscalLogs, turmaAlunos, lessonAttendance, turmas } from "../../drizzle/schema";
 import { eq, desc, sql, and, gte, lt, lte, asc, ne, or, inArray, aliasedTable, ilike, isNull } from "drizzle-orm";
 import { notifyOwner, notifyUser } from "../_core/notification";
 import { handleDbError } from "../utils/error_handler";
@@ -232,7 +232,8 @@ export const portalRouters = {
         .leftJoin(users, eq(announcements.userId, users.id))
         .where(and(
           eq(announcements.organizationId, orgId),
-          eq(announcements.userId, student.professorId),
+          // AUDITORIA Fase 3: aluno vê TODOS os comunicados da escola (antes só via
+          // os do próprio professor — comunicado geral da escola desaparecia).
           sql`(${announcements.targetStudentId} IS NULL OR ${announcements.targetStudentId} = ${studentId})`
         ))
         .orderBy(desc(announcements.createdAt))
@@ -306,7 +307,27 @@ export const portalRouters = {
           .limit(5)
       ]);
 
-      const frequency = statsTotalRecent.count > 0 ? Math.round((statsDoneRecent.count / statsTotalRecent.count) * 100) : 100;
+      // AUDITORIA Fase 3: presenças de turma (lesson_attendance) entram nas
+      // métricas do aluno — antes quem só fazia turma via "0 aulas feitas".
+      let turmaAttended = 0;
+      let turmaTotal = 0;
+      try {
+        const [attOk] = await db.select({ count: sql<number>`CAST(count(*) AS INT)` }).from(lessonAttendance)
+          .where(and(
+            eq(lessonAttendance.organizationId, orgId),
+            eq(lessonAttendance.studentId, studentId),
+            inArray(lessonAttendance.status, ["presente", "justificado"]),
+          ));
+        turmaAttended = Number(attOk?.count) || 0;
+        const [attAll] = await db.select({ count: sql<number>`CAST(count(*) AS INT)` }).from(lessonAttendance)
+          .where(and(eq(lessonAttendance.organizationId, orgId), eq(lessonAttendance.studentId, studentId)));
+        turmaTotal = Number(attAll?.count) || 0;
+      } catch { /* métricas extras não bloqueiam o dashboard */ }
+
+      const lessonsDoneCombined = (Number(statsDone?.count) || 0) + turmaAttended;
+      const totalRecentCombined = (Number(statsTotalRecent?.count) || 0) + turmaTotal;
+      const doneRecentCombined = (Number(statsDoneRecent?.count) || 0) + turmaAttended;
+      const frequency = totalRecentCombined > 0 ? Math.round((doneRecentCombined / totalRecentCombined) * 100) : 100;
 
       return {
         upcomingLessons: upcoming,
@@ -324,11 +345,13 @@ export const portalRouters = {
         teacherId: teacher?.id,
         messages: latestMessages,
         stats: {
-          lessonsDone: statsDone.count,
+          lessonsDone: lessonsDoneCombined,
           pendingExercises: statsPending.count,
           unreadAnnouncements: dbAnnouncements.length,
           frequency,
-          generalProgress: 85,
+          // AUDITORIA Fase 2: valor real (antes 85 fixo). Frequência = presenças
+          // concluídas sobre as aulas do período.
+          generalProgress: frequency,
           level: student.level || 'iniciante',
         }
       };
@@ -548,10 +571,38 @@ export const portalRouters = {
         timeline,
         stats: {
           lessonsDone: done.count,
-          averageGrade: 9.2, // Mock
+          // AUDITORIA Fase 2: nota média não existe no modelo — removido o mock 9.2.
+          averageGrade: null,
         }
       };
     }),
+    /** AUDITORIA Fase 3: presenças recentes do aluno (chamada de turma). */
+    getMyAttendance: studentProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const orgId = ctx.user.organizationId!;
+      let studentId = ctx.user.studentId ?? null;
+      if (!studentId) {
+        const [found] = await db.select({ id: students.id }).from(students)
+          .where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, orgId))).limit(1);
+        studentId = found?.id ?? null;
+      }
+      if (!studentId) return [];
+      return db.select({
+        id: lessonAttendance.id,
+        status: lessonAttendance.status,
+        markedAt: lessonAttendance.markedAt,
+        lessonTitle: lessons.title,
+        scheduledAt: lessons.scheduledAt,
+        turmaName: turmas.name,
+      }).from(lessonAttendance)
+        .innerJoin(lessons, eq(lessons.id, lessonAttendance.lessonId))
+        .leftJoin(turmas, eq(turmas.id, lessons.turmaId))
+        .where(and(eq(lessonAttendance.organizationId, orgId), eq(lessonAttendance.studentId, studentId)))
+        .orderBy(desc(lessons.scheduledAt))
+        .limit(20);
+    }),
+
     getPayments: studentProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
@@ -1427,6 +1478,24 @@ export const portalRouters = {
         // Upload receipt to local storage
         const base64Content = input.fileData.includes(',') ? input.fileData.split(',')[1] : input.fileData;
         const buffer = Buffer.from(base64Content, 'base64');
+
+        // AUDITORIA Fase 2: validação do comprovante (tamanho + formato + assinatura
+        // binária) antes de gravar/enviar para a IA — antes aceitava qualquer coisa.
+        const MAX_RECEIPT_BYTES = 5 * 1024 * 1024; // 5 MB
+        const ALLOWED_RECEIPT_MIMES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"];
+        if (buffer.length === 0) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "O arquivo enviado está vazio." });
+        }
+        if (buffer.length > MAX_RECEIPT_BYTES) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Comprovante muito grande — envie um arquivo de até 5 MB." });
+        }
+        if (!ALLOWED_RECEIPT_MIMES.includes(input.fileType)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Formato não aceito. Envie uma imagem (JPG/PNG) ou PDF." });
+        }
+        if (!checkFileMagicBytes(buffer, input.fileType)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "O arquivo não corresponde ao formato informado. Envie o comprovante original." });
+        }
+
         const ext = input.fileName.split('.').pop() || 'dat';
         const storageKey = `receipts/org_${orgId}/user_${ctx.user.id}/pay_${input.paymentDueId}_${nanoid(6)}.${ext}`;
         
@@ -1514,6 +1583,20 @@ Instruções de análise:
             .where(and(eq(paymentDues.id, payment.id), ne(paymentDues.status, 'pago')));
 
           const valor = Number(payment.amount).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+          // AUDITORIA Fase 2: mesmos efeitos da baixa oficial (cancela links ainda
+          // pagáveis, lembretes e enfileira NFS-e) — evita pagamento em duplicidade.
+          const { afterPaymentConfirmed } = await import("../services/paymentEffects");
+          await afterPaymentConfirmed(db, {
+            organizationId: orgId,
+            dueId: payment.id,
+            source: "portal",
+            receiptUrl,
+            actorUserId: student.professorId,
+            actorUserName: student.name || undefined,
+            cancelOpenCharges: true,
+          });
+
           await notifyUser(student.professorId, {
             title: "Pagamento Confirmado",
             content: `O aluno ${student.name || "Aluno"} pagou a mensalidade de ${valor} via PIX (validado por IA).`,

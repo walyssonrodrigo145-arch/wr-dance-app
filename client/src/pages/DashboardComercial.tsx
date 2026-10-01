@@ -106,20 +106,56 @@ export default function DashboardComercial() {
     setGoalsModalOpen(true);
   };
 
-  // Preenchimento com Leads Padrão para visualização inicial (se não houver leads salvos)
-  const displayLeads = leads.length > 0 ? leads : [
-    { id: 1, name: "Escola Som & Tal", companyOrSchool: "Belo Horizonte - MG", planName: "Plano Pro", value: "199.00", stage: "novo", temperature: "morno", createdAt: new Date() },
-    { id: 2, name: "Vivace Escola de Dança", companyOrSchool: "São Paulo - SP", planName: "Plano Pro", value: "199.00", stage: "contato", temperature: "quente", createdAt: new Date() },
-    { id: 3, name: "Academia do Som", companyOrSchool: "Salvador - BA", planName: "Plano Pro", value: "199.00", stage: "interessado", temperature: "quente", createdAt: new Date() },
-    { id: 4, name: "Center Music", companyOrSchool: "Niterói - RJ", planName: "Plano Pro", value: "199.00", stage: "demonstracao", temperature: "quente", createdAt: new Date() },
-    { id: 5, name: "Escola Allegro", companyOrSchool: "Niterói - RJ", planName: "Plano Pro", value: "199.00", stage: "proposta", temperature: "quente", createdAt: new Date() },
-    { id: 6, name: "Escola Clave de Sol", companyOrSchool: "Florianópolis - SC", planName: "Plano Pro", value: "199.00", stage: "negociacao", temperature: "quente", createdAt: new Date() },
-    { id: 7, name: "Escola Nova Voz", companyOrSchool: "Bauru - SP", planName: "Plano Pro", value: "199.00", stage: "fechado", temperature: "ganho", createdAt: new Date() },
-    { id: 8, name: "Instituto Harmonia", companyOrSchool: "Curitiba - PR", planName: "Plano Essential", value: "149.00", stage: "novo", temperature: "frio", createdAt: new Date() },
-    { id: 9, name: "Toque de Classe", companyOrSchool: "Campinas - SP", planName: "Plano Essential", value: "149.00", stage: "contato", temperature: "morno", createdAt: new Date() },
-    { id: 10, name: "Escola Musicale", companyOrSchool: "Recife - PE", planName: "Plano Essential", value: "149.00", stage: "interessado", temperature: "morno", createdAt: new Date() },
-    { id: 11, name: "Escola Adagio", companyOrSchool: "Brasília - DF", planName: "Plano Pro", value: "199.00", stage: "demonstracao", temperature: "morno", createdAt: new Date() },
-  ];
+  // AUDITORIA Fase 5: sem leads fictícios — mostra apenas os reais cadastrados.
+  const displayLeads = leads;
+
+  // AUDITORIA Fase 5: botões de relatório agora geram CSV de verdade (antes só toast).
+  const downloadCsv = (filename: string, header: string[], rows: Array<Array<string | number>>) => {
+    const csv = [header.join(",")]
+      .concat(rows.map((r) => r.map((v) => '"' + String(v ?? "").replace(/"/g, '""') + '"').join(",")))
+      .join("\n");
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast.success("Relatório exportado: " + filename);
+  };
+
+  const exportOrigins = () => {
+    const bySource = new Map<string, number>();
+    for (const l of displayLeads as any[]) bySource.set(l.source || "Não informado", (bySource.get(l.source || "Não informado") || 0) + 1);
+    downloadCsv("origem-dos-leads.csv", ["Origem", "Leads"],
+      Array.from(bySource.entries()).sort((a, b) => b[1] - a[1]));
+  };
+
+  const exportConversion = () => {
+    const byStage = new Map<string, number>();
+    for (const l of displayLeads as any[]) byStage.set(l.stage || "novo", (byStage.get(l.stage || "novo") || 0) + 1);
+    downloadCsv("conversao-por-etapa.csv", ["Etapa", "Leads"],
+      Array.from(byStage.entries()).sort((a, b) => b[1] - a[1]));
+  };
+
+  const exportLosses = () => {
+    const losses = (displayLeads as any[]).filter((l) => l.lostReason || l.stage === "perdido");
+    downloadCsv("motivos-de-perda.csv", ["Lead", "Etapa", "Motivo da perda"],
+      losses.map((l) => [l.name, l.stage, l.lostReason || "Não informado"]));
+  };
+
+  const exportAll = () => {
+    downloadCsv("leads-completo.csv",
+      ["ID", "Nome", "Escola/Empresa", "Plano", "Valor", "Etapa", "Temperatura", "Criado em"],
+      (displayLeads as any[]).map((l) => [
+        l.id, l.name, l.companyOrSchool ?? "", l.planName ?? "", l.value ?? "",
+        l.stage ?? "", l.temperature ?? "",
+        l.createdAt ? new Date(l.createdAt).toLocaleDateString("pt-BR") : "",
+      ]));
+  };
+
 
   if (activeSubView === "reports") {
     return (
@@ -156,8 +192,8 @@ export default function DashboardComercial() {
             </div>
             <h3 className="text-base font-black text-foreground font-outfit">Origem dos Leads</h3>
             <p className="text-xs text-muted-foreground font-medium">Relatório detalhado por canal de aquisição (Instagram, Google, WhatsApp, Indicação).</p>
-            <Button onClick={() => toast.success("Relatório de Origem exportado em PDF!")} className="w-full rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold h-10 text-xs">
-              <Download size={14} className="mr-1.5" /> Baixar Relatório (PDF)
+            <Button onClick={exportOrigins} className="w-full rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold h-10 text-xs">
+              <Download size={14} className="mr-1.5" /> Baixar Relatório (CSV)
             </Button>
           </div>
 
@@ -167,8 +203,8 @@ export default function DashboardComercial() {
             </div>
             <h3 className="text-base font-black text-foreground font-outfit">Taxas de Conversão</h3>
             <p className="text-xs text-muted-foreground font-medium">Estatísticas de tempo médio de ciclo de venda e taxa de passagem de etapa em etapa.</p>
-            <Button onClick={() => toast.success("Relatório de Conversão exportado!")} className="w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-10 text-xs">
-              <Download size={14} className="mr-1.5" /> Baixar Relatório (PDF)
+            <Button onClick={exportConversion} className="w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-10 text-xs">
+              <Download size={14} className="mr-1.5" /> Baixar Relatório (CSV)
             </Button>
           </div>
 
@@ -178,8 +214,8 @@ export default function DashboardComercial() {
             </div>
             <h3 className="text-base font-black text-foreground font-outfit">Motivos de Perda</h3>
             <p className="text-xs text-muted-foreground font-medium">Mapeamento dos principais motivos de desistência e recusa de propostas comerciais.</p>
-            <Button onClick={() => toast.success("Relatório de Perdas exportado!")} className="w-full rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold h-10 text-xs">
-              <Download size={14} className="mr-1.5" /> Baixar Relatório (PDF)
+            <Button onClick={exportLosses} className="w-full rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold h-10 text-xs">
+              <Download size={14} className="mr-1.5" /> Baixar Relatório (CSV)
             </Button>
           </div>
 
@@ -189,7 +225,7 @@ export default function DashboardComercial() {
             </div>
             <h3 className="text-base font-black text-foreground font-outfit">Exportação Geral (CSV)</h3>
             <p className="text-xs text-muted-foreground font-medium">Exportação completa de todos os dados dos leads e atividades comerciais em planilha.</p>
-            <Button onClick={() => toast.success("Exportação CSV concluída com sucesso!")} className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 text-xs">
+            <Button onClick={exportAll} className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 text-xs">
               <Download size={14} className="mr-1.5" /> Exportar Planilha (CSV)
             </Button>
           </div>
@@ -822,7 +858,7 @@ export default function DashboardComercial() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Button
                 variant="outline"
-                onClick={() => toast.success("Relatório de Origem dos Leads gerado!")}
+                onClick={exportOrigins}
                 className="h-20 rounded-2xl border-border hover:border-violet-500 flex flex-col items-start justify-center p-4 text-left group"
               >
                 <div className="flex items-center gap-2 text-violet-600 font-bold text-xs mb-1">
@@ -833,7 +869,7 @@ export default function DashboardComercial() {
 
               <Button
                 variant="outline"
-                onClick={() => toast.success("Relatório de Conversão do Funil gerado!")}
+                onClick={exportConversion}
                 className="h-20 rounded-2xl border-border hover:border-violet-500 flex flex-col items-start justify-center p-4 text-left group"
               >
                 <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs mb-1">
@@ -844,7 +880,7 @@ export default function DashboardComercial() {
 
               <Button
                 variant="outline"
-                onClick={() => toast.success("Relatório de Motivos de Perda gerado!")}
+                onClick={exportLosses}
                 className="h-20 rounded-2xl border-border hover:border-violet-500 flex flex-col items-start justify-center p-4 text-left group"
               >
                 <div className="flex items-center gap-2 text-rose-500 font-bold text-xs mb-1">
@@ -855,7 +891,7 @@ export default function DashboardComercial() {
 
               <Button
                 variant="outline"
-                onClick={() => toast.success("Exportação de todos os Leads em CSV concluída!")}
+                onClick={exportAll}
                 className="h-20 rounded-2xl border-border hover:border-violet-500 flex flex-col items-start justify-center p-4 text-left group"
               >
                 <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs mb-1">

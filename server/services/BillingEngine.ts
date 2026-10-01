@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, and, isNotNull, asc } from "drizzle-orm";
 import { getDb } from "../db";
 import { paymentDues, settings, billingAuditLogs } from "../../drizzle/schema";
 
@@ -237,22 +237,36 @@ export class BillingEngine {
       throw new Error(`Cobrança com ID ${invoiceId} não encontrada.`);
     }
 
-    // 2. Buscar configurações da escola (por organizationId ou userId)
+    // 2. Buscar configurações da escola.
+    // AUDITORIA Fase 2: prioridade para a conta dona da fatura (invoice.userId) —
+    // a 1ª row da org podia ser de outro usuário e os juros/multa configurados
+    // pelo admin não eram aplicados na cobrança.
     let schoolSettingsObj: any = null;
-    if (invoice.organizationId) {
-      const [setting] = await db
-        .select()
-        .from(settings)
-        .where(eq(settings.organizationId, invoice.organizationId))
-        .limit(1);
-      schoolSettingsObj = setting;
-    }
-
-    if (!schoolSettingsObj && invoice.userId) {
+    if (invoice.userId) {
       const [setting] = await db
         .select()
         .from(settings)
         .where(eq(settings.userId, invoice.userId))
+        .limit(1);
+      schoolSettingsObj = setting;
+    }
+
+    if (!schoolSettingsObj && invoice.organizationId) {
+      const [setting] = await db
+        .select()
+        .from(settings)
+        .where(and(eq(settings.organizationId, invoice.organizationId), isNotNull(settings.schoolName)))
+        .orderBy(asc(settings.id))
+        .limit(1);
+      schoolSettingsObj = setting;
+    }
+
+    if (!schoolSettingsObj && invoice.organizationId) {
+      const [setting] = await db
+        .select()
+        .from(settings)
+        .where(eq(settings.organizationId, invoice.organizationId))
+        .orderBy(asc(settings.id))
         .limit(1);
       schoolSettingsObj = setting;
     }

@@ -12,6 +12,7 @@ import {
 } from "../drizzle/schema";
 import { eq, and, desc, sql, ilike, or, gte, lte } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { isValidCNPJ } from "./routers/helpers";
 import { FiscalService } from "./services/fiscal/FiscalService";
 
 export const fiscalRouter = router({
@@ -36,7 +37,7 @@ export const fiscalRouter = router({
     save: adminProcedure
       .input(
         z.object({
-          cnpj: z.string().min(14, "CNPJ inválido"),
+          cnpj: z.string().refine((v) => isValidCNPJ(v), "CNPJ inválido (verifique os dígitos verificadores)"),
           razaoSocial: z.string().min(2, "Razão social obrigatória"),
           nomeFantasia: z.string().optional().nullable(),
           inscricaoMunicipal: z.string().optional().nullable(),
@@ -227,9 +228,8 @@ export const fiscalRouter = router({
         }
       }
 
-      // Consumo simulado baseado em cota de 4000 notas
+      // AUDITORIA Fase 4: consumo REAL de NFS-e (antes era "cota simulada de 4000").
       const totalConsumo = invoices.length;
-      const cotaTotal = 4000;
 
       return {
         emitidas,
@@ -239,8 +239,8 @@ export const fiscalRouter = router({
         faturamentoNfse,
         consumo: {
           utilizado: totalConsumo,
-          total: cotaTotal,
-          percentual: Math.min(100, Math.round((totalConsumo / cotaTotal) * 100)),
+          total: null as number | null,
+          percentual: null as number | null,
         },
       };
     }),

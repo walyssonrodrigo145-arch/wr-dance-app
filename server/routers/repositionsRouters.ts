@@ -61,7 +61,22 @@ async function notifyParticipants(params: {
   try {
     const db = await getDb();
     if (!db) return;
-    const targets = [params.studentUserId, params.professorUserId].filter(
+
+    // AUDITORIA Fase 3: quando o chamador não informa o professor, resolve pelo
+    // vínculo do aluno — antes o professor NUNCA era avisado das reposições.
+    let professorUserId = params.professorUserId ?? null;
+    if (!professorUserId && params.studentUserId) {
+      try {
+        const [stu] = await db.select({ professorId: students.professorId }).from(students)
+          .where(and(
+            eq(students.organizationId, params.organizationId),
+            eq(students.studentUserId, params.studentUserId),
+          )).limit(1);
+        if (stu?.professorId) professorUserId = stu.professorId;
+      } catch { /* segue sem professor */ }
+    }
+
+    const targets = [params.studentUserId, professorUserId].filter(
       (id): id is number => typeof id === "number" && id > 0
     );
     if (targets.length === 0) return;

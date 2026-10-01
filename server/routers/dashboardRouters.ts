@@ -84,8 +84,12 @@ export const dashboardRouters = {
         professorStudentIds = profStudents.map(s => s.id);
       }
 
+      // AUDITORIA Fase 3: o professor também enxerga as sessões das turmas dele
+      // (lessons.userId = professor), não só aulas individuais dos seus alunos.
       const baseLessonCondition = professorStudentIds
-        ? (professorStudentIds.length > 0 ? inArray(lessons.studentId, professorStudentIds) : sql`false`)
+        ? (professorStudentIds.length > 0
+            ? or(inArray(lessons.studentId, professorStudentIds), eq(lessons.userId, userId))
+            : eq(lessons.userId, userId))
         : (isUserAdmin ? undefined : eq(lessons.userId, userId));
 
       const aulasHojeRes = await db.select({ count: sql<number>`count(*)` })
