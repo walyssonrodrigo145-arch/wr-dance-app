@@ -6,8 +6,10 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq, gte, ilike, inArray, or, sql } from "drizzle-orm";
 import { protectedProcedure, studentProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { coreografias, eventChoreographies, eventParticipants, events, instruments, students } from "../../drizzle/schema";
+import { coreografiaAlunos, coreografias, costumeSales, eventChoreographies, eventParticipants, events, instruments, settings, students } from "../../drizzle/schema";
 import { ENV } from "../_core/env";
+import { notifyUser } from "../_core/notification";
+import { sendWhatsAppMessage } from "../utils/whatsapp";
 
 const EVENT_TYPES = ["recital", "festival", "competicao", "workshop", "audicao", "ensaio_geral", "outro"] as const;
 const EVENT_STATUS = ["planejado", "confirmado", "realizado", "cancelado"] as const;
@@ -20,6 +22,93 @@ function assertStaff(ctx: { user: { role: string; openId: string } | null }) {
   if (!isStaff) {
     throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito a administradores e professores." });
   }
+}
+
+function formatEventWhen(startsAt: Date) {
+  const date = new Date(startsAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Sao_Paulo" });
+  const time = new Date(startsAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+  return `${date} às ${time}`;
+}
+
+/**
+ * Notifica os participantes do evento (in-app para quem tem portal + WhatsApp
+ * quando a escola tem disparo automático configurado). Nunca lança erro.
+ */
+async function notifyEventParticipants(
+  db: any,
+  orgId: number,
+  eventId: number,
+  title: string,
+  content: string,
+  opts?: { whatsapp?: boolean; onlyStudentIds?: number[] }
+) {
+  try {
+    const rows = await db.select({
+      studentId: eventParticipants.studentId,
+      name: students.name,
+      phone: students.phone,
+      studentUserId: students.studentUserId,
+    }).from(eventParticipants)
+      .innerJoin(students, eq(students.id, eventParticipants.studentId))
+      .where(eq(eventParticipants.eventId, eventId));
+
+    const targets = opts?.onlyStudentIds
+      ? rows.filter((r: any) => opts.onlyStudentIds!.includes(r.studentId))
+      : rows;
+
+    for (const r of targets) {
+      if (r.studentUserId) {
+        await notifyUser(r.studentUserId, { title, content }).catch(() => {});
+      }
+    }
+
+    if (opts?.whatsapp) {
+      const [s] = await db.select({
+        whatsappBotUrl: settings.whatsappBotUrl,
+        whatsappBotToken: settings.whatsappBotToken,
+        whatsappAutoSend: settings.whatsappAutoSend,
+      }).from(settings).where(eq(settings.organizationId, orgId)).limit(1);
+      if (s?.whatsappAutoSend === 1 && s.whatsappBotUrl) {
+        for (const r of targets) {
+          if (!r.phone) continue;
+          await sendWhatsAppMessage({
+            url: s.whatsappBotUrl,
+            token: s.whatsappBotToken ?? undefined,
+            phone: r.phone,
+            message: `*${title}*\n\n${content}`,
+          }).catch(() => {});
+        }
+      }
+    }
+  } catch (error) {
+    console.warn("[Eventos] Falha ao notificar participantes:", error);
+  }
+}
+
+/** Importa o elenco (coreografia_alunos) de uma coreografia para o evento. */
+async function importCastForCoreografia(db: any, orgId: number, eventId: number, coreografiaId: number): Promise<number> {
+  const cast = await db.select({ studentId: coreografiaAlunos.studentId }).from(coreografiaAlunos)
+    .where(and(eq(coreografiaAlunos.organizationId, orgId), eq(coreografiaAlunos.coreografiaId, coreografiaId)));
+  if (cast.length === 0) return 0;
+
+  const existing = await db.select({ studentId: eventParticipants.studentId }).from(eventParticipants)
+    .where(eq(eventParticipants.eventId, eventId));
+  const existingIds = new Set(existing.map((r: any) => r.studentId));
+
+  let ids = cast.map((r: any) => r.studentId).filter((id: number) => !existingIds.has(id));
+  if (ids.length === 0) return 0;
+
+  const valid = await db.select({ id: students.id }).from(students)
+    .where(and(eq(students.organizationId, orgId), eq(students.status, "ativo"), inArray(students.id, ids)));
+  ids = valid.map((r: any) => r.id);
+  if (ids.length === 0) return 0;
+
+  await db.insert(eventParticipants).values(ids.map((studentId: number) => ({
+    organizationId: orgId,
+    eventId,
+    studentId,
+  })));
+  return ids.length;
 }
 
 async function resolveStudentId(db: any, ctx: { user: { id: number; studentId?: number | null; organizationId?: number | null } }) {
@@ -118,7 +207,12 @@ export const eventosRouters = {
 
       const [{ participantes }] = await db.select({ participantes: sql<number>`CAST(COUNT(*) AS INT)` })
         .from(eventParticipants)
-        .where(eq(eventParticipants.organizationId, orgId));
+        .innerJoin(events, eq(events.id, eventParticipants.eventId))
+        .where(and(
+          eq(eventParticipants.organizationId, orgId),
+          sql`${events.status} <> 'cancelado'`,
+          eq(events.active, true),
+        ));
 
       const byStatus: Record<string, number> = {};
       let total = 0;
@@ -215,7 +309,7 @@ export const eventosRouters = {
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
       const orgId = ctx.user.organizationId!;
 
-      const [existing] = await db.select({ id: events.id }).from(events)
+      const [existing] = await db.select({ id: events.id, status: events.status, name: events.name }).from(events)
         .where(and(eq(events.id, input.id), eq(events.organizationId, orgId)))
         .limit(1);
       if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Evento não encontrado." });
@@ -237,6 +331,15 @@ export const eventosRouters = {
         updatedAt: new Date(),
       }).where(eq(events.id, input.id));
 
+      // AVISA os participantes quando o status muda (confirmado/cancelado).
+      if (existing.status !== input.status && (input.status === "confirmado" || input.status === "cancelado")) {
+        const title = input.status === "confirmado" ? "Evento confirmado!" : "Evento cancelado";
+        const content = input.status === "confirmado"
+          ? `O evento "${input.name}" está confirmado para ${formatEventWhen(input.startsAt)}${input.venueName ? ` — ${input.venueName}` : ""}.`
+          : `O evento "${input.name}" foi cancelado pela escola.`;
+        await notifyEventParticipants(db, orgId, input.id, title, content, { whatsapp: input.status === "cancelado" });
+      }
+
       return { success: true };
     }),
 
@@ -246,13 +349,18 @@ export const eventosRouters = {
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
       const orgId = ctx.user.organizationId!;
 
-      const [existing] = await db.select({ id: events.id }).from(events)
+      const [existing] = await db.select({ id: events.id, name: events.name }).from(events)
         .where(and(eq(events.id, input.id), eq(events.organizationId, orgId)))
         .limit(1);
       if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Evento não encontrado." });
 
+      // AVISA os participantes antes de remover (o registro será apagado).
+      await notifyEventParticipants(db, orgId, input.id, "Evento cancelado", `O evento "${existing.name}" foi cancelado pela escola.`, { whatsapp: true });
+
       await db.delete(eventChoreographies).where(eq(eventChoreographies.eventId, input.id));
       await db.delete(eventParticipants).where(eq(eventParticipants.eventId, input.id));
+      // AUDITORIA: não deixar vendas de figurino apontando para evento excluído.
+      await db.update(costumeSales).set({ eventId: null }).where(eq(costumeSales.eventId, input.id));
       await db.delete(events).where(eq(events.id, input.id));
       return { success: true };
     }),
@@ -261,6 +369,8 @@ export const eventosRouters = {
     linkCoreografia: protectedProcedure.input(z.object({
       eventId: z.number(),
       coreografiaId: z.number(),
+      /** Importa automaticamente o elenco da coreografia (padrão: sim). */
+      importCast: z.boolean().default(true),
     })).mutation(async ({ ctx, input }) => {
       assertStaff(ctx);
       const db = await getDb();
@@ -289,7 +399,93 @@ export const eventosRouters = {
         coreografiaId: input.coreografiaId,
         ordem: (Number(max) || 0) + 1,
       });
-      return { success: true };
+
+      // Importa o elenco da coreografia (evita o evento ficar com "0 alunos").
+      let castImported = 0;
+      if (input.importCast) {
+        castImported = await importCastForCoreografia(db, orgId, input.eventId, input.coreografiaId);
+        if (castImported > 0) {
+          const [ev] = await db.select({ name: events.name, startsAt: events.startsAt }).from(events)
+            .where(eq(events.id, input.eventId)).limit(1);
+          await notifyEventParticipants(db, orgId, input.eventId, "Você foi incluído(a) em um evento",
+            `Você participa do evento "${ev?.name}"${ev?.startsAt ? ` em ${formatEventWhen(ev.startsAt)}` : ""}. Confirme sua presença no portal.`,
+            { whatsapp: false });
+        }
+      }
+
+      return { success: true, castImported };
+    }),
+
+    /** Importa manualmente o elenco (de uma coreografia ou de todas as vinculadas). */
+    importCast: protectedProcedure.input(z.object({
+      eventId: z.number(),
+      coreografiaId: z.number().optional(),
+    })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+
+      const [event] = await db.select({ id: events.id }).from(events)
+        .where(and(eq(events.id, input.eventId), eq(events.organizationId, orgId))).limit(1);
+      if (!event) throw new TRPCError({ code: "NOT_FOUND", message: "Evento não encontrado." });
+
+      let coreografiaIds: number[] = [];
+      if (input.coreografiaId) {
+        coreografiaIds = [input.coreografiaId];
+      } else {
+        const links = await db.select({ coreografiaId: eventChoreographies.coreografiaId }).from(eventChoreographies)
+          .where(eq(eventChoreographies.eventId, input.eventId));
+        coreografiaIds = links.map((l: any) => l.coreografiaId);
+      }
+      if (coreografiaIds.length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Nenhuma coreografia vinculada — vincule uma coreografia ou selecione uma específica." });
+      }
+
+      let added = 0;
+      for (const cid of coreografiaIds) {
+        added += await importCastForCoreografia(db, orgId, input.eventId, cid);
+      }
+
+      if (added > 0) {
+        const [ev] = await db.select({ name: events.name, startsAt: events.startsAt }).from(events)
+          .where(eq(events.id, input.eventId)).limit(1);
+        await notifyEventParticipants(db, orgId, input.eventId, "Você foi incluído(a) em um evento",
+          `Você participa do evento "${ev?.name}"${ev?.startsAt ? ` em ${formatEventWhen(ev.startsAt)}` : ""}. Confirme sua presença no portal.`,
+          { whatsapp: false });
+      }
+
+      return { success: true, added };
+    }),
+
+    /** Reordena uma coreografia no programa (sobe/desce uma posição). */
+    reorderCoreografia: protectedProcedure.input(z.object({
+      id: z.number(),
+      direction: z.enum(["up", "down"]),
+    })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+
+      const [link] = await db.select({ id: eventChoreographies.id, eventId: eventChoreographies.eventId }).from(eventChoreographies)
+        .where(and(eq(eventChoreographies.id, input.id), eq(eventChoreographies.organizationId, orgId))).limit(1);
+      if (!link) throw new TRPCError({ code: "NOT_FOUND", message: "Coreografia não vinculada ao evento." });
+
+      const all = await db.select({ id: eventChoreographies.id }).from(eventChoreographies)
+        .where(eq(eventChoreographies.eventId, link.eventId))
+        .orderBy(asc(eventChoreographies.ordem), asc(eventChoreographies.id));
+
+      const idx = all.findIndex((l: any) => l.id === input.id);
+      const target = input.direction === "up" ? idx - 1 : idx + 1;
+      if (idx < 0 || target < 0 || target >= all.length) return { success: true, moved: false };
+
+      const order = all.map((l: any) => l.id);
+      [order[idx], order[target]] = [order[target], order[idx]];
+      for (let i = 0; i < order.length; i++) {
+        await db.update(eventChoreographies).set({ ordem: i + 1 }).where(eq(eventChoreographies.id, order[i]));
+      }
+      return { success: true, moved: true };
     }),
 
     unlinkCoreografia: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
@@ -338,6 +534,17 @@ export const eventosRouters = {
         eventId: input.eventId,
         studentId,
       })));
+
+      // AVISA quem acabou de ser convidado (in-app; WhatsApp se a escola usa disparo automático).
+      const [ev] = await db.select({ name: events.name, startsAt: events.startsAt, requiresAuthorization: events.requiresAuthorization }).from(events)
+        .where(eq(events.id, input.eventId)).limit(1);
+      const authNote = ev?.requiresAuthorization ? " Autorize imagem/participação no portal." : "";
+      await notifyEventParticipants(
+        db, orgId, input.eventId,
+        "Você foi convidado(a) para um evento",
+        `Você foi convidado(a) para o evento "${ev?.name}"${ev?.startsAt ? ` em ${formatEventWhen(ev.startsAt)}` : ""}.${authNote}`,
+        { whatsapp: true, onlyStudentIds: toInsert }
+      );
 
       return { success: true, added: toInsert.length };
     }),
@@ -494,14 +701,14 @@ export const eventosRouters = {
       )).orderBy(asc(coreografias.title));
     }),
 
-    /** Portal do aluno: eventos em que o aluno é participante. */
+    /** Portal do aluno: eventos em que o aluno é participante (com o programa). */
     myEvents: studentProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       if (!db) return [];
       const studentId = await resolveStudentId(db, ctx);
       if (!studentId) return [];
 
-      return db.select({
+      const rows = await db.select({
         participantId: eventParticipants.id,
         participantStatus: eventParticipants.status,
         imageAuthorization: eventParticipants.imageAuthorization,
@@ -527,6 +734,28 @@ export const eventosRouters = {
           sql`${events.status} <> 'cancelado'`,
         ))
         .orderBy(asc(events.startsAt));
+
+      if (rows.length === 0) return rows;
+
+      const eventIds = rows.map((r: any) => r.id);
+      const programRows = await db.select({
+        eventId: eventChoreographies.eventId,
+        title: coreografias.title,
+        formacao: coreografias.formacao,
+        ordem: eventChoreographies.ordem,
+      }).from(eventChoreographies)
+        .innerJoin(coreografias, eq(coreografias.id, eventChoreographies.coreografiaId))
+        .where(inArray(eventChoreographies.eventId, eventIds))
+        .orderBy(asc(eventChoreographies.ordem), asc(eventChoreographies.id));
+
+      const programByEvent = new Map<number, any[]>();
+      for (const p of programRows) {
+        const list = programByEvent.get(p.eventId) ?? [];
+        list.push({ title: p.title, formacao: p.formacao, ordem: p.ordem });
+        programByEvent.set(p.eventId, list);
+      }
+
+      return rows.map((r: any) => ({ ...r, program: programByEvent.get(r.id) ?? [] }));
     }),
 
     /** Aluno confirma presença no evento. */
@@ -535,12 +764,31 @@ export const eventosRouters = {
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
       const studentId = await resolveStudentId(db, ctx);
       if (!studentId) throw new TRPCError({ code: "NOT_FOUND", message: "Perfil de aluno não encontrado." });
+      const orgId = ctx.user.organizationId!;
+
+      // AUDITORIA: só confirma evento da propria escola, vigente e ainda não realizado.
+      const [event] = await db.select({
+        id: events.id,
+        name: events.name,
+        status: events.status,
+        startsAt: events.startsAt,
+        createdByUserId: events.createdByUserId,
+      }).from(events)
+        .where(and(eq(events.id, input.eventId), eq(events.organizationId, orgId), eq(events.active, true)))
+        .limit(1);
+      if (!event) throw new TRPCError({ code: "NOT_FOUND", message: "Evento não encontrado." });
+      if (event.status === "cancelado" || event.status === "realizado") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Este evento não está mais disponível para confirmação." });
+      }
+      if (new Date(event.startsAt).getTime() < Date.now()) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "O evento já aconteceu — fale com a escola." });
+      }
 
       const [participant] = await db.select({ id: eventParticipants.id }).from(eventParticipants)
         .where(and(
           eq(eventParticipants.eventId, input.eventId),
           eq(eventParticipants.studentId, studentId),
-          eq(eventParticipants.organizationId, ctx.user.organizationId!),
+          eq(eventParticipants.organizationId, orgId),
         )).limit(1);
       if (!participant) throw new TRPCError({ code: "NOT_FOUND", message: "Você não é participante deste evento." });
 
@@ -549,6 +797,12 @@ export const eventosRouters = {
         confirmedAt: new Date(),
         updatedAt: new Date(),
       }).where(eq(eventParticipants.id, participant.id));
+
+      // AVISA a escola quem confirmou.
+      await notifyUser(event.createdByUserId, {
+        title: "Presença confirmada",
+        content: `${ctx.user.name || "Um aluno"} confirmou presença no evento "${event.name}".`,
+      }).catch(() => {});
 
       return { success: true };
     }),

@@ -6,7 +6,7 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { protectedProcedure, studentProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { coreografiaAlunos, coreografias, instruments, students, users } from "../../drizzle/schema";
+import { coreografiaAlunos, coreografias, eventChoreographies, instruments, students, users } from "../../drizzle/schema";
 import { ENV } from "../_core/env";
 import { extractYoutubeRef } from "../utils/youtubeUrl";
 
@@ -253,6 +253,8 @@ export const coreografiasRouters = {
       if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Coreografia não encontrada." });
 
       await db.delete(coreografiaAlunos).where(eq(coreografiaAlunos.coreografiaId, input.id));
+      // AUDITORIA: remove vínculos com eventos (evita contador "coreografias" órfão).
+      await db.delete(eventChoreographies).where(eq(eventChoreographies.coreografiaId, input.id));
       await db.delete(coreografias).where(eq(coreografias.id, input.id));
       return { success: true };
     }),

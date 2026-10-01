@@ -8,7 +8,7 @@ import { format } from "date-fns";
 import {
   Theater, Plus, Search, Pencil, Trash2, Users, Loader2, MapPin,
   CalendarDays, Music, X, UserPlus, ShieldCheck, CheckCircle2, Clock,
-  Shirt, ShoppingCart,
+  Shirt, ShoppingCart, ArrowUp, ArrowDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -367,7 +367,27 @@ function EventoDetalhes({ eventId, onClose }: { eventId: number | null; onClose:
   };
 
   const linkCoreografia = trpc.eventos.linkCoreografia.useMutation({
-    onSuccess: () => { toast.success("Coreografia vinculada!"); invalidate(); },
+    onSuccess: (result: any) => {
+      toast.success(result?.castImported
+        ? `Coreografia vinculada + ${result.castImported} aluno(s) do elenco importado(s)!`
+        : "Coreografia vinculada!");
+      invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const importCast = trpc.eventos.importCast.useMutation({
+    onSuccess: (result) => {
+      toast.success(result.added > 0
+        ? `${result.added} aluno(s) do elenco importado(s)!`
+        : "Todos os alunos do elenco já estão no evento.");
+      invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const reorderCoreografia = trpc.eventos.reorderCoreografia.useMutation({
+    onSuccess: () => invalidate(),
     onError: (error) => toast.error(error.message),
   });
 
@@ -415,17 +435,41 @@ function EventoDetalhes({ eventId, onClose }: { eventId: number | null; onClose:
             {/* Resumo */}
             <div className="flex flex-wrap gap-2 text-xs font-bold text-muted-foreground">
               <span className="flex items-center gap-1.5"><CalendarDays size={13} className="text-indigo-500" /> {data?.startsAt ? format(new Date(data.startsAt), "dd/MM/yyyy 'às' HH:mm") : "-"}</span>
+              {data?.endsAt && <span className="flex items-center gap-1.5"><Clock size={13} className="text-indigo-500" /> até {format(new Date(data.endsAt), "dd/MM 'às' HH:mm")}</span>}
               {data?.venueName && <span className="flex items-center gap-1.5"><MapPin size={13} className="text-indigo-500" /> {data.venueName}</span>}
+              {data?.venueAddress && <span className="flex items-center gap-1.5"><MapPin size={13} className="text-indigo-500" /> {data.venueAddress}</span>}
+              <span className="flex items-center gap-1.5"><CheckCircle2 size={13} className="text-emerald-500" /> {participantes.filter((p: any) => p.status === "confirmado").length} confirmado(s)</span>
               <Badge variant="outline" className={cn("text-[10px] font-black", STATUS_META[data?.status ?? "planejado"]?.className)}>
                 {STATUS_META[data?.status ?? "planejado"]?.label}
               </Badge>
             </div>
 
+            {data?.description && (
+              <p className="text-sm font-medium text-muted-foreground leading-relaxed whitespace-pre-line -mt-4">
+                {data.description}
+              </p>
+            )}
+
             {/* Coreografias */}
             <div className="space-y-3">
-              <p className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                <Music size={14} /> Coreografias no programa ({coreografiasVinculadas.length})
-              </p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                  <Music size={14} /> Coreografias no programa ({coreografiasVinculadas.length})
+                </p>
+                {coreografiasVinculadas.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-[11px] font-bold"
+                    disabled={importCast.isPending}
+                    onClick={() => eventId && importCast.mutate({ eventId })}
+                    title="Adiciona ao evento todos os alunos do elenco das coreografias vinculadas"
+                  >
+                    {importCast.isPending ? <Loader2 size={13} className="animate-spin mr-1.5" /> : <UserPlus size={13} className="mr-1.5" />}
+                    Importar elenco
+                  </Button>
+                )}
+              </div>
 
               <div className="flex gap-2">
                 <Select
@@ -461,6 +505,26 @@ function EventoDetalhes({ eventId, onClose }: { eventId: number | null; onClose:
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-black text-foreground truncate">{coreografia.title}</p>
                         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{coreografia.formacao}</p>
+                      </div>
+                      <div className="flex flex-col -my-1 shrink-0">
+                        <button
+                          type="button"
+                          className="text-muted-foreground hover:text-indigo-600 disabled:opacity-30 p-0.5"
+                          disabled={reorderCoreografia.isPending || coreografia.ordem <= 1}
+                          onClick={() => reorderCoreografia.mutate({ id: coreografia.id, direction: "up" })}
+                          title="Subir no programa"
+                        >
+                          <ArrowUp size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          className="text-muted-foreground hover:text-indigo-600 disabled:opacity-30 p-0.5"
+                          disabled={reorderCoreografia.isPending || coreografia.ordem >= coreografiasVinculadas.length}
+                          onClick={() => reorderCoreografia.mutate({ id: coreografia.id, direction: "down" })}
+                          title="Descer no programa"
+                        >
+                          <ArrowDown size={13} />
+                        </button>
                       </div>
                       <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-rose-500" onClick={() => unlinkCoreografia.mutate({ id: coreografia.id })} title="Remover do evento">
                         <X size={15} />
@@ -1031,6 +1095,9 @@ export default function Eventos() {
                     <div className="flex flex-wrap gap-2 pt-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                       <span className="flex items-center gap-1"><Music size={11} /> {evento.coreografiasCount} coreografias</span>
                       <span className="flex items-center gap-1"><Users size={11} /> {evento.participantesCount} alunos</span>
+                      {evento.participantesCount > 0 && (
+                        <span className="flex items-center gap-1 text-emerald-600"><CheckCircle2 size={11} /> {evento.confirmadosCount} confirmados</span>
+                      )}
                     </div>
                     {evento.requiresAuthorization && evento.participantesCount > 0 && (
                       <p className={cn(

@@ -23,6 +23,7 @@ import {
   Bot,
   Target,
   Sparkles,
+  Theater,
   Image as ImageIcon
 } from "lucide-react";
 import { useLocation } from "wouter";
@@ -197,6 +198,7 @@ export default function StudentDashboard() {
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
   const { data: dashboard, isLoading } = trpc.studentPortal.getDashboard.useQuery();
   const { data: activePlan } = trpc.progress.getActiveStudyPlan.useQuery();
+  const { data: myEvents = [] } = trpc.eventos.myEvents.useQuery();
 
   // ── Plano diário: percentual, dia atual e estimativas ──────────────────────
   const planDays = useMemo(() => parseDaysCompleted(activePlan?.daysCompleted), [activePlan?.daysCompleted]);
@@ -259,6 +261,13 @@ export default function StudentDashboard() {
 
   const completedGoals = (dashboard?.recentGoals as any[] || []).filter((g) => g.status === 'concluido');
 
+  const nextEvent = useMemo(() => {
+    const upcoming = (myEvents as any[])
+      .filter((e) => new Date(e.startsAt).getTime() >= Date.now())
+      .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+    return upcoming[0] ?? null;
+  }, [myEvents]);
+
   return (
     <motion.div 
       variants={container}
@@ -305,6 +314,29 @@ export default function StudentDashboard() {
       <motion.div variants={item}>
         <RankingCard />
       </motion.div>
+
+      {/* 🎭 Próximo evento em que o aluno participa */}
+      {nextEvent && (
+        <motion.div
+          variants={item}
+          onClick={() => navigate("/aluno/eventos")}
+          className="cursor-pointer rounded-[1.75rem] border border-indigo-500/25 bg-gradient-to-r from-indigo-500/10 via-transparent to-fuchsia-500/10 p-5 flex items-center gap-4 hover:border-indigo-500/50 transition-all"
+        >
+          <div className="w-12 h-12 rounded-2xl bg-indigo-500/15 text-indigo-500 flex items-center justify-center shrink-0">
+            <Theater size={22} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500">Próximo evento</p>
+            <p className="text-base font-black text-foreground truncate">{nextEvent.name}</p>
+            <p className="text-xs font-semibold text-muted-foreground">
+              {format(new Date(nextEvent.startsAt), "dd/MM/yyyy 'às' HH:mm")}
+              {nextEvent.venueName ? ` · ${nextEvent.venueName}` : ""}
+              {nextEvent.participantStatus === "convidado" ? " · confirme sua presença" : ""}
+            </p>
+          </div>
+          <ChevronRight size={18} className="text-muted-foreground shrink-0" />
+        </motion.div>
+      )}
 
       {/* ⭐ Avaliação de Professor (ciclo aberto — sigilosa para o admin) */}
       <motion.div variants={item}>

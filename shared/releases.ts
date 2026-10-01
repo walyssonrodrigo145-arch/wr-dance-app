@@ -26,6 +26,19 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.10.01.20",
+    date: "2026-10-01",
+    title: "Eventos & Espetáculos: convites, programa e confirmações",
+    summary: "O evento agora avisa os participantes, traz o programa para o portal do aluno e o elenco da coreografia entra no evento com um clique.",
+    items: [
+      { type: "novo", title: "Convite e avisos automáticos", description: "Ao adicionar alunos ao evento (ou vincular uma coreografia), eles recebem o convite no portal e no WhatsApp (quando a escola usa o disparo automático). Confirmou? A escola é avisada. Cancelou o evento? Todos são avisados." },
+      { type: "novo", title: "Importar elenco da coreografia", description: "Vincular uma coreografia já traz os alunos do elenco automaticamente — acabou o evento com \"0 alunos\". Há também o botão \"Importar elenco\" para trazer todos de uma vez." },
+      { type: "novo", title: "Programa no portal do aluno", description: "O aluno vê a ordem das coreografias do evento na tela de Eventos e o próximo evento aparece direto no início do portal." },
+      { type: "melhoria", title: "Reordenar o programa e ver detalhes", description: "Setas para subir/descer coreografias na ordem de apresentação, contagem de confirmados, endereço, horário de término e descrição visíveis no evento." },
+      { type: "correcao", title: "Venda de figurino bloqueada em evento cancelado", description: "Se o evento for cancelado, a Loja impede novas vendas vinculadas a ele." },
+    ],
+  },
+  {
     version: "2026.10.01.19",
     date: "2026-10-01",
     title: "Segurança reforçada em todo o sistema",

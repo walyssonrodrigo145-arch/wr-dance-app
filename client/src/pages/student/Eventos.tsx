@@ -1,6 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Loader2, Theater, MapPin, CalendarDays, ShieldCheck, Clock, CheckCircle2 } from "lucide-react";
+import { Loader2, Theater, MapPin, CalendarDays, ShieldCheck, Clock, CheckCircle2, Music } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -68,6 +68,21 @@ function EventCard({ evento, onConfirm, confirming }: {
 
           {evento.description && (
             <p className="text-xs font-medium text-muted-foreground leading-relaxed line-clamp-3">{evento.description}</p>
+          )}
+
+          {(evento.program?.length ?? 0) > 0 && (
+            <div className="rounded-xl border border-border/70 bg-muted/30 p-3 space-y-1.5">
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                <Music size={12} className="text-indigo-500" /> Programa do evento
+              </p>
+              {evento.program.map((item: any, idx: number) => (
+                <p key={`${item.title}-${idx}`} className="text-xs font-bold text-foreground">
+                  <span className="text-indigo-500 mr-1.5">{idx + 1}.</span>
+                  {item.title}
+                  {item.formacao ? <span className="text-muted-foreground font-medium"> · {item.formacao}</span> : null}
+                </p>
+              ))}
+            </div>
           )}
 
           <div className="flex flex-wrap items-center gap-3 pt-1">

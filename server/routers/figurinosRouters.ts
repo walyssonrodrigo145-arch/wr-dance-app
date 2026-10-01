@@ -544,9 +544,13 @@ export const figurinosRouters = {
       }
 
       if (input.eventId != null) {
-        const [event] = await db.select({ id: events.id }).from(events)
+        const [event] = await db.select({ id: events.id, status: events.status }).from(events)
           .where(and(eq(events.id, input.eventId), eq(events.organizationId, orgId))).limit(1);
         if (!event) throw new TRPCError({ code: "NOT_FOUND", message: "Evento não encontrado." });
+        // AUDITORIA: não vender figurino de evento cancelado.
+        if (event.status === "cancelado") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Este evento foi cancelado — a venda de figurinos está bloqueada." });
+        }
       }
 
       const [vendidos] = await db.select({ count: sql<number>`CAST(COALESCE(SUM(${costumeSales.quantity}), 0) AS INT)` })
