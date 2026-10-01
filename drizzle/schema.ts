@@ -2976,3 +2976,23 @@ export const npsResponses = pgTable("nps_responses", {
 export type NpsResponse = typeof npsResponses.$inferSelect;
 export type InsertNpsResponse = typeof npsResponses.$inferInsert;
 
+
+// ─── CALENDÁRIO ESCOLAR (feriados, recessos e eventos) ──────────────────────
+// Marcações da escola usadas na agenda mobile, na comunicação e no planejamento
+// (ex.: recesso de julho, Carnaval, ensaio geral, festival).
+export const schoolHolidays = pgTable("school_holidays", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").notNull(),
+  date: date("date").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  // "recesso" | "feriado_nacional" | "feriado_estadual" | "feriado_municipal" | "evento"
+  type: varchar("type", { length: 30 }).default("feriado_nacional").notNull(),
+  createdByUserId: integer("createdByUserId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdateFn(() => new Date()).notNull(),
+}, (table) => [
+  index("school_holidays_org_date_idx").on(table.organizationId, table.date),
+]);
+
+export type SchoolHoliday = typeof schoolHolidays.$inferSelect;
+export type InsertSchoolHoliday = typeof schoolHolidays.$inferInsert;

@@ -26,6 +26,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.10.01.22",
+    date: "2026-10-01",
+    title: "Agenda mobile nova + Calendário Escolar",
+    summary: "Agenda por mês, semana e dia no celular (com filtros e swipe) e o calendário de feriados/recessos/eventos aparece direto na agenda de toda a equipe.",
+    items: [
+      { type: "novo", title: "Agenda mobile repaginada", description: "No celular: visão por Mês/Semana/Dia, deslizar para trocar o período, pontinhos por status, filtros (professor, sala, modalidade, tipo e status) e botão flutuante para agendar no dia." },
+      { type: "novo", title: "Calendário Escolar em Configurações → Calendário", description: "Marque férias, recessos, feriados (nacionais com um clique) e eventos da escola — ensaio geral, festival, apresentação. Aparece na agenda com aviso no dia." },
+      { type: "novo", title: "Aula \"Em andamento\"", description: "A aula que está acontecendo agora ganha destaque na agenda e no modal do dia, com selo pulsante." },
+      { type: "melhoria", title: "Filtro de professor corrigido na agenda", description: "O filtro por professor agora casa com o usuário correto (antes podia não filtrar)." },
+    ],
+  },
+  {
     version: "2026.10.01.21",
     date: "2026-10-01",
     title: "Financeiro, aulas e portal mais confiáveis",

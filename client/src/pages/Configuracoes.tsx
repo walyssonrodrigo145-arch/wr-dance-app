@@ -19,11 +19,12 @@ import {
   User, Building2, Bell, Palette, Shield, Save,
   Sun, Moon, Phone, Mail,
   CheckCircle2, Loader2, Smartphone, Wallet, Sparkles, HelpCircle,
-  FileText, DollarSign, Percent, Receipt, Calculator, Calendar, Clock, Upload, Trash2, Image, ShoppingBag,
+  FileText, DollarSign, Percent, Receipt, Calculator, Calendar, CalendarDays, Clock, Upload, Trash2, Image, ShoppingBag,
   FileSignature, AlertTriangle, FlaskConical, GraduationCap, Repeat, FileCode2, MessageCircle
 } from "lucide-react";
 import { SUPPORT_WHATSAPP_URL, SUPPORT_WHATSAPP_DISPLAY } from "@/lib/support";
 import { RepositionsSettings } from "@/components/settings/RepositionsSettings";
+import { CalendarioEscolar } from "@/components/settings/CalendarioEscolar";
 import { AiPromptsSettings } from "@/components/settings/AiPromptsSettings";
 import { useTour } from "@/components/tour/TourProvider";
 import { SalasEstudioTab } from "./SalasEstudioTab";
@@ -44,11 +45,12 @@ import { PlanosBolsas } from "@/components/settings/PlanosBolsas";
 import { MyTicketsList } from "@/components/support/MyTicketsList";
 
 // ─── Tab types ───────────────────────────────────────────────────────────────
-type Tab = "perfil" | "escola" | "fiscal" | "salas" | "financeiro" | "loja" | "planos" | "modelos_contrato" | "notificacoes" | "aparencia" | "whatsapp" | "integracoes" | "ia" | "prompts" | "reposicoes" | "seguranca" | "ajuda";
+type Tab = "perfil" | "escola" | "calendario" | "fiscal" | "salas" | "financeiro" | "loja" | "planos" | "modelos_contrato" | "notificacoes" | "aparencia" | "whatsapp" | "integracoes" | "ia" | "prompts" | "reposicoes" | "seguranca" | "ajuda";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType; href?: string }[] = [
   { id: "perfil", label: "Perfil", icon: User },
   { id: "escola", label: "Escola", icon: Building2 },
+  { id: "calendario", label: "Calendário", icon: CalendarDays },
   { id: "salas", label: "Salas & Tablados", icon: Building2 },
   { id: "financeiro", label: "Financeiro", icon: DollarSign },
   { id: "loja", label: "Loja", icon: ShoppingBag },
@@ -1110,6 +1112,11 @@ export default function Configuracoes() {
             )}
 
             {/* ── ABA: FISCAL (NFS-e FOCUS) ── */}
+            {/* ── ABA: CALENDÁRIO ESCOLAR (Feriados/Recessos/Eventos) ── */}
+            {activeTab === "calendario" && (
+              <CalendarioEscolar />
+            )}
+
             {activeTab === "fiscal" && (
               <ConfigFiscalTab />
             )}

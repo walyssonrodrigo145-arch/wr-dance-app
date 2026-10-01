@@ -890,6 +890,21 @@ export async function runAutoMigrations() {
       { table: 'costume_sales', sql: `ALTER TABLE "costume_sales" ADD COLUMN IF NOT EXISTS "paymentLink" text` },
       { table: 'costume_sales', sql: `ALTER TABLE "costume_sales" ADD COLUMN IF NOT EXISTS "pixPayload" text` },
       { table: 'costume_sales', sql: `CREATE INDEX IF NOT EXISTS "costume_sales_external_idx" ON "costume_sales" ("externalPaymentId")` },
+
+      // ═══ Calendário Escolar: feriados, recessos e eventos (agenda mobile) ═══
+      { table: 'school_holidays', sql: `
+        CREATE TABLE IF NOT EXISTS "school_holidays" (
+          "id" serial PRIMARY KEY NOT NULL,
+          "organizationId" integer NOT NULL,
+          "date" date NOT NULL,
+          "name" varchar(255) NOT NULL,
+          "type" varchar(30) DEFAULT 'feriado_nacional' NOT NULL,
+          "createdByUserId" integer,
+          "createdAt" timestamp DEFAULT now() NOT NULL,
+          "updatedAt" timestamp DEFAULT now() NOT NULL
+        )
+      ` },
+      { table: 'school_holidays', sql: `CREATE INDEX IF NOT EXISTS "school_holidays_org_date_idx" ON "school_holidays" ("organizationId", "date")` },
     ];
 
     for (const m of migrations) {

@@ -4,6 +4,8 @@ import { ptBR } from "date-fns/locale";
 import { Plus, CalendarDays, X } from "lucide-react";
 import LessonCard from "@/components/LessonCard";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { isLessonInProgress } from "@shared/agenda";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 
 interface Lesson {
@@ -77,14 +79,27 @@ export default function DayLessonsModal({
           {/* Lessons List */}
           <div className="space-y-3 overflow-y-auto flex-1 pr-1">
             {lessons.length > 0 ? (
-              lessons.map((l) => (
-                <LessonCard
-                  key={l.id}
-                  lesson={l}
-                  onStatusChange={onStatusChange}
-                  onClick={() => onOpenDetail(l)}
-                />
-              ))
+              lessons.map((l) => {
+                const inProgress = isLessonInProgress(l);
+                return (
+                  <div
+                    key={l.id}
+                    className={cn("relative rounded-[1.5rem] md:rounded-[2.2rem]", inProgress && "ring-2 ring-amber-400/50")}
+                  >
+                    {inProgress && (
+                      <span className="absolute -top-2.5 left-5 z-10 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500 text-white text-[9px] font-black uppercase tracking-widest shadow-sm">
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                        Em andamento
+                      </span>
+                    )}
+                    <LessonCard
+                      lesson={l}
+                      onStatusChange={onStatusChange}
+                      onClick={() => onOpenDetail(l)}
+                    />
+                  </div>
+                );
+              })
             ) : (
               <div className="py-16 flex flex-col items-center justify-center text-center bg-muted/5 rounded-[2rem] border border-dashed border-border/20">
                 <CalendarDays size={40} className="mb-3 text-muted-foreground/30" />

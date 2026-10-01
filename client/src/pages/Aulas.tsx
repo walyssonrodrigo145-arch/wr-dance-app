@@ -41,6 +41,7 @@ import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { useBreakpoint } from "@/hooks/useBreakpoint";
 import { Button } from "@/components/ui/button";
 import { DAYS_SHORT, STATUS_CHIP_MAP, AULA_STATUS_CONFIG, RECURRENCE_CARD_CONFIG, LessonCardDesktop } from "@/components/aulas/LessonCardDesktop";
+import MobileAgenda from "@/components/aulas/MobileAgenda";
 
 type CalendarView = "mes" | "semana" | "dia" | "eventos";
 
@@ -1054,145 +1055,14 @@ export default function Aulas() {
   // MOBILE / TABLET LAYOUT (PREMIUM DESIGN)
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      {/* Date Selector Strip */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between px-2">
-           <h2 className="text-sm font-black text-foreground uppercase tracking-widest">{format(selectedDate, "MMMM yyyy", { locale: ptBR })}</h2>
-           <div className="flex gap-2">
-              <button onClick={() => setSelectedDate(addDays(selectedDate, -7))} className="w-8 h-8 rounded-lg bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-blue-600 transition-colors"><ChevronRight className="rotate-180" size={16} /></button>
-              <button onClick={() => setSelectedDate(addDays(selectedDate, 7))} className="w-8 h-8 rounded-lg bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-blue-600 transition-colors"><ChevronRight size={16} /></button>
-           </div>
-        </div>
-        <div className="flex items-center justify-between gap-1 overflow-x-auto no-scrollbar bg-card p-2 rounded-[2rem] shadow-sm border border-border">
-          {weekDaysMobile.map((day, i) => {
-            const isActive = isSameDay(day, selectedDate);
-            return (
-              <button key={i} onClick={() => setSelectedDate(day)} className={cn("flex flex-col items-center gap-2 min-w-[55px] flex-1 py-4 rounded-2xl transition-all relative", isActive ? "bg-blue-600 text-white shadow-xl" : "text-muted-foreground hover:bg-muted")}>
-                <span className={cn("text-[9px] font-black uppercase tracking-widest", isActive ? "text-white/80" : "text-muted-foreground")}>{format(day, "eee", { locale: ptBR }).slice(0, 3)}</span>
-                <span className="text-sm font-black tracking-tight">{format(day, "d")}</span>
-                {isActive && <div className="absolute -bottom-1.5 w-1.5 h-1.5 bg-card rounded-full shadow-[0_0_10px_#fff]" />}
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Filter Chips */}
-      <section className="flex flex-wrap items-center gap-2">
-        {["Todas", "Hoje", "Agendadas", "Concluídas", "Canceladas"].map(chip => (
-          <button key={chip} onClick={() => setStatusFilterMobile(chip)} className={cn("px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm border", statusFilterMobile === chip ? "bg-blue-600 text-white border-blue-600 shadow-blue-200" : "bg-card text-muted-foreground border-border hover:border-blue-200 hover:text-blue-600")}>{chip}</button>
-        ))}
-        <div className="h-6 w-[1px] bg-border mx-1" />
-        {[
-          { id: "todos", label: "Modalidades" },
-          { id: "individual", label: "Indiv." },
-          { id: "turma", label: "Turma" }
-        ].map(t => (
-          <button key={t.id} onClick={() => setLessonTypeFilter(t.id)} className={cn("px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm border", lessonTypeFilter === t.id ? "bg-purple-600 text-white border-purple-600" : "bg-card text-muted-foreground border-border hover:border-purple-200 hover:text-purple-600")}>{t.label}</button>
-        ))}
-      </section>
-
-      {/* Lesson Grid */}
-      <section className="space-y-6">
-        <div className="flex items-center justify-between px-2">
-           <h3 className="text-[11px] font-black text-foreground uppercase tracking-widest">Aulas de {isToday(selectedDate) ? "hoje" : format(selectedDate, "dd 'de' MMMM", { locale: ptBR })}</h3>
-           <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest bg-card border border-border px-3 py-1 rounded-full shadow-sm">{filteredLessons.length} aulas</span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-8">
-          <AnimatePresence mode="popLayout">
-            {isLoading ? Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-56 rounded-[2.5rem] bg-card border border-border animate-pulse" />) : filteredLessons.length === 0 ? (
-              <div className="col-span-full py-24 text-center bg-card rounded-[2.5rem] border border-dashed border-border"><Calendar size={48} className="mx-auto text-slate-100 mb-4" /><p className="text-xs font-black text-muted-foreground uppercase tracking-widest">Nenhuma aula encontrada</p></div>
-            ) : (
-              filteredLessons.sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()).map(lesson => {
-                const isTurma = lesson.lessonType === 'turma';
-                const config = AULA_STATUS_CONFIG[lesson.status as keyof typeof AULA_STATUS_CONFIG] || AULA_STATUS_CONFIG.agendada;
-                // Destaque de recorrência (mesmo modelo do desktop): pintura completa do card
-                const recurrenceConfig = !isTurma && lesson.recurrence ? RECURRENCE_CARD_CONFIG[lesson.recurrence as string] : undefined;
-                const titleText = isTurma ? (lesson.title || "Turma") : (lesson.studentName || lesson.experimentalName || "Aula");
-
-                // Pintura completa do card (mesmas cores do desktop — AULA_STATUS_CONFIG)
-                const cardStyle = isTurma
-                  ? (lesson.status === 'concluida'
-                      ? "bg-emerald-50 dark:bg-emerald-950 border-emerald-300/80 dark:border-emerald-800/60 border-l-emerald-600"
-                      : lesson.status === 'falta'
-                      ? "bg-amber-50 dark:bg-amber-950 border-amber-300/80 dark:border-amber-800/60 border-l-amber-600"
-                      : "bg-purple-50 dark:bg-purple-950 border-purple-300/80 dark:border-purple-800/60 border-l-purple-600")
-                  : recurrenceConfig
-                  ? recurrenceConfig.cardStyle
-                  : `${config.cardBg} ${config.border}`;
-
-                return (
-                  <motion.div key={lesson.id} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} whileHover={{ scale: 1.01 }} className={cn("group rounded-2xl p-3.5 border border-l-4 shadow-sm transition-all cursor-pointer flex flex-col justify-between min-h-[180px] min-w-0 overflow-hidden", cardStyle)} onClick={() => setDetailLessonId(lesson.id)}>
-                    <div className="flex items-start justify-between mb-3 gap-2 flex-wrap">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className={cn("w-1.5 h-6 rounded-full shrink-0", isTurma ? "bg-purple-600" : config.badgeBg.split(" ")[0])} />
-                        <span className="text-lg font-black text-foreground tracking-tighter">{safeFormat(lesson.scheduledAt, "HH:mm")}</span>
-                      </div>
-                      <div className="flex flex-col items-end gap-1.5">
-                        <span className={cn(
-                          "inline-flex items-center gap-1 min-w-0 max-w-full rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-widest border shadow-sm",
-                          isTurma
-                            ? lesson.status === 'concluida'
-                              ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-                              : lesson.status === 'falta'
-                              ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
-                              : "bg-purple-500/10 text-purple-600 border-purple-500/20"
-                            : recurrenceConfig
-                            ? recurrenceConfig.chip
-                            : config.badgeBg
-                        )}>
-                          {isTurma ? (
-                            <span className="truncate">
-                              {lesson.status === 'concluida'
-                                ? `✓ Concluída`
-                                : lesson.status === 'falta'
-                                ? `Turma • Falta`
-                                : `Turma (${lesson.studentCount || 1} Alunos)`}
-                            </span>
-                          ) : (
-                            config.label
-                          )}
-                        </span>
-                        {recurrenceConfig && (
-                          <span className={cn("inline-flex rounded-md px-2 py-0.5 text-[9px] font-black uppercase shadow-xs", recurrenceConfig.chip)}>
-                            {recurrenceConfig.label}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <h4 className="text-sm font-black text-foreground leading-tight group-hover:text-blue-600 transition-colors">{titleText}</h4>
-                      <div className="flex items-center gap-4 flex-wrap">
-                         <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest"><Music size={14} className="text-blue-500" /> {lesson.instrumentName || "Geral"}</div>
-                         {lesson.studioRoomName && (
-                           <div className="flex items-center gap-2 text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest bg-indigo-500/10 px-2.5 py-0.5 rounded-full border border-indigo-500/20">
-                             <LayoutList size={12} className="text-indigo-500" /> {lesson.studioRoomName}
-                           </div>
-                         )}
-                         {isTurma && (
-                           <div className="flex items-center gap-2 text-[10px] font-bold text-purple-600 uppercase tracking-widest"><Users size={14} className="text-purple-500" /> {lesson.studentCount} Alunos na turma</div>
-                         )}
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between mt-6 pt-4 border-t border-black/5 dark:border-white/5">
-                       <button className="text-[11px] font-black text-blue-600 uppercase tracking-widest hover:underline flex items-center gap-1.5">Chamada / Detalhes <ChevronRight size={14} /></button>
-                       <button className="w-10 h-10 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground transition-colors"><MoreVertical size={20} /></button>
-                    </div>
-                  </motion.div>
-                );
-              })
-            )}
-          </AnimatePresence>
-        </div>
-      </section>
-
-      <div className="fixed bottom-[104px] right-6 z-30">
-        <motion.button id="tour-new-lesson" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setAgendarOpen(true)} className="bg-[#2563EB] text-white w-14 h-14 rounded-full flex items-center justify-center shadow-[0_8px_30px_rgba(37,99,235,0.5)] group relative overflow-hidden">
-          <Plus size={26} strokeWidth={3} className="relative z-10" />
-        </motion.button>
-      </div>
+    <div className="animate-in fade-in duration-500">
+      {/* AUDITORIA: agenda mobile unificada (mês/semana/dia, filtros e calendário escolar) */}
+      <MobileAgenda
+        lessons={lessons}
+        isLoading={isLoading}
+        onOpenLesson={(id) => setDetailLessonId(id)}
+        onOpenAgendar={(date) => { setSelectedDate(date); setAgendarOpen(true); }}
+      />
 
       <AgendarModal open={agendarOpen} onOpenChange={(open) => { setAgendarOpen(open); if (!open) setEditingLesson(null); }} editingLesson={editingLesson} initialDate={selectedDate} />
       <LessonDetailModal 
