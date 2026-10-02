@@ -290,11 +290,6 @@ export default function Aulas() {
     return eachDayOfInterval({ start, end });
   }, [currentDate]);
 
-  const weekDaysMobile = useMemo(() => {
-    const start = startOfWeek(selectedDate, { weekStartsOn: 1 });
-    return Array.from({ length: 7 }, (_, i) => addDays(start, i));
-  }, [selectedDate]);
-
   // Unused stats removed for expanded calendar layout
 
   const handleDeleteRequest = (id: number) => {

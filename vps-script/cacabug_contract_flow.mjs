@@ -1,5 +1,6 @@
-// CAÇA-BUG (runtime em produção): endereço completo da aluna + variáveis de contrato.
-// Uso: node vps-script/_tmp_cacabug_contract.mjs
+// CAÇA-BUG (runtime em produção): probe reutilizável de endereço completo + variáveis de contrato.
+// Uso fresca: node vps-script/cacabug_contract_flow.mjs  |  Reuso: SCHOOL_EMAIL=... SCHOOL_PASS=... node ...
+
 import { createTRPCProxyClient, httpBatchLink } from "@trpc/client";
 import superjson from "superjson";
 import zlib from "node:zlib";
