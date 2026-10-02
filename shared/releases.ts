@@ -26,6 +26,19 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.10.01.23",
+    date: "2026-10-01",
+    title: "Endereço completo da aluna + variáveis de contrato simples",
+    summary: "Cadastro da aluna agora tem endereço completo (CEP com busca automática) e o contrato preenche endereço, RG, prazos e valores — inclusive com variáveis de nome simples, no estilo Emusys.",
+    items: [
+      { type: "novo", title: "Endereço completo no cadastro da aluna", description: "CEP (busca automática em ViaCEP/BrasilAPI), logradouro, número, complemento, bairro, cidade e UF — usados no contrato e na nota fiscal. Fica no cadastro/edição da aluna (Alunos → Nova aluna / Editar)." },
+      { type: "novo", title: "Contrato preenchido com endereço completo", description: "O endereço da aluna e da escola entram montados por extenso no contrato (logradouro, número, complemento, bairro, cidade/UF e CEP), no lugar de um texto solto." },
+      { type: "novo", title: "Variáveis simples no editor de modelos", description: "Além das variáveis técnicas, agora existem atalhos com nome amigável (ex.: \"Nome do Contratante\", \"Cidade da Escola\", \"Data de hoje Por Extenso\", \"Valor da Parcela sem Desconto\", \"Meses de aula\", \"Quantidade de Aulas no Total\") — clique e insira." },
+      { type: "novo", title: "Prazos e valores automáticos", description: "O contrato calcula meses de aula, quantidade de aulas no total (pelo plano da aluna), data inicial/final por extenso, número do contrato de adesão e data de hoje." },
+      { type: "melhoria", title: "Busca de variáveis e grupos", description: "As variáveis do contrato ficaram organizadas por assunto (aluna, endereço, responsável, escola, valores/prazos) com campo de busca." },
+    ],
+  },
+  {
     version: "2026.10.01.22",
     date: "2026-10-01",
     title: "Agenda mobile nova + Calendário Escolar",

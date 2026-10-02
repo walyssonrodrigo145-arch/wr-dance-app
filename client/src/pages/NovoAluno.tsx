@@ -224,6 +224,13 @@ export default function NovoAluno() {
     email: "",
     phone: "",
     address: "",
+    fiscalCep: "",
+    fiscalStreet: "",
+    fiscalNumber: "",
+    fiscalComplement: "",
+    fiscalNeighborhood: "",
+    fiscalCity: "",
+    fiscalState: "",
     professorId: "",
     instrumentId: "",
     studioRoomId: "",
@@ -247,6 +254,55 @@ export default function NovoAluno() {
     matriculas: [] as MatriculaForm[],
   });
 
+  // ── Endereço completo (contrato): busca de CEP (ViaCEP com fallback BrasilAPI) ──
+  const [cepLoading, setCepLoading] = useState(false);
+  const formatCep = (value: string) => {
+    const digits = String(value || "").replace(/\D/g, "").slice(0, 8);
+    return digits.length > 5 ? digits.slice(0, 5) + "-" + digits.slice(5) : digits;
+  };
+  const lookupCep = async (raw: string) => {
+    const clean = String(raw || "").replace(/\D/g, "");
+    if (clean.length !== 8) return;
+    setCepLoading(true);
+    try {
+      let data: any = null;
+      try {
+        const res = await fetch("https://viacep.com.br/ws/" + clean + "/json/");
+        data = await res.json();
+        if (data?.erro) data = null;
+      } catch {
+        data = null;
+      }
+      if (!data) {
+        try {
+          const res2 = await fetch("https://brasilapi.com.br/api/cep/v1/" + clean);
+          const d2: any = await res2.json();
+          if (d2?.cep) data = { logradouro: d2.street, bairro: d2.neighborhood, localidade: d2.city, uf: d2.state };
+        } catch {
+          data = null;
+        }
+      }
+      if (!data) {
+        toast.error("CEP não encontrado. Confira o número digitado.");
+        return;
+      }
+      setForm(prev => ({
+        ...prev,
+        fiscalCep: formatCep(clean),
+        fiscalStreet: data.logradouro || prev.fiscalStreet,
+        fiscalNeighborhood: data.bairro || prev.fiscalNeighborhood,
+        fiscalCity: data.localidade || prev.fiscalCity,
+        fiscalState: String(data.uf || prev.fiscalState || "").toUpperCase(),
+      }));
+      toast.success("Endereço preenchido pelo CEP!");
+    } catch {
+      toast.error("Não foi possível buscar o CEP agora. Tente novamente.");
+    } finally {
+      setCepLoading(false);
+    }
+  };
+  const UF_LIST = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
+
   // Pre-populate form when editing
   useEffect(() => {
     if (isEditMode && studentData) {
@@ -261,6 +317,13 @@ export default function NovoAluno() {
         email: studentData.email ?? "",
         phone: studentData.phone ?? "",
         address: (studentData as any).address ?? "",
+        fiscalCep: (studentData as any).fiscalCep ?? "",
+        fiscalStreet: (studentData as any).fiscalStreet ?? "",
+        fiscalNumber: (studentData as any).fiscalNumber ?? "",
+        fiscalComplement: (studentData as any).fiscalComplement ?? "",
+        fiscalNeighborhood: (studentData as any).fiscalNeighborhood ?? "",
+        fiscalCity: (studentData as any).fiscalCity ?? "",
+        fiscalState: (studentData as any).fiscalState ?? "",
         professorId: studentData.professorId ? String(studentData.professorId) : "",
         instrumentId: studentData.instrumentId ? String(studentData.instrumentId) : "",
         studioRoomId: (studentData as any).studioRoomId ? String((studentData as any).studioRoomId) : "",
@@ -735,6 +798,13 @@ export default function NovoAluno() {
           email: form.email.trim() || undefined,
           phone: form.phone || undefined,
           address: form.address || undefined,
+          fiscalCep: form.fiscalCep || undefined,
+          fiscalStreet: form.fiscalStreet || undefined,
+          fiscalNumber: form.fiscalNumber || undefined,
+          fiscalComplement: form.fiscalComplement || undefined,
+          fiscalNeighborhood: form.fiscalNeighborhood || undefined,
+          fiscalCity: form.fiscalCity || undefined,
+          fiscalState: form.fiscalState || undefined,
           professorId: form.professorId ? Number(form.professorId) : undefined,
           instrumentId: form.instrumentId ? Number(form.instrumentId) : undefined,
           studioRoomId: form.studioRoomId ? Number(form.studioRoomId) : undefined,
@@ -964,6 +1034,13 @@ export default function NovoAluno() {
       cpf: form.cpf || undefined,
       rg: form.rg || undefined,
       address: form.address || undefined,
+      fiscalCep: form.fiscalCep || undefined,
+      fiscalStreet: form.fiscalStreet || undefined,
+      fiscalNumber: form.fiscalNumber || undefined,
+      fiscalComplement: form.fiscalComplement || undefined,
+      fiscalNeighborhood: form.fiscalNeighborhood || undefined,
+      fiscalCity: form.fiscalCity || undefined,
+      fiscalState: form.fiscalState || undefined,
       guardianName: form.guardianName.trim() || undefined,
       guardianPhone: form.guardianPhone.replace(/\D/g, "") || undefined,
       guardianEmail: form.guardianEmail.trim() || undefined,
@@ -1305,6 +1382,110 @@ export default function NovoAluno() {
                     />
                     <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/70 group-focus-within/input:text-blue-500 transition-colors" size={18} />
                   </div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* CARD — Endereço Completo (usado no contrato e na NF) */}
+            <motion.div variants={cardVariants} className="bg-card rounded-[2rem] p-8 shadow-sm border border-blue-500/20 bg-blue-500/5 hover:shadow-xl hover:shadow-blue-500/5 transition-all duration-500">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
+                  <MapPin size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-foreground tracking-tight">Endereço Completo</h3>
+                  <p className="text-[10px] text-blue-600/70 font-bold uppercase tracking-[0.2em]">Contrato • Nota fiscal</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em] ml-1">CEP</label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="00000-000"
+                      value={form.fiscalCep}
+                      onChange={(e) => {
+                        const masked = formatCep(e.target.value);
+                        handleInputChange('fiscalCep', masked);
+                        if (masked.replace(/\D/g, "").length === 8) lookupCep(masked);
+                      }}
+                      className="h-12 rounded-xl border-border bg-muted/30 focus:bg-background transition-all text-sm font-semibold"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => lookupCep(form.fiscalCep)}
+                      disabled={cepLoading}
+                      className="h-12 rounded-xl font-bold shrink-0"
+                    >
+                      {cepLoading ? <Loader2 size={16} className="animate-spin" /> : "Buscar"}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2 md:col-span-3">
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em] ml-1">Logradouro (Rua/Av.)</label>
+                  <Input
+                    placeholder="Rua das Acácias"
+                    value={form.fiscalStreet}
+                    onChange={(e) => handleInputChange('fiscalStreet', e.target.value)}
+                    className="h-12 rounded-xl border-border bg-muted/30 focus:bg-background transition-all text-sm font-semibold"
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-1">
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em] ml-1">Número</label>
+                  <Input
+                    placeholder="123"
+                    value={form.fiscalNumber}
+                    onChange={(e) => handleInputChange('fiscalNumber', e.target.value)}
+                    className="h-12 rounded-xl border-border bg-muted/30 focus:bg-background transition-all text-sm font-semibold"
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em] ml-1">Complemento</label>
+                  <Input
+                    placeholder="Apto 12 / Casa 05"
+                    value={form.fiscalComplement}
+                    onChange={(e) => handleInputChange('fiscalComplement', e.target.value)}
+                    className="h-12 rounded-xl border-border bg-muted/30 focus:bg-background transition-all text-sm font-semibold"
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em] ml-1">Bairro</label>
+                  <Input
+                    placeholder="Centro"
+                    value={form.fiscalNeighborhood}
+                    onChange={(e) => handleInputChange('fiscalNeighborhood', e.target.value)}
+                    className="h-12 rounded-xl border-border bg-muted/30 focus:bg-background transition-all text-sm font-semibold"
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-1">
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em] ml-1">UF</label>
+                  <select
+                    value={form.fiscalState}
+                    onChange={(e) => handleInputChange('fiscalState', e.target.value)}
+                    className="w-full h-12 rounded-xl border border-border bg-muted/30 px-3 text-sm font-semibold focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
+                  >
+                    <option value="">--</option>
+                    {UF_LIST.map((uf) => (
+                      <option key={uf} value={uf}>{uf}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2 md:col-span-1">
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em] ml-1">Cidade</label>
+                  <Input
+                    placeholder="São Paulo"
+                    value={form.fiscalCity}
+                    onChange={(e) => handleInputChange('fiscalCity', e.target.value)}
+                    className="h-12 rounded-xl border-border bg-muted/30 focus:bg-background transition-all text-sm font-semibold"
+                  />
                 </div>
               </div>
             </motion.div>

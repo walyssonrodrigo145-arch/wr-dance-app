@@ -11,7 +11,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 const DEFAULT_TEMPLATE_CONTENT = `CONTRATO DE PRESTAÇÃO DE SERVIÇOS EDUCACIONAIS
 
-Pelo presente instrumento particular, de um lado {{school_name}}, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº {{school_cnpj}}, com sede em {{school_address}}, doravante denominada CONTRATADA, e de outro lado {{student_name}}, inscrito(a) no CPF sob o nº {{student_cpf}}, residente em {{student_address}}, doravante denominado(a) CONTRATANTE, têm entre si justo e acertado o presente Contrato de Prestação de Serviços Educacionais, que se regerá pelas seguintes cláusulas:
+Pelo presente instrumento particular, de um lado {{school_name}}, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº {{school_cnpj}}, com sede em {{school_address}}, doravante denominada CONTRATADA, e de outro lado {{student_name}}, portador(a) do RG nº {{student_rg}}, inscrito(a) no CPF sob o nº {{student_cpf}}, residente e domiciliado(a) em {{student_address}}, doravante denominado(a) CONTRATANTE, têm entre si justo e acertado o presente Contrato de Prestação de Serviços Educacionais, que se regerá pelas seguintes cláusulas:
 
 CLÁUSULA 1ª — DO OBJETO
 O presente contrato tem como objeto a prestação de serviços educacionais de aulas de {{instrument}}, ministradas pela CONTRATADA ao CONTRATANTE, conforme grade pedagógica da instituição.
@@ -48,7 +48,7 @@ Pelo presente instrumento particular, de um lado {{school_name}}, pessoa jurídi
 
 CONTRATANTE / RESPONSÁVEL LEGAL:
 Nome: {{guardian_name}}
-CPF: {{guardian_cpf}}
+CPF: {{guardian_cpf}} • RG: {{guardian_rg}}
 Telefone: {{guardian_phone}} • E-mail: {{guardian_email}}
 Endereço: {{guardian_address}}
 
@@ -192,6 +192,11 @@ export interface ContractVariablesInput {
   schoolCity?: string | null;
   schoolPhone?: string | null;
   schoolEmail?: string | null;
+  schoolStreet?: string | null;
+  schoolNumber?: string | null;
+  schoolDistrict?: string | null;
+  schoolCep?: string | null;
+  schoolState?: string | null;
   studentName: string;
   studentCpf?: string | null;
   studentRg?: string | null;
@@ -199,6 +204,13 @@ export interface ContractVariablesInput {
   studentEmail?: string | null;
   studentPhone?: string | null;
   studentAddress?: string | null;
+  studentCep?: string | null;
+  studentStreet?: string | null;
+  studentNumber?: string | null;
+  studentComplement?: string | null;
+  studentDistrict?: string | null;
+  studentCity?: string | null;
+  studentState?: string | null;
   guardianName?: string | null;
   guardianCpf?: string | null;
   guardianRg?: string | null;
@@ -207,9 +219,14 @@ export interface ContractVariablesInput {
   guardianAddress?: string | null;
   instrument?: string | null;
   monthlyFee?: string | null;
+  monthlyFeeFull?: string | null;
   dueDay?: string | null;
   startDate?: string | null;
   endDate?: string | null;
+  /** Aulas por semana do plano do aluno (usado em "Quantidade de Aulas no Total"). */
+  lessonsPerWeek?: number | null;
+  /** Número do contrato de adesão (ex.: 000123/2026). */
+  contractNumber?: string | null;
 }
 
 export function buildContractVariables(input: ContractVariablesInput): Record<string, string> {
@@ -219,32 +236,164 @@ export function buildContractVariables(input: ContractVariablesInput): Record<st
     if (!y || !m || !day) return d;
     return `${day}/${m}/${y}`;
   };
+  const MONTHS_PT = [
+    "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+  ];
+  const fmtDateLong = (d?: string | null) => {
+    if (!d) return "____ de __________ de ______";
+    const [y, m, day] = String(d).slice(0, 10).split("-");
+    const monthName = MONTHS_PT[Number(m) - 1];
+    if (!y || !monthName || !day) return d;
+    return `${Number(day)} de ${monthName} de ${y}`;
+  };
+  const todayIso = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const monthsBetween = (start?: string | null, end?: string | null): number | null => {
+    if (!start || !end) return null;
+    const s = new Date(String(start).slice(0, 10) + "T12:00:00");
+    const e = new Date(String(end).slice(0, 10) + "T12:00:00");
+    if (isNaN(s.getTime()) || isNaN(e.getTime()) || e <= s) return null;
+    const months = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
+    return Math.max(1, Math.round(months));
+  };
+  const contractMonths = monthsBetween(input.startDate, input.endDate);
+  const lessonsPerWeek = input.lessonsPerWeek && input.lessonsPerWeek > 0 ? input.lessonsPerWeek : null;
+  const totalLessons = contractMonths != null && lessonsPerWeek != null
+    ? Math.round(contractMonths * lessonsPerWeek * 4)
+    : null;
+
+  // Endereço completo do contratante montado a partir dos campos estruturados.
+  const hasStructuredStudent = Boolean(input.studentStreet || input.studentNumber || input.studentDistrict || input.studentCep);
+  const studentAddressFull = (hasStructuredStudent
+    ? [
+        [input.studentStreet, input.studentNumber].filter(Boolean).join(", "),
+        input.studentComplement,
+        input.studentDistrict,
+        [input.studentCity, input.studentState].filter(Boolean).join("/"),
+        input.studentCep ? `CEP ${input.studentCep}` : null,
+      ].filter(Boolean).join(" — ")
+    : null)
+    || input.studentAddress
+    || [input.studentCity, input.studentState].filter(Boolean).join("/")
+    || null;
+
+  // Endereço da escola: estruturado (organizations) com fallback para o texto livre.
+  const hasStructuredSchool = Boolean(input.schoolStreet || input.schoolNumber || input.schoolDistrict || input.schoolCep);
+  const schoolAddressFull = (hasStructuredSchool
+    ? [
+        [input.schoolStreet, input.schoolNumber].filter(Boolean).join(", "),
+        input.schoolDistrict,
+        [input.schoolCity, input.schoolState].filter(Boolean).join("/"),
+        input.schoolCep ? `CEP ${input.schoolCep}` : null,
+      ].filter(Boolean).join(" — ")
+    : null)
+    || [input.schoolAddress, input.schoolCity].filter(Boolean).join(", ")
+    || [input.schoolCity, input.schoolState].filter(Boolean).join("/")
+    || null;
+
+  const cityState = [input.schoolCity, input.schoolState].filter(Boolean).join(" - ")
+    || [input.studentCity, input.studentState].filter(Boolean).join(" - ")
+    || "__________";
+
+  const contractNumber = input.contractNumber || "__________";
+  const contractYear = String(new Date().getFullYear());
+  const fee = input.monthlyFee || "__________";
+  const feeFull = input.monthlyFeeFull || input.monthlyFee || "__________";
+
   return {
+    // ── Chaves técnicas (compatibilidade) ──
     school_name: input.schoolName || "A escola",
     school_cnpj: input.schoolCnpj || "__________",
-    school_address: [input.schoolAddress, input.schoolCity].filter(Boolean).join(", ") || "__________",
+    school_address: schoolAddressFull || "__________",
     school_phone: input.schoolPhone || "__________",
     school_email: input.schoolEmail || "__________",
+    school_cep: input.schoolCep || "__________",
+    school_street: input.schoolStreet || "__________",
+    school_number: input.schoolNumber || "__________",
+    school_district: input.schoolDistrict || "__________",
+    school_city: input.schoolCity || "__________",
+    school_state: input.schoolState || "__________",
     student_name: input.studentName,
     student_cpf: input.studentCpf || "__________",
     student_rg: input.studentRg || "__________",
     student_birth_date: fmtDate(input.studentBirthDate),
     student_email: input.studentEmail || "__________",
     student_phone: input.studentPhone || "__________",
-    student_address: input.studentAddress || "__________",
+    student_address: studentAddressFull || "__________",
+    student_cep: input.studentCep || "__________",
+    student_street: input.studentStreet || "__________",
+    student_number: input.studentNumber || "__________",
+    student_complement: input.studentComplement || "",
+    student_district: input.studentDistrict || "__________",
+    student_city: input.studentCity || "__________",
+    student_state: input.studentState || "__________",
     guardian_name: input.guardianName || input.studentName || "__________",
     guardian_cpf: input.guardianCpf || "__________",
     guardian_rg: input.guardianRg || "__________",
     guardian_phone: input.guardianPhone || input.studentPhone || "__________",
     guardian_email: input.guardianEmail || input.studentEmail || "__________",
-    guardian_address: input.guardianAddress || input.studentAddress || "__________",
+    guardian_address: input.guardianAddress || studentAddressFull || "__________",
     instrument: input.instrument || "dança",
     // Identidade de dança: {{modalidade}} é aceito como apelido de {{instrument}}
     modalidade: input.instrument || "dança",
-    monthly_fee: input.monthlyFee || "__________",
+    monthly_fee: fee,
+    monthly_fee_full: feeFull,
     due_date: input.dueDay || "10",
     contract_start_date: fmtDate(input.startDate),
     contract_end_date: fmtDate(input.endDate),
+    contract_start_date_long: fmtDateLong(input.startDate),
+    contract_end_date_long: fmtDateLong(input.endDate),
+    contract_months: contractMonths != null ? String(contractMonths) : "____",
+    contract_lessons_total: totalLessons != null ? String(totalLessons) : "____",
+    months_between: contractMonths != null ? String(contractMonths) : "____",
+    contract_number: contractNumber,
+    contract_year: contractYear,
+    today: fmtDate(todayIso),
+    today_long: fmtDateLong(todayIso),
+    city_state: cityState,
+
+    // ── Variáveis simples (estilo Emusys) — mesmo valor, nome amigável ──
+    "Nome do Contratante": input.studentName,
+    "CPF do Contratante": input.studentCpf || "__________",
+    "RG do Contratante": input.studentRg || "__________",
+    "Logradouro do Contratante": input.studentStreet || "__________",
+    "Número do Endereço do Contratante": input.studentNumber || "__________",
+    "Complemento do Contratante": input.studentComplement || "",
+    "Bairro do Contratante": input.studentDistrict || "__________",
+    "CEP do Contratante": input.studentCep || "__________",
+    "Cidade do Contratante": input.studentCity || "__________",
+    "Estado do Contratante": input.studentState || "__________",
+    "Endereço Completo do Contratante": studentAddressFull || "__________",
+    "Nome do Responsável": input.guardianName || input.studentName || "__________",
+    "CPF do Responsável": input.guardianCpf || "__________",
+    "Telefone do Responsável": input.guardianPhone || input.studentPhone || "__________",
+    "Nome do Aluno": input.studentName,
+    "Data de Nascimento do Aluno": fmtDate(input.studentBirthDate),
+    "Telefone do Aluno": input.studentPhone || "__________",
+    "E-mail do Aluno": input.studentEmail || "__________",
+    "Razão Social da Escola": input.schoolName || "A escola",
+    "CNPJ da Escola": input.schoolCnpj || "__________",
+    "Logradouro da Escola": input.schoolStreet || "__________",
+    "Número da Escola": input.schoolNumber || "__________",
+    "Bairro da Escola": input.schoolDistrict || "__________",
+    "CEP da Escola": input.schoolCep || "__________",
+    "Cidade da Escola": input.schoolCity || "__________",
+    "Estado da Escola": input.schoolState || "__________",
+    "Endereço da Escola": schoolAddressFull || "__________",
+    "Cidade da Escola - Estado da Escola": cityState,
+    "Modalidade": input.instrument || "dança",
+    "Valor da Mensalidade": fee,
+    "Valor da Parcela sem Desconto": feeFull,
+    "Dia do Vencimento": input.dueDay || "10",
+    "Data Inicial": fmtDate(input.startDate),
+    "Data Final": fmtDate(input.endDate),
+    "Meses de aula": contractMonths != null ? String(contractMonths) : "____",
+    "Meses de pagamento": contractMonths != null ? String(contractMonths) : "____",
+    "Quantidade de Aulas no Total": totalLessons != null ? String(totalLessons) : "____",
+    "Número do Contrato de Adesão": contractNumber,
+    "Ano Atual": contractYear,
+    "Data de Hoje": fmtDate(todayIso),
+    "Data de hoje Por Extenso": fmtDateLong(todayIso),
   };
 }
 
@@ -317,7 +466,7 @@ export async function prepareContractRender(
   templateId: number,
   opts: { startDate?: string | null; endDate?: string | null; monthlyFeeOverride?: string | null }
 ): Promise<PreparedContract> {
-  const { students, instruments, settings: settingsT, organizations: orgs, contractTemplates: templates } =
+  const { students, instruments, settings: settingsT, organizations: orgs, contractTemplates: templates, schoolPlans } =
     await import("../../drizzle/schema");
   const { eq, and } = await import("drizzle-orm");
 
@@ -367,26 +516,43 @@ export async function prepareContractRender(
   const [instrument] = student.instrumentId    ? await db.select().from(instruments).where(and(eq(instruments.id, student.instrumentId), eq(instruments.organizationId, orgId))).limit(1)
     : [null];
 
+  // Plano da aluna: alimenta "Quantidade de Aulas no Total" e "Valor da Parcela sem Desconto".
+  const [plan] = student.schoolPlanId
+    ? await db.select().from(schoolPlans).where(and(eq(schoolPlans.id, student.schoolPlanId), eq(schoolPlans.organizationId, orgId))).limit(1)
+    : [null];
+
   const monthlyFee = opts.monthlyFeeOverride ?? (student.monthlyFee as string | null) ?? null;
 
-  // ─── Constrói endereço completo do aluno a partir de múltiplos campos ──────
-  const studentAddressParts = [
-    student.address,
-    student.city,
-    student.state,
-  ].filter(Boolean);
-  const studentAddressFull = studentAddressParts.length > 0
-    ? studentAddressParts.join(", ")
-    : null;
+  // ─── Endereço completo estruturado do contratante (campos fiscais do aluno) ──
+  const studentAddressStructured = [
+    [(student as any).fiscalStreet, (student as any).fiscalNumber].filter(Boolean).join(", "),
+    (student as any).fiscalComplement,
+    (student as any).fiscalNeighborhood,
+    [(student as any).fiscalCity, (student as any).fiscalState].filter(Boolean).join("/"),
+    (student as any).fiscalCep ? `CEP ${(student as any).fiscalCep}` : null,
+  ].filter(Boolean).join(" — ");
+  const studentAddressFull = studentAddressStructured
+    || [student.address, (student as any).fiscalCity, (student as any).fiscalState].filter(Boolean).join(", ")
+    || null;
+
+  // Número do contrato de adesão: aluno + ano (ex.: 000123/2026).
+  const contractYear = new Date().getFullYear();
+  const contractNumber = `${String(student.id).padStart(6, "0")}/${contractYear}`;
 
   // ─── Fallback triplo: orgSettings (admin settings) → org (espelho) → placeholder
   const variables = buildContractVariables({
     schoolName:       orgSettings?.schoolName    || (org as any)?.name     || null,
     schoolCnpj:       schoolCnpjResolved,
     schoolAddress:    orgSettings?.schoolAddress || (org as any)?.address  || null,
-    schoolCity:      orgSettings?.schoolCity    || (org as any)?.city     || null,
+    schoolCity:      orgSettings?.schoolCity    || (org as any)?.addressCity || (org as any)?.city || null,
     schoolPhone:     orgSettings?.schoolPhone   || (org as any)?.phone    || null,
     schoolEmail:     orgSettings?.schoolEmail   || (org as any)?.email    || null,
+    // Endereço estruturado da escola (capturado no cadastro público — ViaCEP)
+    schoolStreet:    (org as any)?.addressStreet   || null,
+    schoolNumber:    (org as any)?.addressNumber   || null,
+    schoolDistrict:  (org as any)?.addressDistrict || null,
+    schoolCep:       (org as any)?.zipCode         || null,
+    schoolState:     (org as any)?.addressState    || null,
     studentName:     student.name,
     studentCpf:      student.cpf,
     studentRg:       student.rg,
@@ -394,6 +560,13 @@ export async function prepareContractRender(
     studentEmail:    student.email,
     studentPhone:    student.phone,
     studentAddress:  studentAddressFull,
+    studentCep:      (student as any).fiscalCep || null,
+    studentStreet:   (student as any).fiscalStreet || null,
+    studentNumber:   (student as any).fiscalNumber || null,
+    studentComplement: (student as any).fiscalComplement || null,
+    studentDistrict: (student as any).fiscalNeighborhood || null,
+    studentCity:     (student as any).fiscalCity || null,
+    studentState:    (student as any).fiscalState || null,
     guardianName:    student.guardianName || null,
     guardianCpf:     (student as any).guardianCpf || null,
     guardianRg:      (student as any).guardianRg || null,
@@ -402,9 +575,12 @@ export async function prepareContractRender(
     guardianAddress: (student as any).guardianAddress || studentAddressFull,
     instrument:      instrument?.name,
     monthlyFee,
+    monthlyFeeFull:  (plan as any)?.valorCheio ? String((plan as any).valorCheio) : monthlyFee,
+    lessonsPerWeek:  (plan as any)?.aulasPorSemana ?? null,
     dueDay:          student.dueDay ? String(student.dueDay) : "10",
     startDate:       opts.startDate,
     endDate:         opts.endDate,
+    contractNumber,
   });
 
   const pdfBuffer = await renderContractPdf(template.content || buildDefaultTemplateContent(), variables);

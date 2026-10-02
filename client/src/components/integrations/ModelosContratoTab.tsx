@@ -23,29 +23,82 @@ import {
 const BLOCK_TYPES = Object.keys(CONTRACT_BLOCK_LABELS) as ContractBlockType[];
 
 /** Variáveis suportadas pelo servidor (@server/services/contractService). */
-const AVAILABLE_VARIABLES = [
-  { tag: "{{school_name}}", label: "Nome da Escola" },
-  { tag: "{{school_cnpj}}", label: "CNPJ da Escola" },
-  { tag: "{{school_address}}", label: "Endereço da Escola" },
-  { tag: "{{school_email}}", label: "E-mail da Escola" },
-  { tag: "{{school_phone}}", label: "Telefone da Escola" },
-  { tag: "{{guardian_name}}", label: "Nome do Responsável" },
-  { tag: "{{guardian_cpf}}", label: "CPF do Responsável" },
-  { tag: "{{guardian_phone}}", label: "Telefone do Responsável" },
-  { tag: "{{guardian_email}}", label: "E-mail do Responsável" },
-  { tag: "{{guardian_address}}", label: "Endereço do Responsável" },
-  { tag: "{{student_name}}", label: "Nome do Aluno(a)" },
-  { tag: "{{student_cpf}}", label: "CPF do Aluno(a)" },
-  { tag: "{{student_rg}}", label: "RG do Aluno(a)" },
-  { tag: "{{student_birth_date}}", label: "Nascimento do Aluno(a)" },
-  { tag: "{{student_address}}", label: "Endereço do Aluno(a)" },
-  { tag: "{{student_email}}", label: "E-mail do Aluno(a)" },
-  { tag: "{{student_phone}}", label: "Telefone do Aluno(a)" },
-  { tag: "{{modalidade}}", label: "Modalidade / Curso" },
-  { tag: "{{monthly_fee}}", label: "Valor da Mensalidade" },
-  { tag: "{{due_date}}", label: "Dia do Vencimento" },
-  { tag: "{{contract_start_date}}", label: "Início do Contrato" },
-  { tag: "{{contract_end_date}}", label: "Término do Contrato" },
+const AVAILABLE_VARIABLES: { tag: string; label: string; group: string }[] = [
+  // ── Aluno(a) / Contratante ──
+  { group: "Aluno(a) · Contratante", tag: "{{student_name}}", label: "Nome do Aluno(a)" },
+  { group: "Aluno(a) · Contratante", tag: "{{student_cpf}}", label: "CPF do Aluno(a)" },
+  { group: "Aluno(a) · Contratante", tag: "{{student_rg}}", label: "RG do Aluno(a)" },
+  { group: "Aluno(a) · Contratante", tag: "{{student_birth_date}}", label: "Nascimento do Aluno(a)" },
+  { group: "Aluno(a) · Contratante", tag: "{{student_email}}", label: "E-mail do Aluno(a)" },
+  { group: "Aluno(a) · Contratante", tag: "{{student_phone}}", label: "Telefone do Aluno(a)" },
+  // ── Endereço do contratante ──
+  { group: "Endereço", tag: "{{student_cep}}", label: "CEP" },
+  { group: "Endereço", tag: "{{student_street}}", label: "Logradouro" },
+  { group: "Endereço", tag: "{{student_number}}", label: "Número" },
+  { group: "Endereço", tag: "{{student_complement}}", label: "Complemento" },
+  { group: "Endereço", tag: "{{student_district}}", label: "Bairro" },
+  { group: "Endereço", tag: "{{student_city}}", label: "Cidade" },
+  { group: "Endereço", tag: "{{student_state}}", label: "UF" },
+  { group: "Endereço", tag: "{{student_address}}", label: "Endereço Completo" },
+  // ── Responsável ──
+  { group: "Responsável", tag: "{{guardian_name}}", label: "Nome do Responsável" },
+  { group: "Responsável", tag: "{{guardian_cpf}}", label: "CPF do Responsável" },
+  { group: "Responsável", tag: "{{guardian_phone}}", label: "Telefone do Responsável" },
+  { group: "Responsável", tag: "{{guardian_email}}", label: "E-mail do Responsável" },
+  { group: "Responsável", tag: "{{guardian_address}}", label: "Endereço do Responsável" },
+  // ── Escola (Contratada) ──
+  { group: "Escola · Contratada", tag: "{{school_name}}", label: "Nome da Escola" },
+  { group: "Escola · Contratada", tag: "{{school_cnpj}}", label: "CNPJ da Escola" },
+  { group: "Escola · Contratada", tag: "{{school_cep}}", label: "CEP da Escola" },
+  { group: "Escola · Contratada", tag: "{{school_street}}", label: "Logradouro da Escola" },
+  { group: "Escola · Contratada", tag: "{{school_number}}", label: "Número da Escola" },
+  { group: "Escola · Contratada", tag: "{{school_district}}", label: "Bairro da Escola" },
+  { group: "Escola · Contratada", tag: "{{school_city}}", label: "Cidade da Escola" },
+  { group: "Escola · Contratada", tag: "{{school_state}}", label: "UF da Escola" },
+  { group: "Escola · Contratada", tag: "{{school_address}}", label: "Endereço Completo da Escola" },
+  { group: "Escola · Contratada", tag: "{{school_email}}", label: "E-mail da Escola" },
+  { group: "Escola · Contratada", tag: "{{school_phone}}", label: "Telefone da Escola" },
+  // ── Curso, valores e prazos ──
+  { group: "Curso · Valores · Prazos", tag: "{{modalidade}}", label: "Modalidade / Curso" },
+  { group: "Curso · Valores · Prazos", tag: "{{monthly_fee}}", label: "Valor da Mensalidade" },
+  { group: "Curso · Valores · Prazos", tag: "{{monthly_fee_full}}", label: "Valor da Parcela sem Desconto" },
+  { group: "Curso · Valores · Prazos", tag: "{{due_date}}", label: "Dia do Vencimento" },
+  { group: "Curso · Valores · Prazos", tag: "{{contract_start_date}}", label: "Data Inicial" },
+  { group: "Curso · Valores · Prazos", tag: "{{contract_end_date}}", label: "Data Final" },
+  { group: "Curso · Valores · Prazos", tag: "{{contract_months}}", label: "Meses de aula" },
+  { group: "Curso · Valores · Prazos", tag: "{{contract_lessons_total}}", label: "Quantidade de Aulas no Total" },
+  { group: "Curso · Valores · Prazos", tag: "{{contract_number}}", label: "Número do Contrato de Adesão" },
+  { group: "Curso · Valores · Prazos", tag: "{{contract_year}}", label: "Ano Atual" },
+  { group: "Curso · Valores · Prazos", tag: "{{today}}", label: "Data de Hoje" },
+  { group: "Curso · Valores · Prazos", tag: "{{today_long}}", label: "Data de hoje Por Extenso" },
+  { group: "Curso · Valores · Prazos", tag: "{{city_state}}", label: "Cidade - Estado (assinatura)" },
+  // ── Variáveis simples (nome amigável, mesmo valor — estilo Emusys) ──
+  { group: "Simples (texto pronto p/ colar)", tag: "{{Nome do Contratante}}", label: "Nome do Contratante" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{CPF do Contratante}}", label: "CPF do Contratante" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{RG do Contratante}}", label: "RG do Contratante" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{Logradouro do Contratante}}", label: "Logradouro do Contratante" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{Número do Endereço do Contratante}}", label: "Número do Endereço" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{Bairro do Contratante}}", label: "Bairro do Contratante" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{CEP do Contratante}}", label: "CEP do Contratante" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{Cidade do Contratante}}", label: "Cidade do Contratante" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{Estado do Contratante}}", label: "Estado do Contratante" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{Razão Social da Escola}}", label: "Razão Social da Escola" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{CNPJ da Escola}}", label: "CNPJ da Escola" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{Logradouro da Escola}}", label: "Logradouro da Escola" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{Número da Escola}}", label: "Número da Escola" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{Bairro da Escola}}", label: "Bairro da Escola" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{CEP da Escola}}", label: "CEP da Escola" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{Cidade da Escola}}", label: "Cidade da Escola" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{Estado da Escola}}", label: "Estado da Escola" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{Cidade da Escola - Estado da Escola}}", label: "Cidade da Escola - Estado da Escola" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{Data de hoje Por Extenso}}", label: "Data de hoje Por Extenso" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{Número do Contrato de Adesão}}", label: "Número do Contrato de Adesão" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{Valor da Parcela sem Desconto}}", label: "Valor da Parcela sem Desconto" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{Meses de aula}}", label: "Meses de aula" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{Quantidade de Aulas no Total}}", label: "Quantidade de Aulas no Total" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{Data Inicial}}", label: "Data Inicial" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{Data Final}}", label: "Data Final" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{Meses de pagamento}}", label: "Meses de pagamento" },
 ];
 
 function newBlockId(): string {
@@ -96,6 +149,7 @@ export function ModelosContratoTab() {
   const [blocks, setBlocks] = useState<ContractBlock[]>([]);
   const [preview, setPreview] = useState(false);
   const [selectedBlock, setSelectedBlock] = useState<number>(-1);
+  const [varFilter, setVarFilter] = useState("");
   const textareaRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
 
   const autoMutation = trpc.contractTemplates.autoInsertVariables.useMutation({
@@ -249,18 +303,38 @@ export function ModelosContratoTab() {
                   {autoMutation.isPending ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />} Auto-identificar
                 </Button>
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                {AVAILABLE_VARIABLES.map((v) => (
-                  <button
-                    key={v.tag}
-                    type="button"
-                    title={v.tag}
-                    onClick={() => insertVariable(v.tag)}
-                    className="px-2 py-1 rounded-lg border border-border/60 bg-background text-[10px] font-bold text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors"
-                  >
-                    {v.label}
-                  </button>
-                ))}
+              <Input
+                value={varFilter}
+                onChange={(e) => setVarFilter(e.target.value)}
+                placeholder="Buscar variável (ex.: cidade, contratante, data, valor)"
+                className="h-9 rounded-xl text-xs"
+              />
+              <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1 subtle-scrollbar">
+                {Array.from(new Set(AVAILABLE_VARIABLES.map((v) => v.group))).map((group) => {
+                  const q = varFilter.trim().toLowerCase();
+                  const items = AVAILABLE_VARIABLES.filter(
+                    (v) => v.group === group && (!q || v.label.toLowerCase().includes(q) || v.tag.toLowerCase().includes(q))
+                  );
+                  if (items.length === 0) return null;
+                  return (
+                    <div key={group}>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/70 mb-1.5">{group}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {items.map((v) => (
+                          <button
+                            key={v.tag}
+                            type="button"
+                            title={v.tag}
+                            onClick={() => insertVariable(v.tag)}
+                            className="px-2 py-1 rounded-lg border border-border/60 bg-background text-[10px] font-bold text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors"
+                          >
+                            {v.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

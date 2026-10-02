@@ -130,6 +130,14 @@ export const studentsRouters = {
         professorId: students.professorId,
         allowAutoReminders: students.allowAutoReminders,
         studioRoomId: students.studioRoomId,
+        // Endereço completo (contrato/NF)
+        fiscalCep: students.fiscalCep,
+        fiscalStreet: students.fiscalStreet,
+        fiscalNumber: students.fiscalNumber,
+        fiscalComplement: students.fiscalComplement,
+        fiscalNeighborhood: students.fiscalNeighborhood,
+        fiscalCity: students.fiscalCity,
+        fiscalState: students.fiscalState,
       }).from(students)
         .where(and(
           eq(students.id, input.id), 
@@ -452,6 +460,14 @@ export const studentsRouters = {
         return clean.length >= 5 && !/^0+$/.test(clean);
       }, "RG deve ter pelo menos 5 caracteres e não conter apenas zeros"),
       address: z.string().optional().nullable(),
+      // Endereço completo (contrato/NF): campos estruturados estilo Emusys
+      fiscalCep: z.string().max(20).optional().nullable(),
+      fiscalStreet: z.string().max(255).optional().nullable(),
+      fiscalNumber: z.string().max(50).optional().nullable(),
+      fiscalComplement: z.string().max(100).optional().nullable(),
+      fiscalNeighborhood: z.string().max(100).optional().nullable(),
+      fiscalCity: z.string().max(100).optional().nullable(),
+      fiscalState: z.string().max(2).optional().nullable(),
       guardianName: z.string().optional().nullable().refine((val) => {
         if (!val) return true;
         return /^[a-zA-ZáàâãéêíóôõúüçÁÀÂÃÉÊÍÓÔÕÚÜÇ\s]*$/.test(val);
@@ -536,6 +552,13 @@ export const studentsRouters = {
             cpf: input.cpf || undefined,
             rg: input.rg || undefined,
             address: input.address || undefined,
+            fiscalCep: input.fiscalCep || undefined,
+            fiscalStreet: input.fiscalStreet || undefined,
+            fiscalNumber: input.fiscalNumber || undefined,
+            fiscalComplement: input.fiscalComplement || undefined,
+            fiscalNeighborhood: input.fiscalNeighborhood || undefined,
+            fiscalCity: input.fiscalCity || undefined,
+            fiscalState: input.fiscalState ? String(input.fiscalState).toUpperCase().slice(0, 2) : undefined,
             guardianName: input.guardianName || undefined,
             guardianPhone: input.guardianPhone || undefined,
             guardianEmail: input.guardianEmail || undefined,
@@ -652,6 +675,14 @@ export const studentsRouters = {
         return clean.length >= 5 && !/^0+$/.test(clean);
       }, "RG deve ter pelo menos 5 caracteres e não conter apenas zeros"),
       address: z.string().optional().nullable(),
+      // Endereço completo (contrato/NF): campos estruturados estilo Emusys
+      fiscalCep: z.string().max(20).optional().nullable(),
+      fiscalStreet: z.string().max(255).optional().nullable(),
+      fiscalNumber: z.string().max(50).optional().nullable(),
+      fiscalComplement: z.string().max(100).optional().nullable(),
+      fiscalNeighborhood: z.string().max(100).optional().nullable(),
+      fiscalCity: z.string().max(100).optional().nullable(),
+      fiscalState: z.string().max(2).optional().nullable(),
       guardianName: z.string().optional().nullable().refine((val) => {
         if (!val) return true;
         return /^[a-zA-ZáàâãéêíóôõúüçÁÀÂÃÉÊÍÓÔÕÚÜÇ\s]*$/.test(val);
