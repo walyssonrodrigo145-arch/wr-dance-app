@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.git/
+.gitignore
+.env
+.env.*
+*.md
+.DS_Store
+uploads/
+vps-script/
+AUDITORIA_COMPLETA_2026-10.md
+PLANO_MELHORIAS_MUSICPRO_PARA_DANCEPRO.md

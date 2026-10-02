@@ -11,6 +11,7 @@ import { notifyOwner } from "./_core/notification";
 import { isSuperAdmin } from "./superAdminRouter";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
+import { checkFileMagicBytes } from "./utils/fileSecurity";
 
 export const supportRouter = router({
   // Upload de imagem anexa ao chamado (base64 → storage próprio → URL)
@@ -27,7 +28,11 @@ export const supportRouter = router({
       if (buffer.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "Arquivo vazio." });
       if (buffer.length > 8 * 1024 * 1024) throw new TRPCError({ code: "BAD_REQUEST", message: "Imagem maior que 8MB." });
       if (!input.fileType.startsWith("image/")) throw new TRPCError({ code: "BAD_REQUEST", message: "Envie apenas imagens (PNG/JPG)." });
-      const ext = (input.fileName.split(".").pop() || "png").replace(/[^a-zA-Z0-9]/g, "").slice(0, 8);
+      const ALLOWED = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
+      if (!ALLOWED.includes(input.fileType)) throw new TRPCError({ code: "BAD_REQUEST", message: "Formato não aceito. Envie JPG/PNG/WEBP/GIF." });
+      if (!checkFileMagicBytes(buffer, input.fileType)) throw new TRPCError({ code: "BAD_REQUEST", message: "O arquivo não corresponde ao formato informado." });
+      const extByMime: Record<string, string> = { "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
+      const ext = extByMime[input.fileType] || "jpg";
       const key = `support/org_${orgId}/user_${ctx.user.id}/${nanoid(10)}.${ext}`;
       const { url } = await storagePut(key, buffer, input.fileType);
       return { url };

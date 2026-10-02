@@ -55,6 +55,46 @@ import { FiscalService } from "../services/fiscal/FiscalService";
 import { loginAttempts, safeEqualStr, isReservedSuperAdminEmail, getOrgPlanLimits, syncOrgAsaasSubscription, reconcileOrgAsaasCharges, runCreateAssinafyContract } from "./helpers";
 import { createFileToken } from "../_core/fileTokens";
 
+/**
+ * AUDITORIA P1: usado por getLessons/getMaterials/getPayments — validava apenas
+ * que o usuário é autenticado, mas ignorava as permissões escolhidas pela escola
+ * (canSeeSchedule/canSeeFiles/canSeeFinanceiro/...). Reflete o MESMO padrão do
+ * getMessages (parsed.canSeeX === false → vazio). Retorna studentId ou null
+ * (null = sem permissão → endpoint devolve lista vazia).
+ */
+async function assertPortalPermission(
+  db: any,
+  ctx: { user: { studentId?: number | null; id: number; organizationId?: number | null; role?: string } },
+  flag: string,
+): Promise<number | null> {
+  if (ctx.user.role === "admin") return ctx.user.studentId ?? null;
+  let studentId = ctx.user.studentId ?? null;
+  if (!studentId) {
+    const [found] = await db.select({ id: students.id, permissions: students.permissions }).from(students)
+      .where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!))).limit(1);
+    if (!found) return null;
+    studentId = found.id;
+    if (found.permissions) {
+      try {
+        const parsed = JSON.parse(found.permissions);
+        if (parsed[flag] === false) return null;
+      } catch { /* permissão inválida = liberar */ }
+    }
+    return studentId;
+  }
+  const [row] = await db.select({ permissions: students.permissions }).from(students)
+    .where(eq(students.id, studentId)).limit(1);
+  if (row?.permissions) {
+    try {
+      const parsed = JSON.parse(row.permissions);
+      if (parsed[flag] === false) {
+        return null;
+      }
+    } catch { /* permissão inválida = liberar */ }
+  }
+  return studentId;
+}
+
 export const portalRouters = {
   chat: router({
     getMessages: protectedProcedure.input(z.object({ withUserId: z.number() })).query(async ({ ctx, input }) => {
@@ -402,8 +442,9 @@ export const portalRouters = {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
       
-      const studentId = ctx.user.studentId || (await db.select({ id: students.id }).from(students).where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!))).limit(1).then(res => res[0]?.id));
-      if (!studentId) throw new Error("Acesso não autorizado");
+      // AUDITORIA P1: permissão server-side (canSeeSchedule)
+      const studentId = await assertPortalPermission(db, ctx, "canSeeSchedule");
+      if (!studentId) return [];
 
       const orgId = ctx.user.organizationId!;
       const profUsers = aliasedTable(users, "less_prof_users");
@@ -471,8 +512,9 @@ export const portalRouters = {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
       
-      const studentId = ctx.user.studentId || (await db.select({ id: students.id }).from(students).where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!))).limit(1).then(res => res[0]?.id));
-      if (!studentId) throw new Error("Acesso não autorizado");
+      // AUDITORIA P1: permissão server-side (canSeeFiles)
+      const studentId = await assertPortalPermission(db, ctx, "canSeeFiles");
+      if (!studentId) return [];
 
       const orgId = ctx.user.organizationId!;
       return db.select().from(studentFiles).where(and(eq(studentFiles.studentId, studentId), eq(studentFiles.organizationId, orgId))).orderBy(desc(studentFiles.createdAt)).limit(100);
@@ -607,8 +649,9 @@ export const portalRouters = {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
       
-      const studentId = ctx.user.studentId || (await db.select({ id: students.id }).from(students).where(and(eq(students.studentUserId, ctx.user.id), eq(students.organizationId, ctx.user.organizationId!))).limit(1).then(res => res[0]?.id));
-      if (!studentId) throw new Error("Acesso não autorizado");
+      // AUDITORIA P1: permissão server-side (canSeeFinanceiro)
+      const studentId = await assertPortalPermission(db, ctx, "canSeeFinanceiro");
+      if (!studentId) return [];
 
       const orgId = ctx.user.organizationId!;
       return db.select().from(paymentDues).where(and(eq(paymentDues.studentId, studentId), eq(paymentDues.organizationId, orgId))).orderBy(desc(paymentDues.dueDate));

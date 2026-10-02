@@ -187,6 +187,7 @@ export const students = pgTable("students", {
   guardianPhone: varchar("guardianPhone", { length: 30 }),
   guardianEmail: varchar("guardianEmail", { length: 320 }),
   guardianCpf: varchar("guardianCpf", { length: 20 }),
+  guardianRg: varchar("guardianRg", { length: 30 }),
   avatar: text("avatar"),
   instrumentId: integer("instrumentId"),
   level: levelEnum("level").default("iniciante").notNull(),

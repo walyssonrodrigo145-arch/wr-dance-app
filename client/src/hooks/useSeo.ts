@@ -1,6 +1,9 @@
 import { useEffect } from "react";
 
-const SITE = "https://dancepro.wrmusicpro.com.br";
+// AUDITORIA: canonical/OG no domínio ATIVO (antes apontava p/ domínio morto)
+const SITE = typeof window !== "undefined"
+  ? window.location.origin
+  : (import.meta.env?.VITE_APP_URL ?? "https://dancepro.wrvsystems.com.br");
 
 type SeoOptions = {
   title: string;

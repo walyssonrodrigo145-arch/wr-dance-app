@@ -304,6 +304,24 @@ export const financeiroRouters = {
             .from(paymentDues)
             .where(and(eq(paymentDues.id, input.id), eq(paymentDues.organizationId, orgId)))
             .limit(1);
+          if (!due) throw new TRPCError({ code: "NOT_FOUND", message: "Mensalidade não encontrada" });
+
+          // AUDITORIA P0: posse OBRIGATÓRIA antes dos efeitos (cancelar cobrança
+          // de terceiro / limpar referências / persistir valores). Admin da
+          // escola opera qualquer fatura; professor só as dos seus alunos.
+          {
+            if (!(ctx.user.role === 'admin' || ctx.user.openId === ENV.ownerOpenId)) {
+              const [owner] = await db.select({ professorId: students.professorId })
+                .from(students)
+                .where(and(
+                  eq(students.id, due.studentId),
+                  eq(students.organizationId, orgId),
+                )).limit(1);
+              if (!owner || owner.professorId !== ctx.user.id) {
+                throw new TRPCError({ code: "FORBIDDEN", message: "Mensalidade não pertence aos seus alunos." });
+              }
+            }
+          }
 
           // AUDIT-P1 FIX (idempotência): se a mensalidade JÁ está paga, retornar sucesso
           // sem reexecutar efeitos colaterais (cancelar cobrança Asaas, disparar NFS-e,
@@ -323,15 +341,32 @@ export const financeiroRouters = {
             .where(and(eq(paymentDues.id, input.id), eq(paymentDues.organizationId, orgId)))
             .limit(1);
 
+          // AUDITORIA P0: posse OBRIGATÓRIA antes dos efeitos (cancelar cobrança
+          // de terceiro / limpar referências / persistir valores).
+          {
+            const isOwnerDue = (await db.select({ id: students.id })
+              .from(students)
+              .where(and(
+                eq(students.id, due.studentId),
+                eq(students.organizationId, orgId),
+                eq(students.professorId, ctx.user.id),
+              )).limit(1)).length > 0;
+            const isOwnerByUser = due.userId === ctx.user.id;
+            if (!isOwnerDue && !isOwnerByUser) {
+              throw new TRPCError({ code: "FORBIDDEN", message: "Mensalidade não pertence aos seus alunos." });
+            }
+          }
+
           // ── CRÍTICO-2 FIX: Cancelar cobrança aberta no Asaas ao dar baixa manual ──
           // Evita que o aluno pague novamente pelo link que ficou ativo
           // (AUDIT: o early-return acima já garante status !== 'pago' aqui)
           if (due?.asaasId) {
             try {
+              // AUDITORIA P1: credencial do DONO DA FATURA (não do operador).
               const [settingsData] = await db
                 .select({ asaasApiKey: settings.asaasApiKey })
                 .from(settings)
-                .where(eq(settings.userId, ctx.user.id))
+                .where(eq(settings.userId, due.userId))
                 .limit(1);
               const { deleteAsaasCharge } = await import('../utils/asaas');
               await deleteAsaasCharge(due.asaasId, settingsData?.asaasApiKey ? decryptSecret(settingsData.asaasApiKey) : undefined);
@@ -812,27 +847,22 @@ export const financeiroRouters = {
             // Base já existe: lança apenas a taxa da 1ª mensalidade, se ainda não lançada
             if (isFirstMonth && extra > 0) {
               const marker = `[Taxa] ${input.firstMonthExtraNotes || "Taxa de matrícula"}`;
-              const [extraDup] = await db.select({ id: paymentDues.id }).from(paymentDues)
+              const [extraDup] = await db.select({ id: paymentDues.id, amount: paymentDues.amount, originalAmount: paymentDues.originalAmount, notes: paymentDues.notes }).from(paymentDues)
                 .where(and(
                   eq(paymentDues.organizationId, orgId),
                   eq(paymentDues.studentId, input.studentId),
                   eq(paymentDues.month, month),
                   eq(paymentDues.year, y),
-                  sql`${paymentDues.notes} LIKE '[Taxa]%'`,
                 )).limit(1);
-              if (!extraDup) {
-                rows.push({
-                  organizationId: orgId,
-                  userId: ctx.user.id,
-                  studentId: input.studentId,
-                  amount: extra.toFixed(2),
-                  dueDate: d.dueDateISO,
-                  month,
-                  year: y,
-                  status: 'pendente' as const,
-                  notes: marker,
-                  billingPeriodicity: periodicity,
-                });
+              // AUDITORIA: com o índice único (org+aluno+mês+ano), NÃO é possível
+              // inserir 2ª fatura do mês. A taxa entra SOMADA na fatura existente.
+              if (extraDup && !String(extraDup.notes || "").includes("[Taxa]")) {
+                await db.update(paymentDues).set({
+                  amount: (Number(extraDup.amount ?? 0) + Number(extra)).toFixed(2),
+                  originalAmount: String(Number(extraDup.originalAmount ?? extraDup.amount ?? 0) + Number(extra)),
+                  notes: [extraDup.notes, marker + " R$ " + Number(extra).toFixed(2)].filter(Boolean).join(" • "),
+                  updatedAt: new Date(),
+                }).where(eq(paymentDues.id, extraDup.id));
               }
             }
             continue; // pular duplicados

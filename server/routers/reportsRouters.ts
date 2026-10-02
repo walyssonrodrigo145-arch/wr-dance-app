@@ -509,6 +509,10 @@ export const reportsRouters = {
           throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem criar professores" });
         }
 
+        if (isReservedSuperAdminEmail(input.email)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Este e-mail é reservado para a administração da plataforma." });
+        }
+
         const existingUser = await db.select().from(users).where(and(eq(users.email, input.email), eq(users.organizationId, orgId))).limit(1);
         if (existingUser.length > 0) {
           throw new TRPCError({ code: "CONFLICT", message: "E-mail já cadastrado nesta organização" });

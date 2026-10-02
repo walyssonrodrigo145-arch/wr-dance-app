@@ -505,6 +505,7 @@ export default function LessonDetailModal({
         <TurmaAttendanceModal
           turmaId={(lesson as any)?.turmaId ?? null}
           turmaName={lesson?.title}
+          lessonId={lesson?.id}
           open={isAttendanceOpen}
           onOpenChange={setIsAttendanceOpen}
         />

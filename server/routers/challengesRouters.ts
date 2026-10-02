@@ -6,6 +6,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
+import { checkFileMagicBytes } from "../utils/fileSecurity";
 import { protectedProcedure, studentProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import {
@@ -462,8 +463,21 @@ export const challengesRouter = router({
     const base64 = input.base64Data.includes(",") ? input.base64Data.split(",")[1] : input.base64Data;
     const buffer = Buffer.from(base64, "base64");
     if (buffer.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "Arquivo vazio." });
-    if (buffer.length > 60 * 1024 * 1024) throw new TRPCError({ code: "BAD_REQUEST", message: "Arquivo maior que 60MB." });
-    const ext = (input.fileName.split(".").pop() || "bin").replace(/[^a-zA-Z0-9]/g, "").slice(0, 8);
+    if (buffer.length > 20 * 1024 * 1024) throw new TRPCError({ code: "BAD_REQUEST", message: "Arquivo maior que 20MB." });
+    // AUDITORIA P0 (anti-XSS): extensão derivada do TIPO REAL (assinado por
+    // magic bytes) — nunca do nome do arquivo; e bloqueia extensões executáveis.
+    const MEDIA: Record<string, string> = {
+      "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png",
+      "image/webp": "webp", "image/gif": "gif", "image/heic": "heic",
+      "video/mp4": "mp4", "video/quicktime": "mov",
+      "application/pdf": "pdf",
+      "audio/mpeg": "mp3", "audio/wav": "wav", "audio/mp4": "m4a",
+    };
+    if (!MEDIA[input.fileType]) throw new TRPCError({ code: "BAD_REQUEST", message: "Formato não aceito (imagem/vídeo/áudio/PDF)." });
+    if (!checkFileMagicBytes(buffer, input.fileType)) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "O arquivo não corresponde ao formato informado." });
+    }
+    const ext = MEDIA[input.fileType];
     const key = `challenges/org_${orgId}/student_${ctx.user.studentId ?? ctx.user.id}/${nanoid(8)}.${ext}`;
     const { url } = await storagePut(key, buffer, input.fileType);
     return { url };

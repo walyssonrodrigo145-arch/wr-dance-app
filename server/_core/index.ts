@@ -1365,6 +1365,7 @@ async function startServer() {
           "'self'",
           "https://*.wrmusicpro.com.br",
           "https://wrmusicpro.com.br",
+          "https://*.wrvsystems.com.br",
           "capacitor://localhost",
           "http://localhost:*",
         ],
@@ -1381,6 +1382,8 @@ async function startServer() {
   }));
   const allowedOrigins = [
     process.env.APP_URL,
+    "https://dancepro.wrvsystems.com.br",
+    "https://wrvsystems.com.br",
     "https://wrmusicpro.com.br",
     "https://www.wrmusicpro.com.br",
     "https://leads.wrmusicpro.com.br",
@@ -1537,7 +1540,7 @@ async function startServer() {
 
   // SEO público: sitemap dinâmico (a partir do conteúdo de @shared/seo) e robots
   app.get("/sitemap.xml", (_req, res) => {
-    const base = (ENV.appUrl || "https://dancepro.wrmusicpro.com.br").replace(/\/+$/, "");
+    const base = (ENV.appUrl || "https://dancepro.wrvsystems.com.br").replace(/\/+$/, "");
     const urls = SEO_PATHS.map((p) =>
       `  <url><loc>${base}${p}</loc><changefreq>weekly</changefreq><priority>${p === "/" ? "1.0" : "0.7"}</priority></url>`
     ).join("\n");
@@ -1547,7 +1550,7 @@ async function startServer() {
   });
 
   app.get("/robots.txt", (_req, res) => {
-    const base = (ENV.appUrl || "https://dancepro.wrmusicpro.com.br").replace(/\/+$/, "");
+    const base = (ENV.appUrl || "https://dancepro.wrvsystems.com.br").replace(/\/+$/, "");
     res.type("text/plain").send(
       `User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /painel/\nSitemap: ${base}/sitemap.xml\n`
     );

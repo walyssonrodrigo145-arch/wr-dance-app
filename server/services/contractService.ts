@@ -558,6 +558,22 @@ export async function prepareContractRender(
   const contractYear = new Date().getFullYear();
   const contractNumber = `${String(student.id).padStart(6, "0")}/${contractYear}`;
 
+  // ─── AUDITORIA P1: CONTRACT NUNCA NUNCA sai com datas em branco ───
+  // Sem vigência: PDF inconclusivo com "____/____/________" e meses/aulas "____".
+  // Default: startDate = hoje (BRT); endDate = hoje + duracaoMeses do plano (ou 12).
+  let effStartDate = opts.startDate || null;
+  let effEndDate = opts.endDate || null;
+  const planMonths = ((plan as any)?.duracaoMeses && Number((plan as any).duracaoMeses)) || 12;
+  const brToday = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  if (!effStartDate) effStartDate = brToday;
+  if (!effEndDate) {
+    const d = new Date(effStartDate.slice(0, 10) + "T12:00:00");
+    if (!isNaN(d.getTime())) {
+      d.setMonth(d.getMonth() + planMonths);
+      effEndDate = d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+    }
+  }
+
   // ─── Fallback triplo: orgSettings (admin settings) → org (espelho) → placeholder
   const variables = buildContractVariables({
     schoolName:       orgSettings?.schoolName    || (org as any)?.name     || null,
@@ -600,8 +616,8 @@ export async function prepareContractRender(
     monthlyFeeFull:  (plan as any)?.valorCheio ? String((plan as any).valorCheio) : monthlyFee,
     lessonsPerWeek:  (plan as any)?.aulasPorSemana ?? null,
     dueDay:          student.dueDay ? String(student.dueDay) : "10",
-    startDate:       opts.startDate,
-    endDate:         opts.endDate,
+    startDate:       effStartDate,
+    endDate:         effEndDate,
     contractNumber,
   });
 

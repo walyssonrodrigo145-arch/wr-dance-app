@@ -464,8 +464,8 @@ export async function applyScholarshipLateFullValue(): Promise<ScholarshipLateRe
     if (todayStr <= limiteStr) continue;
 
     if (row.asaasId || row.mpPaymentId) {
-      // ── Fatura já emitida em gateway: COMPLEMENTO da diferença (dedup POR FATURA de origem) ──
-      // AUDITORIA (DP-025): dedup antigo por aluno+mês+ano impedia complemento de uma 2ª fatura.
+      // ── Fatura já emitida em gateway: COMPLEMENTO da diferença ──
+      // AUDITORIA: dedup antigo por aluno+mês+ano impedia complemento de uma 2ª fatura.
       const [dup] = await db.select({ id: paymentDues.id }).from(paymentDues)
         .where(_and(
           _eq(paymentDues.organizationId, row.organizationId),
@@ -476,19 +476,20 @@ export async function applyScholarshipLateFullValue(): Promise<ScholarshipLateRe
         ))
         .limit(1);
       if (dup) continue;
-      await db.insert(paymentDues).values({
-        organizationId: row.organizationId,
-        userId: row.userId,
-        studentId: row.studentId,
-        amount: (valorCheio - amountAtual).toFixed(2),
-        dueDate: row.dueDate,
-        month: row.month,
-        year: row.year,
-        status: 'pendente' as const,
-        notes: `Complemento valor cheio — Plano ${plan.nome} (ref #${row.id}, atraso após dia ${limiteDia})`,
-        billingPeriodicity: 'mensal',
-      });
-      result.complements++;
+      // AUDITORIA P0 (índice único org+aluno+mês+ano): NÃO é possível inserir
+      // a 2ª fatura do mesmo mês — o INSERT anterior violava o índice e o
+      // complemento NUNCA era cobrado. Fatura por gateway agora SOMA o
+      // complemento na própria fatura (igual ao ramo interno).
+      if ((row.notes || "").includes("Valor cheio aplicado")) continue;
+      await db.update(paymentDues).set({
+        amount: valorCheio.toFixed(2),
+        originalAmount: row.originalAmount ?? amountAtual.toFixed(2),
+        notes: [row.notes, `Complemento valor cheio — Plano ${plan.nome} (atraso após dia ${limiteDia})`].filter(Boolean).join(" • "),
+        updatedAt: new Date(),
+      }).where(_eq(paymentDues.id, row.id));
+      result.adjusted++;
+      // IMPORTANTE: cobrança enviada ao gateway pode ficar com valor antigo.
+      // O operador deve cancelar/regenerar o link; sinalizamos via note acima.
     } else {
       // ── Fatura apenas interna: ajusta o valor na própria fatura ──
       if ((row.notes || "").includes("Valor cheio aplicado")) continue;

@@ -257,10 +257,14 @@ export async function saveTurmaAttendance(
   entries: Array<{ studentId: number; status: "presente" | "ausente" | "justificado" }>,
   markedByUserId: number,
 ) {
-  const [session] = await db.select({ id: lessons.id, turmaId: lessons.turmaId }).from(lessons)
+  const [session] = await db.select({ id: lessons.id, turmaId: lessons.turmaId, status: lessons.status }).from(lessons)
     .where(and(eq(lessons.id, lessonId), eq(lessons.organizationId, organizationId), isNotNull(lessons.turmaId)))
     .limit(1);
   if (!session) throw new Error("Aula de turma não encontrada.");
+  // AUDITORIA CAÇA-BUG: não "ressuscitar" aula cancelada via chamada
+  if (session.status === "cancelada") {
+    throw new Error("Esta aula está cancelada — reative a aula ou agende outra antes de registrar presenças.");
+  }
 
   const roster = await db.select({ studentId: turmaAlunos.studentId }).from(turmaAlunos)
     .where(and(

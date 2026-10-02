@@ -81,6 +81,9 @@ export const lessonsRouters = {
         lessonType: lessons.lessonType,
         recurringGroupId: lessons.recurringGroupId,
         recurrence: lessons.recurrence,
+        // AUDITORIA CAÇA-BUG: necessário para o modal abrir a Chamada da turma
+        // (sessão de grade) em vez da UI antiga por aluno.
+        turmaId: lessons.turmaId,
         studioRoomId: lessons.studioRoomId,
         studioRoomName: studioRooms.name,
         studioRoomColor: studioRooms.color,
@@ -194,6 +197,7 @@ export const lessonsRouters = {
               lessonType: lessons.lessonType,
               recurringGroupId: lessons.recurringGroupId,
               recurrence: lessons.recurrence,
+              turmaId: lessons.turmaId,
               studioRoomId: lessons.studioRoomId,
               studioRoomName: studioRooms.name,
               studioRoomColor: studioRooms.color,
@@ -721,6 +725,7 @@ export const lessonsRouters = {
           duration: lessons.duration,
           lessonType: lessons.lessonType,
           recurringGroupId: lessons.recurringGroupId,
+          turmaId: lessons.turmaId,
           studioRoomId: lessons.studioRoomId,
           status: lessons.status,
           studentProfessorId: students.professorId,
@@ -736,6 +741,15 @@ export const lessonsRouters = {
           )).limit(1);
         if (!currentLesson) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Aula não encontrada ou você não tem permissão." });
+        }
+
+        // AUDITORIA CAÇA-BUG: sessão de GRADE é gerenciada pela Chamada da turma
+        // (por aluna) — não por troca de status individual/série aqui.
+        if ((currentLesson as any).turmaId) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Esta é uma aula de turma. Use a Chamada da turma para presenças ou gere/cancele aulas pela Turma.",
+          });
         }
 
         const updateData: any = {

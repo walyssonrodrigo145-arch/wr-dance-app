@@ -1463,7 +1463,9 @@ export async function upsertUser(user: InsertUser, maxRetries = 3): Promise<void
         user.role = "admin";
       }
 
-      const superAdminEmails = ['walyssonrodrigo145@gmail.com', 'ddwvitor@gmail.com'];
+      // AUDITORIA P0: super admins definidos SÓ por variável de ambiente
+      // (SUPER_ADMIN_EMAIL(S)); nunca por lista hardcoded no código.
+      const superAdminEmails: string[] = ENV.superAdminEmails;
       const isAdminEmail = user.email?.toLowerCase() && superAdminEmails.includes(user.email.toLowerCase());
       const isOwner = user.openId === ENV.ownerOpenId || isAdminEmail;
 
@@ -1806,6 +1808,8 @@ export async function getRecentLessons(
     studentId: students.id,
     lessonType: lessons.lessonType,
     recurringGroupId: lessons.recurringGroupId,
+    // AUDITORIA CAÇA-BUG: agenda precisa de turmaId para abrir a Chamada
+    turmaId: lessons.turmaId,
     // CAÇA-BUG: a agenda (lessons.list sem input) usa getRecentLessons — sem
     // recurrence aqui, o card nunca recebia o destaque quinzenal/mensal.
     recurrence: lessons.recurrence,

@@ -29,6 +29,8 @@ type Props = {
   turmaName?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** AUDITORIA CAÇA-BUG: agenda passa a SESSÃO específica (não sempre hoje). */
+  lessonId?: number | null;
 };
 
 const STATUS_META: Record<AttendanceStatus, { label: string; short: string; cls: string; icon: typeof Check }> = {
@@ -38,7 +40,7 @@ const STATUS_META: Record<AttendanceStatus, { label: string; short: string; cls:
 };
 
 /** Chamada da turma: lista os alunos matriculados e registra presença por aluno. */
-export function TurmaAttendanceModal({ turmaId, turmaName, open, onOpenChange }: Props) {
+export function TurmaAttendanceModal({ turmaId, turmaName, open, onOpenChange, lessonId: lessonIdProp }: Props) {
   const utils = trpc.useUtils();
   const [statuses, setStatuses] = useState<Record<number, AttendanceStatus>>({});
   const [showAdd, setShowAdd] = useState(false);
@@ -47,8 +49,11 @@ export function TurmaAttendanceModal({ turmaId, turmaName, open, onOpenChange }:
   const [addScope, setAddScope] = useState<"single" | "upcoming">("single");
   const [removing, setRemoving] = useState<{ studentId: number; name: string; isExtra: boolean } | null>(null);
 
-  const today = trpc.turmas.todayLesson.useQuery({ id: turmaId! }, { enabled: open && !!turmaId });
-  const lessonId = today.data?.lesson?.id ?? null;
+  // AUDITORIA CAÇA-BUG: quando o modal abre por uma AULA específica (agenda),
+  // usa ESSA sessão — antes ignorava e sempre gravava na aula de HOJE.
+  const today = trpc.turmas.todayLesson.useQuery({ id: turmaId! }, { enabled: open && !!turmaId && !lessonIdProp });
+  const lessonId = (lessonIdProp ?? today.data?.lesson?.id ?? null) as number | null;
+  const lessonIsCancelled = today.data?.lesson && (today.data.lesson as any).status === "cancelada";
 
   const attendance = trpc.turmaAttendance.get.useQuery(
     { lessonId: lessonId! },

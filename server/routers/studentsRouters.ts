@@ -318,6 +318,12 @@ export const studentsRouters = {
       const orgId = ctx.user.organizationId!;
       debugLog(`[TRPC] Enabling portal access for student: ${input.studentId} requested by: ${ctx.user.id}`);
 
+      // AUDITORIA P0: e-mail reservado não pode gerar usuário de portal (escala a Super Admin).
+      const resolvedEmail = input.email || null;
+      if (resolvedEmail && isReservedSuperAdminEmail(resolvedEmail)) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: "Este e-mail é reservado para a administração da plataforma." });
+      }
+
       const [student] = await db.select().from(students).where(and(eq(students.id, input.studentId as number), eq(students.organizationId, orgId))).limit(1);
       if (!student) throw new TRPCError({ code: 'NOT_FOUND', message: "Aluno não encontrado." });
 
@@ -840,7 +846,9 @@ export const studentsRouters = {
         // --- Verificação de limite de plano na reativação ---
         const [existing] = await db.select({ status: students.status }).from(students)
           .where(and(eq(students.id, input.id), eq(students.organizationId, orgId))).limit(1);
-        
+        if (!existing) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Aluno não encontrado." });
+        }
         if (existing && input.status === 'ativo' && existing.status !== 'ativo') {
           const planInfo = await getOrgPlanLimits(db, orgId);
           
@@ -863,6 +871,19 @@ export const studentsRouters = {
         // ---------------------------------------
 
         const isAdmin = ctx.user.role === 'admin' || ctx.user.openId === ENV.ownerOpenId;
+
+        // AUDITORIA P0: posse OBRIGATÓRIA antes dos efeitos destrutivos.
+        // Antes o UPDATE respeitava posse, mas os deletes (aulas/mensalidades)
+        // rodavam por (studentId + org) — um professor podia apagar agenda e
+        // mensalidades de aluno de OUTRO professor.
+        const [ownerRow] = await db.select({ professorId: students.professorId })
+          .from(students)
+          .where(and(eq(students.id, input.id), eq(students.organizationId, orgId)))
+          .limit(1);
+        if (!ownerRow) throw new TRPCError({ code: "NOT_FOUND", message: "Aluno não encontrado." });
+        if (!isAdmin && ownerRow.professorId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Você não tem permissão para alterar este aluno." });
+        }
 
         await db.update(students).set({
           status: input.status,

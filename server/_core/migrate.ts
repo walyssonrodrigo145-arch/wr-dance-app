@@ -910,6 +910,7 @@ export async function runAutoMigrations() {
       { table: 'settings', sql: `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "schoolResponsibleName" varchar(255)` },
       { table: 'settings', sql: `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "schoolResponsibleRg" varchar(30)` },
       { table: 'settings', sql: `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "schoolResponsibleCpf" varchar(20)` },
+      { table: 'students', sql: `ALTER TABLE "students" ADD COLUMN IF NOT EXISTS "guardianRg" varchar(30)` },
     ];
 
     for (const m of migrations) {
