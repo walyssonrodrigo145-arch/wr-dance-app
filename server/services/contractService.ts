@@ -197,6 +197,9 @@ export interface ContractVariablesInput {
   schoolDistrict?: string | null;
   schoolCep?: string | null;
   schoolState?: string | null;
+  schoolResponsibleName?: string | null;
+  schoolResponsibleRg?: string | null;
+  schoolResponsibleCpf?: string | null;
   studentName: string;
   studentCpf?: string | null;
   studentRg?: string | null;
@@ -313,6 +316,9 @@ export function buildContractVariables(input: ContractVariablesInput): Record<st
     school_district: input.schoolDistrict || "__________",
     school_city: input.schoolCity || "__________",
     school_state: input.schoolState || "__________",
+    school_responsible_name: input.schoolResponsibleName || "__________",
+    school_responsible_rg: input.schoolResponsibleRg || "__________",
+    school_responsible_cpf: input.schoolResponsibleCpf || "__________",
     student_name: input.studentName,
     student_cpf: input.studentCpf || "__________",
     student_rg: input.studentRg || "__________",
@@ -381,6 +387,9 @@ export function buildContractVariables(input: ContractVariablesInput): Record<st
     "Estado da Escola": input.schoolState || "__________",
     "Endereço da Escola": schoolAddressFull || "__________",
     "Cidade da Escola - Estado da Escola": cityState,
+    "Nome do Responsável pela Escola": input.schoolResponsibleName || "__________",
+    "RG do Responsável pela Escola": input.schoolResponsibleRg || "__________",
+    "CPF do Responsável pela Escola": input.schoolResponsibleCpf || "__________",
     "Modalidade": input.instrument || "dança",
     "Valor da Mensalidade": fee,
     "Valor da Parcela sem Desconto": feeFull,
@@ -515,6 +524,14 @@ export async function prepareContractRender(
     [orgSettings?.schoolCnpj, ...allOrgSettings.map((s: any) => s.schoolCnpj), (org as any)?.cnpj]
       .find((c: any) => c && String(c).trim() !== "") || null;
 
+  // Responsável legal: pode ter sido salvo na linha de settings de outro admin.
+  const pickSetting = (field: string): string | null =>
+    [orgSettings?.[field], ...allOrgSettings.map((s: any) => s[field])]
+      .find((v: any) => v && String(v).trim() !== "") || null;
+  const schoolResponsibleName = pickSetting("schoolResponsibleName");
+  const schoolResponsibleRg = pickSetting("schoolResponsibleRg");
+  const schoolResponsibleCpf = pickSetting("schoolResponsibleCpf");
+
   const [instrument] = student.instrumentId    ? await db.select().from(instruments).where(and(eq(instruments.id, student.instrumentId), eq(instruments.organizationId, orgId))).limit(1)
     : [null];
 
@@ -555,6 +572,9 @@ export async function prepareContractRender(
     schoolDistrict:  (org as any)?.addressDistrict || null,
     schoolCep:       (org as any)?.zipCode         || null,
     schoolState:     (org as any)?.addressState    || null,
+    schoolResponsibleName,
+    schoolResponsibleRg,
+    schoolResponsibleCpf,
     studentName:     student.name,
     studentCpf:      student.cpf,
     studentRg:       student.rg,

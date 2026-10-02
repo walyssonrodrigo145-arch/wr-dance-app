@@ -108,14 +108,21 @@ await step("Login admin + configurar escola", async () => {
   const me = await admin.auth.me.query();
   expect(me?.role === "admin", `role=${me?.role}`);
   ctxStore.orgId = me.organizationId;
+  ctxStore.respCpf = validCpf();
   await admin.settings.updateSchool.mutate({
     schoolName: `Caça-Bug Contratos ${stamp}`,
     schoolAddress: "Rua das Piruetas, 100",
     schoolCity: "São Paulo",
     schoolPhone: "(11) 3333-4444",
     schoolEmail,
+    schoolResponsibleName: "Ana Lima Cacabug",
+    schoolResponsibleRg: "1.234.567-8",
+    schoolResponsibleCpf: ctxStore.respCpf,
   });
-  return `org=${me.organizationId}`;
+  const s = await admin.settings.get.query();
+  expect(s?.schoolResponsibleName === "Ana Lima Cacabug", `resp=${s?.schoolResponsibleName}`);
+  expect(s?.schoolResponsibleCpf === ctxStore.respCpf, `respCpf=${s?.schoolResponsibleCpf}`);
+  return `org=${me.organizationId} · responsável salvo`;
 });
 
 await step("Criar plano (2x/semana · cheio R$ 380)", async () => {
@@ -177,6 +184,7 @@ await step("Criar modelo SOMENTE com variáveis novas (amigáveis + técnicas)",
     "Numero: {{Número do Endereço do Contratante}}",
     "Endereco: {{Logradouro do Contratante}}, {{Número do Endereço do Contratante}}, {{Bairro do Contratante}}, CEP {{CEP do Contratante}} - {{Cidade do Contratante}}/{{Estado do Contratante}}",
     "Escola: {{Razão Social da Escola}} - {{Cidade da Escola}}",
+    "Responsavel: {{Nome do Responsável pela Escola}} | RG {{RG do Responsável pela Escola}} | CPF {{CPF do Responsável pela Escola}}",
     "Prazo: {{Data Inicial}} a {{Data Final}} ({{Meses de aula}} meses, {{Quantidade de Aulas no Total}} aulas)",
     "Por extenso: {{Data Inicial Por Extenso}} a {{Data Final Por Extenso}}",
     "Valores: {{Valor da Mensalidade}} / sem desconto {{Valor da Parcela sem Desconto}}",
@@ -211,6 +219,9 @@ await step("Gerar contrato (previewPdf) e conferir substituição no PDF", async
     ["29900-000", "CEP do contratante"],
     ["Linhares", "cidade do contratante"],
     ["Caça-Bug Contratos", "razão social da escola"],
+    ["Responsavel: Ana Lima Cacabug", "nome do responsável pela escola"],
+    ["1.234.567-8", "rg do responsável"],
+    [ctxStore.respCpf, "cpf do responsável"],
     ["10/01/2026", "data inicial"],
     ["10/07/2026", "data final"],
     ["julho de 2026", "data final por extenso"],
@@ -224,6 +235,17 @@ await step("Gerar contrato (previewPdf) e conferir substituição no PDF", async
   const missing = checks.filter(([needle]) => !raw.includes(needle)).map(([needle, label]) => label);
   expect(missing.length === 0, `variáveis NÃO substituídas: ${missing.join(", ")}`);
   return `${checks.length} substituições OK (pdf ${preview.base64.length} b64)`;
+});
+
+await step("CPF inválido do responsável é rejeitado (validação server-side)", async () => {
+  let rejected = false;
+  try {
+    await admin.settings.updateSchool.mutate({ schoolResponsibleCpf: "111.111.111-11" });
+  } catch (e) {
+    rejected = /CPF do responsável inválido/.test(e?.message || "");
+  }
+  expect(rejected, "CPF inválido foi aceito pela API");
+  return "rejeitado corretamente";
 });
 
 await step("Contrato com variável desconhecida não quebra (vira vazio)", async () => {

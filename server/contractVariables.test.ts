@@ -15,6 +15,9 @@ const baseInput = {
   studentState: "ES",
   schoolName: "Escola DancePro",
   schoolCnpj: "11.222.333/0001-44",
+  schoolResponsibleName: "Ana Lima",
+  schoolResponsibleRg: "1.234.567-8",
+  schoolResponsibleCpf: "529.982.247-25",
   schoolStreet: "Av. Central",
   schoolNumber: "100",
   schoolDistrict: "Centro",
@@ -77,8 +80,21 @@ describe("buildContractVariables — endereço completo", () => {
     expect(vars.contract_end_date_long).toBe("10 de julho de 2026");
   });
 
-  it("preenche valores e número do contrato", () => {
+  it("expõe o responsável legal pela escola (contratada) em técnico e simples", () => {
     const vars = buildContractVariables(baseInput);
+    expect(vars.school_responsible_name).toBe("Ana Lima");
+    expect(vars.school_responsible_rg).toBe("1.234.567-8");
+    expect(vars.school_responsible_cpf).toBe("529.982.247-25");
+    expect(vars["Nome do Responsável pela Escola"]).toBe("Ana Lima");
+    expect(vars["RG do Responsável pela Escola"]).toBe("1.234.567-8");
+    expect(vars["CPF do Responsável pela Escola"]).toBe("529.982.247-25");
+
+    const semDados = buildContractVariables({ studentName: "X" });
+    expect(semDados.school_responsible_name).toBe("__________");
+    expect(semDados["CPF do Responsável pela Escola"]).toBe("__________");
+  });
+
+  it("preenche valores e número do contrato", () => {    const vars = buildContractVariables(baseInput);
     expect(vars.monthly_fee).toBe("320.00");
     expect(vars["Valor da Parcela sem Desconto"]).toBe("380.00");
     expect(vars["Número do Contrato de Adesão"]).toBe("000123/2026");

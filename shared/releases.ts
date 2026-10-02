@@ -26,6 +26,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.10.01.24",
+    date: "2026-10-01",
+    title: "Responsável pela escola nos contratos",
+    summary: "Cadastre o responsável legal (nome, RG e CPF) em Configurações → Escola e o contrato qualifica a CONTRATADA automaticamente.",
+    items: [
+      { type: "novo", title: "Responsável pela Escola em Configurações", description: "Nome, RG e CPF do responsável legal, com validação de CPF — usados na qualificação da escola (CONTRATADA) nos contratos." },
+      { type: "novo", title: "Variáveis do responsável no contrato", description: "\"Nome do Responsável pela Escola\", \"RG do Responsável pela Escola\" e \"CPF do Responsável pela Escola\" (também em versão técnica) disponíveis no editor de modelos." },
+    ],
+  },
+  {
     version: "2026.10.01.23",
     date: "2026-10-01",
     title: "Endereço completo da aluna + variáveis de contrato simples",

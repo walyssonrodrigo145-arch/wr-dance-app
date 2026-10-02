@@ -52,7 +52,7 @@ import { chatbotFlowRouter } from "../chatbotFlowRouter";
 import { schoolAiRouter } from "../schoolAiRouter";
 import { fiscalRouter } from "../fiscalRouter";
 import { FiscalService } from "../services/fiscal/FiscalService";
-import { loginAttempts, safeEqualStr, isReservedSuperAdminEmail, getOrgPlanLimits, syncOrgAsaasSubscription, reconcileOrgAsaasCharges, runCreateAssinafyContract } from "./helpers";
+import { loginAttempts, safeEqualStr, isReservedSuperAdminEmail, getOrgPlanLimits, syncOrgAsaasSubscription, reconcileOrgAsaasCharges, runCreateAssinafyContract, isValidCPF } from "./helpers";
 export const plataformaRouters = {
   settings: router({
     get: protectedProcedure.query(async ({ ctx }) => {
@@ -182,6 +182,9 @@ export const plataformaRouters = {
       schoolEmail: z.string().email("E-mail inválido").optional().or(z.literal("")).transform(v => v === "" ? undefined : v),
       schoolWebsite: z.string().optional(),
       schoolDescription: z.string().optional(),
+      schoolResponsibleName: z.string().max(255).optional(),
+      schoolResponsibleRg: z.string().max(30).optional(),
+      schoolResponsibleCpf: z.string().max(20).optional(),
       showSchoolName: z.boolean().optional(),
       logoUrl: z.string().optional().nullable(),
       schoolHours: z.string().optional(),
@@ -195,6 +198,10 @@ export const plataformaRouters = {
       // rejeição posterior na NFS-e/contratos por dados fiscais incorretos).
       if (input.schoolCnpj && !isValidCNPJ(input.schoolCnpj)) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "CNPJ inválido. Verifique os dígitos e tente novamente." });
+      }
+      // Responsável legal (contratos): CPF, quando informado, precisa ser válido.
+      if (input.schoolResponsibleCpf && input.schoolResponsibleCpf.trim() !== "" && !isValidCPF(input.schoolResponsibleCpf)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "CPF do responsável inválido. Verifique os dígitos e tente novamente." });
       }
       await upsertSettings(orgId, ctx.user.id, {
         ...input,

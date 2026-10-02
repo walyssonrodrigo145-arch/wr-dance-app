@@ -285,6 +285,10 @@ export const settings = pgTable("settings", {
   schoolEmail: varchar("schoolEmail", { length: 255 }),
   schoolWebsite: varchar("schoolWebsite", { length: 255 }),
   schoolDescription: text("schoolDescription"),
+  // Responsável legal pela escola (qualificação da CONTRATADA nos contratos)
+  schoolResponsibleName: varchar("schoolResponsibleName", { length: 255 }),
+  schoolResponsibleRg: varchar("schoolResponsibleRg", { length: 30 }),
+  schoolResponsibleCpf: varchar("schoolResponsibleCpf", { length: 20 }),
   showSchoolName: integer("showSchoolName").default(1).notNull(), // 1 = logo + nome | 0 = somente logo
   logoUrl: text("logoUrl"),
   dueDaysForecast: text("dueDaysForecast").default("5,10,15,20"),

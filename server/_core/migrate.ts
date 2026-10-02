@@ -905,6 +905,11 @@ export async function runAutoMigrations() {
         )
       ` },
       { table: 'school_holidays', sql: `CREATE INDEX IF NOT EXISTS "school_holidays_org_date_idx" ON "school_holidays" ("organizationId", "date")` },
+
+      // ═══ Contratos: responsável legal pela escola (CONTRATADA) ═══
+      { table: 'settings', sql: `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "schoolResponsibleName" varchar(255)` },
+      { table: 'settings', sql: `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "schoolResponsibleRg" varchar(30)` },
+      { table: 'settings', sql: `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "schoolResponsibleCpf" varchar(20)` },
     ];
 
     for (const m of migrations) {

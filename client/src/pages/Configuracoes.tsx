@@ -97,6 +97,9 @@ export default function Configuracoes() {
   const [schoolEmail, setSchoolEmail] = useState("");
   const [schoolWebsite, setSchoolWebsite] = useState("");
   const [schoolDescription, setSchoolDescription] = useState("");
+  const [schoolResponsibleName, setSchoolResponsibleName] = useState("");
+  const [schoolResponsibleRg, setSchoolResponsibleRg] = useState("");
+  const [schoolResponsibleCpf, setSchoolResponsibleCpf] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [showSchoolName, setShowSchoolName] = useState(true);
   const [logoEditorOpen, setLogoEditorOpen] = useState(false);
@@ -220,6 +223,9 @@ export default function Configuracoes() {
       setSchoolEmail(settings.schoolEmail ?? "");
       setSchoolWebsite(settings.schoolWebsite ?? "");
       setSchoolDescription(settings.schoolDescription ?? "");
+      setSchoolResponsibleName((settings as any).schoolResponsibleName ?? "");
+      setSchoolResponsibleRg((settings as any).schoolResponsibleRg ?? "");
+      setSchoolResponsibleCpf((settings as any).schoolResponsibleCpf ?? "");
       setLogoUrl((settings as any).logoUrl ?? (user as any)?.schoolLogo ?? "");
       setShowSchoolName((settings as any).showSchoolName !== 0);
       setDueDaysForecast(settings.dueDaysForecast ?? "5,10,15,20");
@@ -711,6 +717,9 @@ export default function Configuracoes() {
                         schoolEmail,
                         schoolWebsite,
                         schoolDescription,
+                        schoolResponsibleName,
+                        schoolResponsibleRg,
+                        schoolResponsibleCpf,
                         showSchoolName,
                         logoUrl,
                         schoolHours: JSON.stringify(schoolHours),
@@ -905,6 +914,39 @@ export default function Configuracoes() {
                       className="h-12 text-sm font-bold rounded-xl border-border bg-muted focus:bg-card transition-all shadow-sm"
                     />
                   </Field>
+                </div>
+
+                {/* Responsável legal pela escola (qualificação da CONTRATADA nos contratos) */}
+                <div className="rounded-2xl border border-border/60 bg-muted/20 p-4 space-y-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                    Responsável pela Escola (usado nos contratos)
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Field label="Nome do responsável">
+                      <DebouncedInput
+                        value={schoolResponsibleName}
+                        onChange={(e: any) => setSchoolResponsibleName(e.target.value)}
+                        placeholder="Ex: Ana Lima"
+                        className="h-12 text-sm font-bold rounded-xl border-border bg-muted focus:bg-card transition-all shadow-sm"
+                      />
+                    </Field>
+                    <Field label="RG do responsável">
+                      <DebouncedInput
+                        value={schoolResponsibleRg}
+                        onChange={(e: any) => setSchoolResponsibleRg(e.target.value)}
+                        placeholder="00.000.000-0"
+                        className="h-12 text-sm font-bold rounded-xl border-border bg-muted focus:bg-card transition-all shadow-sm"
+                      />
+                    </Field>
+                    <Field label="CPF do responsável">
+                      <DebouncedInput
+                        value={schoolResponsibleCpf}
+                        onChange={(e: any) => setSchoolResponsibleCpf(e.target.value)}
+                        placeholder="000.000.000-00"
+                        className="h-12 text-sm font-bold rounded-xl border-border bg-muted focus:bg-card transition-all shadow-sm"
+                      />
+                    </Field>
+                  </div>
                 </div>
 
                 <Field label="Site ou Instagram">
