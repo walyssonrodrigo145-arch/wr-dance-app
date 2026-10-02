@@ -98,6 +98,8 @@ const AVAILABLE_VARIABLES: { tag: string; label: string; group: string }[] = [
   { group: "Simples (texto pronto p/ colar)", tag: "{{Quantidade de Aulas no Total}}", label: "Quantidade de Aulas no Total" },
   { group: "Simples (texto pronto p/ colar)", tag: "{{Data Inicial}}", label: "Data Inicial" },
   { group: "Simples (texto pronto p/ colar)", tag: "{{Data Final}}", label: "Data Final" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{Data Inicial Por Extenso}}", label: "Data Inicial Por Extenso" },
+  { group: "Simples (texto pronto p/ colar)", tag: "{{Data Final Por Extenso}}", label: "Data Final Por Extenso" },
   { group: "Simples (texto pronto p/ colar)", tag: "{{Meses de pagamento}}", label: "Meses de pagamento" },
 ];
 

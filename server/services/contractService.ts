@@ -387,6 +387,8 @@ export function buildContractVariables(input: ContractVariablesInput): Record<st
     "Dia do Vencimento": input.dueDay || "10",
     "Data Inicial": fmtDate(input.startDate),
     "Data Final": fmtDate(input.endDate),
+    "Data Inicial Por Extenso": fmtDateLong(input.startDate),
+    "Data Final Por Extenso": fmtDateLong(input.endDate),
     "Meses de aula": contractMonths != null ? String(contractMonths) : "____",
     "Meses de pagamento": contractMonths != null ? String(contractMonths) : "____",
     "Quantidade de Aulas no Total": totalLessons != null ? String(totalLessons) : "____",
