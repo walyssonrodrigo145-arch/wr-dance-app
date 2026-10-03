@@ -128,7 +128,7 @@ await step("Transições inválidas são bloqueadas (cancelado→planejado, real
   // evento realizado é terminal: cria, publica, encerra e tenta cancelar
   const res2 = await admin.eventos.create.mutate({
     name: `Realizado Terminal ${stamp}`,
-    type: "espetaculo",
+    type: "audicao",
     startsAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
     status: "confirmado",
     requiresAuthorization: false,
