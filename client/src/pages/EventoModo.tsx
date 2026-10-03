@@ -96,8 +96,8 @@ export default function EventoModo() {
       {/* Header simples */}
       <div className="sticky top-0 z-20 border-b border-border bg-card/80 backdrop-blur-md">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => setLocation(`/eventos/${eventId}`)}>
-            <ArrowLeft size={15} className="mr-1.5" /> Sair do Modo Evento
+          <Button variant="ghost" size="sm" onClick={() => setLocation(`/eventos/${eventId}`)} className="shrink-0">
+            <ArrowLeft size={15} className="mr-1.5" /> <span className="hidden sm:inline">Sair do Modo Evento</span><span className="sm:hidden">Sair</span>
           </Button>
           <div className="flex-1 min-w-0 text-center">
             <p className="text-sm font-black text-foreground truncate flex items-center justify-center gap-2">
@@ -124,7 +124,7 @@ export default function EventoModo() {
               {onStage ? (
                 <>
                   <p className="text-2xl font-outfit font-black text-foreground">{onStage.ordem} · {onStage.title}</p>
-                  <div className="flex items-center gap-2 mt-3">
+                  <div className="flex flex-wrap items-center gap-2 mt-3">
                     <Button size="lg" variant="outline" className="h-12" onClick={() => setStageState.mutate({ id: onStage.id, state: "finalizada" })} disabled={setStageState.isPending}>
                       <Flag size={16} className="mr-1.5" /> Finalizar
                     </Button>
@@ -162,14 +162,14 @@ export default function EventoModo() {
                       const part = participantsByStudent.get(a.id);
                       const meta = STAGE_STATUS_META[part?.stageStatus ?? "nao_chegou"] ?? STAGE_STATUS_META.nao_chegou;
                       return (
-                        <div key={a.id} className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-1.5">
+                        <div key={a.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-background px-3 py-2">
                           <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", meta.dot)} />
-                          <p className="text-xs font-black text-foreground truncate flex-1 min-w-0">{a.name}</p>
+                          <p className="text-xs font-black text-foreground truncate flex-1 min-w-[120px]">{a.name}</p>
                           {part && (
                             <select
                               value={part.stageStatus ?? "nao_chegou"}
                               onChange={(e) => updateParticipant.mutate({ id: part.id, stageStatus: e.target.value as any })}
-                              className="h-8 rounded-lg border border-border bg-background px-1.5 text-[11px] font-bold text-foreground max-w-[170px]"
+                              className="h-9 w-full sm:w-[170px] rounded-lg border border-border bg-background px-1.5 text-[11px] font-bold text-foreground"
                             >
                               {Object.entries(STAGE_STATUS_META).map(([value, m]) => (
                                 <option key={value} value={value}>{m.label}</option>

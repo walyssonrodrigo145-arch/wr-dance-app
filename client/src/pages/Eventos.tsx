@@ -280,26 +280,26 @@ export default function Eventos() {
                   </div>
 
                   {/* Métricas (Participações · Vendas · Receita — base: loja do evento) */}
-                  <div className="flex flex-wrap items-center gap-4 sm:gap-6 px-4 py-3 lg:py-0 lg:px-0 lg:pr-7 lg:border-l border-border">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-500/10 text-purple-500"><Users size={16} /></span>
-                      <div>
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-3 px-4 py-3 lg:py-0 lg:px-0 lg:pr-7 lg:border-l border-border">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-500/10 text-purple-500"><Users size={16} /></span>
+                      <div className="min-w-0">
                         <p className="text-lg font-outfit font-black leading-none text-foreground">{evento.participantesCount}</p>
-                        <p className="text-[10px] font-bold text-muted-foreground">Participações</p>
+                        <p className="text-[10px] font-bold text-muted-foreground whitespace-nowrap">Participações</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-500/10 text-teal-500"><Shirt size={16} /></span>
-                      <div>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-teal-500/10 text-teal-500"><Shirt size={16} /></span>
+                      <div className="min-w-0">
                         <p className="text-lg font-outfit font-black leading-none text-foreground">{evento.vendasQty}</p>
-                        <p className="text-[10px] font-bold text-muted-foreground">Vendas da loja</p>
+                        <p className="text-[10px] font-bold text-muted-foreground whitespace-nowrap">Vendas da loja</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500"><TrendingUp size={16} /></span>
-                      <div>
-                        <p className="text-lg font-outfit font-black leading-none text-foreground">{formatBRL(evento.status === "realizado" ? evento.receitaArrecadada : evento.receitaPrevista)}</p>
-                        <p className="text-[10px] font-bold text-muted-foreground">{evento.status === "realizado" ? "Receita arrecadada" : "Receita prevista"}</p>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500"><TrendingUp size={16} /></span>
+                      <div className="min-w-0">
+                        <p className="text-lg font-outfit font-black leading-none text-foreground truncate">{formatBRL(evento.status === "realizado" ? evento.receitaArrecadada : evento.receitaPrevista)}</p>
+                        <p className="text-[10px] font-bold text-muted-foreground whitespace-nowrap">{evento.status === "realizado" ? "Receita arrecadada" : "Receita prevista"}</p>
                       </div>
                     </div>
                   </div>

@@ -55,7 +55,7 @@ export function TicketsTab({ eventId }: { eventId: number }) {
   return (
     <div className="space-y-3">
       {/* Sub-abas */}
-      <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border bg-muted/30 p-1">
+      <div className="flex items-center gap-1.5 rounded-xl border border-border bg-muted/30 p-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {([
           { key: "tipos", label: "Tipos", icon: Ticket },
           { key: "vendas", label: "Vendas", icon: QrCode, count: stats?.issued ?? 0 },
@@ -68,7 +68,7 @@ export function TicketsTab({ eventId }: { eventId: number }) {
               key={v.key}
               onClick={() => setView(v.key)}
               className={cn(
-                "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-black transition-colors",
+                "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-black transition-colors",
                 view === v.key ? "bg-background text-foreground shadow" : "text-muted-foreground hover:text-foreground",
               )}
             >
@@ -650,7 +650,7 @@ function SeatMapView({ eventId, onChanged }: { eventId: number; onChanged: () =>
                       onClick={() => statusMut.mutate({ id: s.id, status: blocked ? "disponivel" : "bloqueado" })}
                       title={occupied ? `${s.sector} ${s.row}-${s.number} — ${s.occupant === "cortesia" ? "cortesia" : "vendido"}` : blocked ? "Bloqueado (clique para liberar)" : "Disponível (clique para bloquear)"}
                       className={cn(
-                        "h-8 min-w-8 rounded-lg border px-1 text-[9px] font-black transition-colors",
+                        "h-9 min-w-9 rounded-lg border px-1.5 text-[9px] font-black transition-colors",
                         occupied
                           ? s.occupant === "cortesia" ? "bg-violet-500/20 border-violet-500/40 text-violet-700 dark:text-violet-300 cursor-not-allowed" : "bg-indigo-600 border-indigo-600 text-white cursor-not-allowed"
                           : blocked

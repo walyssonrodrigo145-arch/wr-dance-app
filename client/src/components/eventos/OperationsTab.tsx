@@ -32,7 +32,7 @@ export function OperationsTab({ eventId }: { eventId: number }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border bg-muted/30 p-1">
+      <div className="flex items-center gap-1.5 rounded-xl border border-border bg-muted/30 p-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {([
           { key: "backstage", label: "Backstage", icon: LayoutList },
           { key: "equipe", label: "Equipe", icon: Users },
@@ -45,7 +45,7 @@ export function OperationsTab({ eventId }: { eventId: number }) {
               key={v.key}
               onClick={() => setView(v.key)}
               className={cn(
-                "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-black transition-colors",
+                "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-black transition-colors",
                 view === v.key ? "bg-background text-foreground shadow" : "text-muted-foreground hover:text-foreground",
               )}
             >
@@ -599,7 +599,7 @@ export function FinanceiroTab({ eventId }: { eventId: number }) {
       {/* Lançamento */}
       <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
         <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Novo lançamento</p>
-        <div className="grid grid-cols-2 lg:grid-cols-6 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2">
           <Select value={kind} onValueChange={(v) => { setKind(v as any); setCategory(v === "receita" ? "Patrocínios" : "Local"); }}>
             <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -613,7 +613,7 @@ export function FinanceiroTab({ eventId }: { eventId: number }) {
               {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descrição (opcional)" maxLength={255} className="col-span-2" />
+          <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descrição (opcional)" maxLength={255} className="sm:col-span-2" />
           <Input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Valor (R$)" inputMode="decimal" />
           <div className="flex gap-2">
             <Select value={status} onValueChange={setStatus}>

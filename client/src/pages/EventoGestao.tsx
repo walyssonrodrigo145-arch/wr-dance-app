@@ -438,21 +438,21 @@ export default function EventoGestao() {
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2 shrink-0">
-            <Button variant="outline" onClick={() => setLocation(`/eventos/${eventId}/modo`)}><Play size={15} className="mr-2" /> Modo Evento</Button>
-            <Button variant="outline" onClick={() => setModalOpen(true)}><Pencil size={15} className="mr-2" /> Editar</Button>
-            <Button variant="outline" onClick={() => duplicateMut.mutate({ id: eventId })} disabled={duplicateMut.isPending}><Copy size={15} className="mr-2" /> Duplicar</Button>
+          <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:flex-wrap sm:w-auto shrink-0">
+            <Button variant="outline" onClick={() => setLocation(`/eventos/${eventId}/modo`)} className="justify-center"><Play size={15} className="mr-2" /> Modo Evento</Button>
+            <Button variant="outline" onClick={() => setModalOpen(true)} className="justify-center"><Pencil size={15} className="mr-2" /> Editar</Button>
+            <Button variant="outline" onClick={() => duplicateMut.mutate({ id: eventId })} disabled={duplicateMut.isPending} className="justify-center"><Copy size={15} className="mr-2" /> Duplicar</Button>
             {data?.status === "planejado" && (
-              <Button onClick={() => setStatusMut.mutate({ id: eventId, status: "confirmado" })} disabled={setStatusMut.isPending} className="bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/25"><Send size={15} className="mr-2" /> Publicar evento</Button>
+              <Button onClick={() => setStatusMut.mutate({ id: eventId, status: "confirmado" })} disabled={setStatusMut.isPending} className="justify-center bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/25"><Send size={15} className="mr-2" /> Publicar evento</Button>
             )}
             {(data?.status === "planejado" || data?.status === "confirmado") && (
               <>
-                <Button variant="outline" onClick={() => setConfirmAction({ status: "realizado", label: "Encerrar como realizado" })}><CheckCircle2 size={15} className="mr-2" /> Encerrar</Button>
-                <Button variant="ghost" className="text-muted-foreground hover:text-rose-500" onClick={() => setConfirmAction({ status: "cancelado", label: "Cancelar evento" })}><Ban size={15} className="mr-2" /> Cancelar</Button>
+                <Button variant="outline" onClick={() => setConfirmAction({ status: "realizado", label: "Encerrar como realizado" })} className="justify-center"><CheckCircle2 size={15} className="mr-2" /> Encerrar</Button>
+                <Button variant="ghost" className="text-muted-foreground hover:text-rose-500 justify-center" onClick={() => setConfirmAction({ status: "cancelado", label: "Cancelar evento" })}><Ban size={15} className="mr-2" /> Cancelar</Button>
               </>
             )}
             {data?.status === "cancelado" && (
-              <Button variant="outline" onClick={() => setStatusMut.mutate({ id: eventId, status: "confirmado" })} disabled={setStatusMut.isPending}><CheckCircle2 size={15} className="mr-2" /> Reativar</Button>
+              <Button variant="outline" onClick={() => setStatusMut.mutate({ id: eventId, status: "confirmado" })} disabled={setStatusMut.isPending} className="justify-center"><CheckCircle2 size={15} className="mr-2" /> Reativar</Button>
             )}
           </div>
         </div>
@@ -478,15 +478,15 @@ export default function EventoGestao() {
         </div>
       ) : (
         <Tabs value={tab} onValueChange={changeTab}>
-          <TabsList className="w-full sm:w-auto h-auto flex-wrap">
-            <TabsTrigger value="visao"><LayoutDashboard size={13} className="mr-1.5" /> Visão geral</TabsTrigger>
-            <TabsTrigger value="participantes"><Users size={13} className="mr-1.5" /> Participações ({participantes.length})</TabsTrigger>
-            <TabsTrigger value="programa"><Music size={13} className="mr-1.5" /> Programação ({coreografiasVinculadas.length})</TabsTrigger>
-            <TabsTrigger value="ingressos"><Ticket size={13} className="mr-1.5" /> Ingressos</TabsTrigger>
-            <TabsTrigger value="operacao"><ClipboardList size={13} className="mr-1.5" /> Operação</TabsTrigger>
-            <TabsTrigger value="loja"><Shirt size={13} className="mr-1.5" /> Loja ({sales.length})</TabsTrigger>
-            <TabsTrigger value="financeiro"><Wallet size={13} className="mr-1.5" /> Financeiro</TabsTrigger>
-            <TabsTrigger value="relatorios"><FileText size={13} className="mr-1.5" /> Relatórios</TabsTrigger>
+          <TabsList className="w-full sm:w-auto h-auto flex-nowrap overflow-x-auto justify-start sm:flex-wrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <TabsTrigger value="visao" className="shrink-0 whitespace-nowrap"><LayoutDashboard size={13} className="mr-1.5" /> Visão geral</TabsTrigger>
+            <TabsTrigger value="participantes" className="shrink-0 whitespace-nowrap"><Users size={13} className="mr-1.5" /> Participações ({participantes.length})</TabsTrigger>
+            <TabsTrigger value="programa" className="shrink-0 whitespace-nowrap"><Music size={13} className="mr-1.5" /> Programação ({coreografiasVinculadas.length})</TabsTrigger>
+            <TabsTrigger value="ingressos" className="shrink-0 whitespace-nowrap"><Ticket size={13} className="mr-1.5" /> Ingressos</TabsTrigger>
+            <TabsTrigger value="operacao" className="shrink-0 whitespace-nowrap"><ClipboardList size={13} className="mr-1.5" /> Operação</TabsTrigger>
+            <TabsTrigger value="loja" className="shrink-0 whitespace-nowrap"><Shirt size={13} className="mr-1.5" /> Loja ({sales.length})</TabsTrigger>
+            <TabsTrigger value="financeiro" className="shrink-0 whitespace-nowrap"><Wallet size={13} className="mr-1.5" /> Financeiro</TabsTrigger>
+            <TabsTrigger value="relatorios" className="shrink-0 whitespace-nowrap"><FileText size={13} className="mr-1.5" /> Relatórios</TabsTrigger>
           </TabsList>
 
           {/* ── VISÃO GERAL (dashboard operacional) ── */}
@@ -548,19 +548,19 @@ export default function EventoGestao() {
                   ) : (
                     <div className="space-y-2">
                       {data?.requiresAuthorization && autorizPendentes > 0 && (
-                        <div className="flex items-center justify-between gap-2 text-xs">
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                           <p className="font-bold text-foreground"><span className="font-black">{autorizPendentes}</span> autorização(ões) pendente(s)</p>
                           <Button size="sm" variant="ghost" className="h-7 text-[10px] font-black" onClick={() => setParticipantView("autorizacoes")}>Resolver</Button>
                         </div>
                       )}
                       {aguardandoResposta > 0 && (
-                        <div className="flex items-center justify-between gap-2 text-xs">
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                           <p className="font-bold text-foreground"><span className="font-black">{aguardandoResposta}</span> convidado(s) sem resposta</p>
                           <Button size="sm" variant="ghost" className="h-7 text-[10px] font-black" onClick={() => setParticipantView("confirmacoes")}>Revisar</Button>
                         </div>
                       )}
                       {semFigurino > 0 && (
-                        <div className="flex items-center justify-between gap-2 text-xs">
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                           <p className="font-bold text-foreground"><span className="font-black">{semFigurino}</span> figurino(s) sem observação</p>
                           <Button size="sm" variant="ghost" className="h-7 text-[10px] font-black" onClick={() => setParticipantView("figurinos")}>Definir</Button>
                         </div>
@@ -605,7 +605,7 @@ export default function EventoGestao() {
 
           {/* ── PARTICIPAÇÕES ── */}
           <TabsContent value="participantes" className="mt-4 space-y-3">
-            <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border bg-muted/30 p-1">
+            <div className="flex items-center gap-1.5 rounded-xl border border-border bg-muted/30 p-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {[
                 { key: "elenco", label: "Elenco", count: participantes.length },
                 { key: "confirmacoes", label: "Confirmações", count: confirmados },
@@ -616,7 +616,7 @@ export default function EventoGestao() {
                   key={v.key}
                   onClick={() => setParticipantView(v.key as any)}
                   className={cn(
-                    "rounded-lg px-3 py-1.5 text-xs font-black transition-colors",
+                    "shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-black transition-colors",
                     participantView === v.key ? "bg-background text-foreground shadow" : "text-muted-foreground hover:text-foreground",
                   )}
                 >
@@ -1156,50 +1156,52 @@ export default function EventoGestao() {
                       }}
                       onDragEnd={() => setDragIndex(null)}
                       className={cn(
-                        "flex items-center gap-3 rounded-2xl border border-border bg-card p-3 hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing",
+                        "rounded-2xl border border-border bg-card p-3 hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing",
                         dragIndex === idx && "opacity-60 border-primary/40",
                       )}
                     >
-                      <GripVertical size={15} className="text-muted-foreground/50 shrink-0" />
-                      <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-xs font-black flex items-center justify-center shrink-0 shadow-md shadow-indigo-500/20">
-                        {coreografia.ordem}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-black text-foreground truncate">{coreografia.title}</p>
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] font-bold text-muted-foreground mt-0.5">
-                          <span className="flex items-center gap-1"><Clock size={10} /> {coreografia.entryAt ? format(coreografia.entryAt, "HH:mm") : "—"}{coreografia.exitAt ? "–" + format(coreografia.exitAt, "HH:mm") : ""}</span>
-                          <span>{coreografia.durationMinutes ? coreografia.durationMinutes + " min" : "duração não definida"}</span>
-                          {coreografia.dressingRoom && <span>Camarim: {coreografia.dressingRoom}</span>}
-                          {(coreografia.alunos?.length ?? 0) > 0 && <span title={coreografia.alunos.map((a: any) => a.name).join(", ")}>{coreografia.alunos.length} aluno(s)</span>}
-                          <span className="uppercase tracking-widest">{coreografia.formacao}</span>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <GripVertical size={15} className="text-muted-foreground/50 shrink-0" />
+                        <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-xs font-black flex items-center justify-center shrink-0 shadow-md shadow-indigo-500/20">
+                          {coreografia.ordem}
+                        </span>
+                        <p className="text-sm font-black text-foreground truncate flex-1 min-w-0">{coreografia.title}</p>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => setChoreoEdit(coreografia)} title="Editar apresentação (duração, camarim, horários)">
+                          <Pencil size={14} />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-rose-500" onClick={() => unlinkCoreografia.mutate({ id: coreografia.id })} title="Remover do evento">
+                          <X size={15} />
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-bold text-muted-foreground mt-2 pl-[26px]">
+                        <span className="flex items-center gap-1"><Clock size={11} /> {coreografia.entryAt ? format(coreografia.entryAt, "HH:mm") : "—"}{coreografia.exitAt ? "–" + format(coreografia.exitAt, "HH:mm") : ""}</span>
+                        <span>{coreografia.durationMinutes ? coreografia.durationMinutes + " min" : "duração não definida"}</span>
+                        {coreografia.dressingRoom && <span>Camarim: {coreografia.dressingRoom}</span>}
+                        {(coreografia.alunos?.length ?? 0) > 0 && <span title={coreografia.alunos.map((a: any) => a.name).join(", ")}>{coreografia.alunos.length} aluno(s)</span>}
+                      </div>
+                      <div className="flex items-center justify-between gap-2 mt-2 pl-[26px]">
+                        <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground truncate">{coreografia.formacao}</span>
+                        <div className="flex items-center rounded-lg border border-border bg-muted/30 p-0.5 shrink-0">
+                          <button
+                            type="button"
+                            className="p-2 text-muted-foreground hover:text-indigo-600 disabled:opacity-30 rounded-md hover:bg-background transition-colors"
+                            disabled={reorderCoreografia.isPending || coreografia.ordem <= 1}
+                            onClick={() => reorderCoreografia.mutate({ id: coreografia.id, direction: "up" })}
+                            title="Subir no programa"
+                          >
+                            <ArrowUp size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            className="p-2 text-muted-foreground hover:text-indigo-600 disabled:opacity-30 rounded-md hover:bg-background transition-colors"
+                            disabled={reorderCoreografia.isPending || coreografia.ordem >= coreografiasVinculadas.length}
+                            onClick={() => reorderCoreografia.mutate({ id: coreografia.id, direction: "down" })}
+                            title="Descer no programa"
+                          >
+                            <ArrowDown size={14} />
+                          </button>
                         </div>
                       </div>
-                      <div className="flex items-center rounded-lg border border-border bg-muted/30 p-0.5 shrink-0">
-                        <button
-                          type="button"
-                          className="p-1.5 text-muted-foreground hover:text-indigo-600 disabled:opacity-30 rounded-md hover:bg-background transition-colors"
-                          disabled={reorderCoreografia.isPending || coreografia.ordem <= 1}
-                          onClick={() => reorderCoreografia.mutate({ id: coreografia.id, direction: "up" })}
-                          title="Subir no programa"
-                        >
-                          <ArrowUp size={13} />
-                        </button>
-                        <button
-                          type="button"
-                          className="p-1.5 text-muted-foreground hover:text-indigo-600 disabled:opacity-30 rounded-md hover:bg-background transition-colors"
-                          disabled={reorderCoreografia.isPending || coreografia.ordem >= coreografiasVinculadas.length}
-                          onClick={() => reorderCoreografia.mutate({ id: coreografia.id, direction: "down" })}
-                          title="Descer no programa"
-                        >
-                          <ArrowDown size={13} />
-                        </button>
-                      </div>
-                      <Button size="icon" variant="ghost" onClick={() => setChoreoEdit(coreografia)} title="Editar apresentação (duração, camarim, horários)">
-                        <Pencil size={14} />
-                      </Button>
-                      <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-rose-500" onClick={() => unlinkCoreografia.mutate({ id: coreografia.id })} title="Remover do evento">
-                        <X size={15} />
-                      </Button>
                     </div>
                   ))}
                 </div>

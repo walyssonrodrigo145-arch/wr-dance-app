@@ -126,19 +126,19 @@ export function BackstageTab({ eventId }: { eventId: number }) {
               const part = participantsByStudent.get(a.id);
               const meta = STAGE_STATUS_META[part?.stageStatus ?? "nao_chegou"] ?? STAGE_STATUS_META.nao_chegou;
               return (
-                <div key={a.id} className="flex items-center gap-2.5 rounded-xl border border-border bg-background px-3 py-2">
+                <div key={a.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-background px-3 py-2">
                   <Avatar className="w-7 h-7 shrink-0">
                     <AvatarFallback className="bg-indigo-600 text-white text-[9px] font-black">
                       {a.name?.split(" ").map((x: string) => x[0]).join("").slice(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  <p className="text-xs font-black text-foreground truncate flex-1 min-w-0">{a.name}</p>
+                  <p className="text-xs font-black text-foreground truncate flex-1 min-w-[120px]">{a.name}</p>
                   {part ? (
                     <Select
                       value={part.stageStatus ?? "nao_chegou"}
                       onValueChange={(value) => updateParticipant.mutate({ id: part.id, stageStatus: value as any })}
                     >
-                      <SelectTrigger className="w-[170px] h-8 text-[11px] font-bold bg-background">
+                      <SelectTrigger className="w-full sm:w-[170px] h-9 text-[11px] font-bold bg-background">
                         <span className="flex items-center gap-1.5 truncate">
                           <span className={cn("h-2 w-2 rounded-full shrink-0", meta.dot)} />
                           <SelectValue />
