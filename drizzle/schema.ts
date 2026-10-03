@@ -2650,6 +2650,8 @@ export const events = pgTable("events", {
   status: varchar("status", { length: 30 }).default("planejado").notNull(),
   // Exige autorização de imagem/participação dos participantes
   requiresAuthorization: boolean("requiresAuthorization").default(true).notNull(),
+  // Imagem do evento (banner do cartão na aba Eventos)
+  photoUrl: text("photoUrl"),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdateFn(() => new Date()).notNull(),

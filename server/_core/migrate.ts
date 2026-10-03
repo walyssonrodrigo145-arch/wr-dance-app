@@ -918,6 +918,9 @@ export async function runAutoMigrations() {
       { table: 'costumes', sql: `ALTER TABLE "costumes" ADD COLUMN IF NOT EXISTS "promoPrice" decimal(10,2)` },
       { table: 'costume_sales', sql: `UPDATE "costume_sales" SET "orderCode" = 'VDA-' || (1000 + "id") WHERE "orderCode" IS NULL` },
       { table: 'costume_sales', sql: `CREATE UNIQUE INDEX IF NOT EXISTS "costume_sales_order_code_unique" ON "costume_sales" ("orderCode")` },
+
+      // ═══ Eventos: banner do evento ═══
+      { table: 'events', sql: `ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "photoUrl" text` },
     ];
 
     for (const m of migrations) {

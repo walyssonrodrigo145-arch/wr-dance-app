@@ -8,8 +8,13 @@ import { format } from "date-fns";
 import {
   Theater, Plus, Search, Pencil, Trash2, Users, Loader2, MapPin,
   CalendarDays, Music, X, UserPlus, ShieldCheck, CheckCircle2, Clock,
-  Shirt, ShoppingCart, ArrowUp, ArrowDown,
+  Shirt, ShoppingCart, ArrowUp, ArrowDown, Send, Copy, FileText, Ticket,
+  TrendingUp, MoreVertical, PartyPopper,
 } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -92,10 +97,14 @@ type EventoRow = {
   endsAt: string | Date | null;
   status: string;
   requiresAuthorization: boolean;
+  photoUrl: string | null;
   coreografiasCount: number;
   participantesCount: number;
   confirmadosCount: number;
   autorizadosCount: number;
+  vendasQty: number;
+  receitaPrevista: number;
+  receitaArrecadada: number;
 };
 
 type EventoForm = {
@@ -108,6 +117,7 @@ type EventoForm = {
   venueAddress: string;
   description: string;
   requiresAuthorization: boolean;
+  photoUrl: string;
 };
 
 const EMPTY_FORM: EventoForm = {
@@ -120,6 +130,7 @@ const EMPTY_FORM: EventoForm = {
   venueAddress: "",
   description: "",
   requiresAuthorization: true,
+  photoUrl: "",
 };
 
 // ─── Modal de criação/edição ─────────────────────────────────────────────────
@@ -140,6 +151,7 @@ function EventoModal({ open, onClose, editing }: {
     venueAddress: editing.venueAddress ?? "",
     description: editing.description ?? "",
     requiresAuthorization: editing.requiresAuthorization,
+    photoUrl: editing.photoUrl ?? "",
   } : EMPTY_FORM);
 
   const set = (key: keyof EventoForm, value: string | boolean) => setForm((prev) => ({ ...prev, [key]: value }));
@@ -154,6 +166,7 @@ function EventoModal({ open, onClose, editing }: {
     venueAddress: form.venueAddress.trim() || null,
     description: form.description.trim() || null,
     requiresAuthorization: form.requiresAuthorization,
+    photoUrl: form.photoUrl.trim() || null,
   });
 
   const createMutation = trpc.eventos.create.useMutation({
@@ -247,6 +260,11 @@ function EventoModal({ open, onClose, editing }: {
           <div className="space-y-1.5">
             <Label>Endereço</Label>
             <Input value={form.venueAddress} onChange={(event) => set("venueAddress", event.target.value)} placeholder="Rua, número, cidade" maxLength={500} />
+          </div>
+
+          <div className="sm:col-span-2 space-y-1.5">
+            <Label>Foto do evento (URL) — aparece no cartão da lista</Label>
+            <Input value={form.photoUrl} onChange={(event) => set("photoUrl", event.target.value)} placeholder="https://... (foto do palco, elenco ou divulgação)" maxLength={1000} />
           </div>
 
           <div className="sm:col-span-2 space-y-1.5">
@@ -967,18 +985,43 @@ function EventoDetalhes({ eventId, onClose }: { eventId: number | null; onClose:
 
 // ─── Página ───────────────────────────────────────────────────────────────────
 
+const CHIP_META: Array<{ key: string; label: string }> = [
+  { key: "todos", label: "Todos" },
+  { key: "proximos", label: "Próximos" },
+  { key: "realizados", label: "Realizados" },
+  { key: "rascunhos", label: "Rascunhos" },
+  { key: "cancelados", label: "Cancelados" },
+];
+
+const DATE_BADGE_BG: Record<string, string> = {
+  planejado: "bg-amber-500",
+  confirmado: "bg-indigo-600",
+  realizado: "bg-emerald-600",
+  cancelado: "bg-slate-500",
+};
+
 export default function Eventos() {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("todos");
+  const [chip, setChip] = useState("todos");
+  const [typeFilter, setTypeFilter] = useState("todos");
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<EventoRow | null>(null);
   const [detailsId, setDetailsId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<EventoRow | null>(null);
+  const [, navigate] = useLocation();
 
   const { data: stats } = trpc.eventos.stats.useQuery();
+  const queryParams = useMemo(() => {
+    if (chip === "proximos") return { upcomingOnly: true };
+    if (chip === "realizados") return { status: "realizado" as const };
+    if (chip === "rascunhos") return { status: "planejado" as const };
+    if (chip === "cancelados") return { status: "cancelado" as const };
+    return {};
+  }, [chip]);
   const { data: eventos = [], isLoading } = trpc.eventos.list.useQuery({
     search: search.trim() || undefined,
-    status: statusFilter === "todos" ? undefined : (statusFilter as any),
+    type: typeFilter === "todos" ? undefined : (typeFilter as any),
+    ...queryParams,
   });
 
   const utils = trpc.useUtils();
@@ -992,61 +1035,120 @@ export default function Eventos() {
     onError: (error) => toast.error(error.message),
   });
 
+  const setStatusMut = trpc.eventos.setStatus.useMutation({
+    onSuccess: (_, variables) => {
+      const msg: Record<string, string> = {
+        confirmado: "Evento publicado e confirmado!",
+        planejado: "Evento voltou para rascunho.",
+        realizado: "Evento encerrado como realizado!",
+        cancelado: "Evento cancelado.",
+      };
+      toast.success(msg[variables.status] ?? "Status atualizado.");
+      utils.eventos.list.invalidate();
+      utils.eventos.stats.invalidate();
+      utils.eventos.getById.invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const duplicateMut = trpc.eventos.duplicate.useMutation({
+    onSuccess: () => {
+      toast.success("Evento duplicado como rascunho — edite a data e publique.");
+      utils.eventos.list.invalidate();
+      utils.eventos.stats.invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const chipCounts: Record<string, number> = {
+    todos: stats?.total ?? 0,
+    proximos: stats?.proximos ?? 0,
+    realizados: stats?.realizados ?? 0,
+    rascunhos: stats?.planejados ?? 0,
+    cancelados: stats?.cancelados ?? 0,
+  };
+
+  const concl = stats && stats.total > 0 ? Math.round((stats.realizados / stats.total) * 100) : 0;
+
   const kpis = useMemo(() => ([
-    { label: "Eventos", value: stats?.total ?? 0, icon: Theater, className: "text-indigo-500" },
-    { label: "Próximos", value: stats?.proximos ?? 0, icon: CalendarDays, className: "text-blue-500" },
-    { label: "Realizados", value: stats?.realizados ?? 0, icon: CheckCircle2, className: "text-emerald-500" },
-    { label: "Participações", value: stats?.participantes ?? 0, icon: Users, className: "text-purple-500" },
-  ]), [stats]);
+    { label: "Total de eventos", value: String(stats?.total ?? 0), icon: CalendarDays, iconBg: "bg-violet-500/10 text-violet-500", sub: stats && (stats.novosEsteMes ?? 0) > 0 ? `+${stats.novosEsteMes} este mês` : "nenhum novo este mês", subClass: stats && (stats.novosEsteMes ?? 0) > 0 ? "text-emerald-600 dark:text-emerald-400" : "" },
+    { label: "Próximos eventos", value: String(stats?.proximos30 ?? 0), icon: Clock, iconBg: "bg-blue-500/10 text-blue-500", sub: "Nos próximos 30 dias", subClass: "" },
+    { label: "Eventos realizados", value: String(stats?.realizados ?? 0), icon: CheckCircle2, iconBg: "bg-emerald-500/10 text-emerald-500", sub: `${concl}% de conclusão`, subClass: "" },
+    { label: "Total de participações", value: String(stats?.participantes ?? 0), icon: Users, iconBg: "bg-purple-500/10 text-purple-500", sub: "alunas convidadas nos eventos", subClass: "" },
+  ]), [stats, concl]);
 
   return (
-    <div className="flex-1 space-y-6 lg:space-y-8 p-4 sm:p-6 lg:p-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="flex-1 space-y-6 p-4 sm:p-6 lg:p-8">
+      {/* ── Header ── */}
+      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-black tracking-tight text-foreground flex items-center gap-2">
-            <Theater className="text-indigo-500" size={28} />
+          <h1 className="text-2xl lg:text-3xl font-outfit font-black tracking-tight text-foreground flex items-center gap-2.5">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-500/25"><Theater size={22} /></span>
             Eventos & Espetáculos
           </h1>
-          <p className="text-muted-foreground font-medium text-sm mt-1">
-            Recitais, festivais, competições e workshops: programa, elenco e autorizações em um só lugar.
-          </p>
+          <p className="text-muted-foreground font-medium text-sm mt-1.5">Organize recitais, festivais, competições e workshops da sua escola em um só lugar.</p>
         </div>
-        <Button onClick={() => { setEditing(null); setModalOpen(true); }} className="bg-indigo-600 hover:bg-indigo-700">
-          <Plus size={16} className="mr-2" /> Novo evento
-        </Button>
-      </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => navigate("/aulas")}><CalendarDays size={16} className="mr-2" /> Calendário</Button>
+          <Button onClick={() => { setEditing(null); setModalOpen(true); }} className="bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/25"><Plus size={16} className="mr-2" /> Novo evento</Button>
+        </div>
+      </motion.div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {kpis.map((kpi) => {
+      {/* ── KPIs ── */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+        {kpis.map((kpi, idx) => {
           const Icon = kpi.icon;
           return (
-            <div key={kpi.label} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-              <div className="flex items-center gap-2">
-                <Icon size={16} className={kpi.className} />
-                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{kpi.label}</p>
+            <motion.div key={kpi.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }} className="rounded-2xl border border-border bg-card p-4 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{kpi.label}</p>
+                  <p className="text-[26px] lg:text-3xl font-outfit font-black tracking-tight text-foreground leading-none mt-2">{kpi.value}</p>
+                  <p className={cn("text-[10px] font-bold text-muted-foreground mt-1.5 flex items-center gap-1", kpi.subClass)}>
+                    {kpi.subClass && <TrendingUp size={10} />}{kpi.sub}
+                  </p>
+                </div>
+                <span className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl", kpi.iconBg)}><Icon size={22} /></span>
               </div>
-              <p className="text-2xl font-black text-foreground mt-2">{kpi.value}</p>
-            </div>
+            </motion.div>
           );
         })}
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome ou local..." className="pl-10" />
+      {/* ── Chips de filtro + busca + selects ── */}
+      <div className="flex flex-col xl:flex-row xl:items-center gap-3">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {CHIP_META.map((c) => (
+            <button
+              key={c.key}
+              onClick={() => setChip(c.key)}
+              className={cn(
+                "rounded-full px-3.5 py-1.5 text-xs font-black transition-all",
+                chip === c.key ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/25" : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/60"
+              )}
+            >
+              {c.label} ({chipCounts[c.key] ?? 0})
+            </button>
+          ))}
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-[200px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos os status</SelectItem>
-            {Object.entries(STATUS_META).map(([value, meta]) => (
-              <SelectItem key={value} value={value}>{meta.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex flex-col sm:flex-row gap-2 xl:ml-auto xl:w-[640px]">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={15} />
+            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome, local ou descrição..." className="pl-9" />
+          </div>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-full sm:w-[160px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os tipos</SelectItem>
+              {Object.entries(TYPE_LABEL).map(([value, label]) => (
+                <SelectItem key={value} value={value}>{label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
+      {/* ── Lista de eventos ── */}
       {isLoading ? (
         <div className="flex justify-center py-20"><Loader2 className="animate-spin text-primary" size={32} /></div>
       ) : eventos.length === 0 ? (
@@ -1056,70 +1158,128 @@ export default function Eventos() {
           <p className="text-sm text-muted-foreground mt-1">Crie o primeiro evento para organizar o próximo espetáculo.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="space-y-3">
           {eventos.map((evento: EventoRow, index: number) => {
             const statusMeta = STATUS_META[evento.status] ?? STATUS_META.planejado;
             const startsAt = new Date(evento.startsAt);
+            const endsAt = evento.endsAt ? new Date(evento.endsAt) : null;
+            const progressPct = evento.receitaPrevista > 0 ? Math.min(100, Math.round((evento.receitaArrecadada / evento.receitaPrevista) * 100)) : 0;
             return (
               <motion.div
                 key={evento.id}
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.04 }}
-                className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden flex flex-col"
+                transition={{ delay: Math.min(index * 0.04, 0.25) }}
+                className="rounded-3xl border border-border bg-card shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden"
               >
-                <div className="flex">
-                  <div className="w-20 shrink-0 bg-indigo-600 text-white flex flex-col items-center justify-center py-4">
-                    <span className="text-[10px] font-black uppercase tracking-widest opacity-80">
-                      {format(startsAt, "MMM")}
-                    </span>
-                    <span className="text-2xl font-black leading-none">{format(startsAt, "dd")}</span>
-                    <span className="text-[10px] font-bold mt-1 opacity-80">{format(startsAt, "HH:mm")}</span>
+                <div className="flex flex-col lg:flex-row lg:items-stretch">
+                  {/* Foto + badge de data */}
+                  <div className="relative h-[130px] lg:h-auto lg:w-[215px] lg:min-w-[215px] shrink-0">
+                    {evento.photoUrl ? (
+                      <img src={evento.photoUrl} alt={evento.name} className="h-full w-full object-cover" loading="lazy" />
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-indigo-500/15 via-violet-500/10 to-transparent"><Theater className="text-indigo-400/50" size={40} /></div>
+                    )}
+                    <div className={cn("absolute left-3 top-3 rounded-xl px-2.5 py-1.5 text-center text-white shadow-lg", DATE_BADGE_BG[evento.status] ?? DATE_BADGE_BG.planejado)}>
+                      <p className="text-[9px] font-black uppercase tracking-widest opacity-90">{format(startsAt, "MMM", { locale: undefined }).replace(".", "")}</p>
+                      <p className="text-xl font-black leading-none">{format(startsAt, "dd")}</p>
+                      <p className="text-[9px] font-bold opacity-90">{format(startsAt, "yyyy")}</p>
+                    </div>
                   </div>
 
-                  <div className="flex-1 p-4 space-y-2 min-w-0">
+                  {/* Informações */}
+                  <div className="flex-1 min-w-0 p-4 space-y-2">
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-black text-foreground leading-tight truncate">{evento.name}</h3>
-                      <Badge variant="outline" className={cn("shrink-0 text-[10px] font-black", statusMeta.className)}>
-                        {statusMeta.label}
-                      </Badge>
+                      <h3 className="font-black text-foreground text-base lg:text-lg leading-tight truncate">{evento.name}</h3>
+                      <Badge variant="outline" className={cn("shrink-0 text-[10px] font-black", statusMeta.className)}>{statusMeta.label}</Badge>
                     </div>
-                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
-                      {TYPE_LABEL[evento.type] ?? evento.type}
-                    </p>
-                    {evento.venueName && (
-                      <p className="text-xs font-medium text-muted-foreground flex items-center gap-1 truncate">
-                        <MapPin size={12} className="shrink-0" /> {evento.venueName}
-                      </p>
-                    )}
-                    <div className="flex flex-wrap gap-2 pt-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                      <span className="flex items-center gap-1"><Music size={11} /> {evento.coreografiasCount} coreografias</span>
-                      <span className="flex items-center gap-1"><Users size={11} /> {evento.participantesCount} alunos</span>
-                      {evento.participantesCount > 0 && (
-                        <span className="flex items-center gap-1 text-emerald-600"><CheckCircle2 size={11} /> {evento.confirmadosCount} confirmados</span>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-bold text-muted-foreground">
+                      <span className="flex items-center gap-1"><CalendarDays size={12} /> {format(startsAt, "dd 'de' MMMM 'de' yyyy")}</span>
+                      <span className="flex items-center gap-1"><Clock size={12} /> {format(startsAt, "HH:mm")}{endsAt ? ` – ${format(endsAt, "HH:mm")}` : ""}</span>
+                      {evento.venueName && <span className="flex items-center gap-1 truncate"><MapPin size={12} /> {evento.venueName}</span>}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                      <Badge variant="outline" className="text-[10px] font-black bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30">{TYPE_LABEL[evento.type] ?? evento.type}</Badge>
+                      <Badge variant="outline" className={cn("text-[10px] font-black", evento.requiresAuthorization ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30")}>
+                        <ShieldCheck size={9} className="mr-1" /> {evento.requiresAuthorization ? "Autorização necessária" : "Autorização livre"}
+                      </Badge>
+                      {evento.coreografiasCount > 0 && (
+                        <Badge variant="outline" className="text-[10px] font-black bg-primary/5 text-muted-foreground border-border"><Music size={9} className="mr-1" /> {evento.coreografiasCount} coreografia(s)</Badge>
                       )}
                     </div>
-                    {evento.requiresAuthorization && evento.participantesCount > 0 && (
-                      <p className={cn(
-                        "text-[10px] font-black uppercase tracking-widest",
-                        evento.autorizadosCount === evento.participantesCount ? "text-emerald-600" : "text-amber-600"
-                      )}>
-                        {evento.autorizadosCount}/{evento.participantesCount} autorizações completas
-                      </p>
-                    )}
                   </div>
-                </div>
 
-                <div className="flex items-center gap-2 p-3 pt-0 mt-auto">
-                  <Button size="sm" variant="outline" className="flex-1" onClick={() => setDetailsId(evento.id)}>
-                    <Users size={14} className="mr-1.5" /> Programa & Elenco
-                  </Button>
-                  <Button size="icon" variant="ghost" onClick={() => { setEditing(evento); setModalOpen(true); }} title="Editar">
-                    <Pencil size={15} />
-                  </Button>
-                  <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-rose-500" onClick={() => setDeleting(evento)} title="Excluir">
-                    <Trash2 size={15} />
-                  </Button>
+                  {/* Métricas (Participações · Ingressos · Receita) */}
+                  <div className="flex items-center gap-4 sm:gap-6 px-4 py-3 lg:py-0 lg:px-0 lg:pr-7 lg:border-l border-border lg:min-w-[330px]">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-500/10 text-purple-500"><Users size={16} /></span>
+                      <div>
+                        <p className="text-lg font-outfit font-black leading-none text-foreground">{evento.participantesCount}</p>
+                        <p className="text-[10px] font-bold text-muted-foreground">Participações</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-500/10 text-teal-500"><Ticket size={16} /></span>
+                      <div>
+                        <p className="text-lg font-outfit font-black leading-none text-foreground">{evento.vendasQty}</p>
+                        <p className="text-[10px] font-bold text-muted-foreground">Ingressos</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="h-1.5 w-14 rounded-full bg-muted overflow-hidden">
+                            <span className={cn("block h-full rounded-full transition-all", progressPct >= 100 ? "bg-emerald-500" : "bg-indigo-500")} style={{ width: `${progressPct}%` }} />
+                          </span>
+                          <span className="text-[9px] font-black text-muted-foreground">{progressPct}%</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500"><TrendingUp size={16} /></span>
+                      <div>
+                        <p className="text-lg font-outfit font-black leading-none text-foreground">{formatBRL(evento.status === "realizado" ? evento.receitaArrecadada : evento.receitaPrevista)}</p>
+                        <p className="text-[10px] font-bold text-muted-foreground">{evento.status === "realizado" ? "Receita arrecadada" : "Receita estimada"}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Ações */}
+                  <div className="flex flex-col gap-2 p-4 pt-0 lg:pt-4 lg:w-[215px] shrink-0 border-t lg:border-t-0 lg:border-l border-border">
+                    {evento.status === "planejado" && (
+                      <>
+                        <Button size="sm" onClick={() => setStatusMut.mutate({ id: evento.id, status: "confirmado" })} disabled={setStatusMut.isPending} className="bg-indigo-600 hover:bg-indigo-700"><Send size={13} className="mr-1.5" /> Publicar evento</Button>
+                        <Button size="sm" variant="outline" onClick={() => { setEditing(evento); setModalOpen(true); }}><Pencil size={13} className="mr-1.5" /> Editar evento</Button>
+                      </>
+                    )}
+                    {evento.status === "confirmado" && (
+                      <>
+                        <Button size="sm" variant="outline" onClick={() => setDetailsId(evento.id)}><Users size={13} className="mr-1.5" /> Ver detalhes</Button>
+                        <Button size="sm" onClick={() => setDetailsId(evento.id)} className="bg-indigo-600 hover:bg-indigo-700"><Ticket size={13} className="mr-1.5" /> Gerenciar ingressos</Button>
+                      </>
+                    )}
+                    {evento.status === "realizado" && (
+                      <>
+                        <Button size="sm" variant="outline" onClick={() => setDetailsId(evento.id)}><FileText size={13} className="mr-1.5" /> Ver relatório</Button>
+                        <Button size="sm" variant="outline" onClick={() => duplicateMut.mutate({ id: evento.id })} disabled={duplicateMut.isPending}><Copy size={13} className="mr-1.5" /> Duplicar evento</Button>
+                      </>
+                    )}
+                    {evento.status === "cancelado" && (
+                      <Button size="sm" variant="outline" onClick={() => setDetailsId(evento.id)}><Users size={13} className="mr-1.5" /> Ver detalhes</Button>
+                    )}
+                    <div className="flex items-center justify-center gap-1">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground"><MoreVertical size={15} /></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem onClick={() => setDetailsId(evento.id)}><Users size={13} className="mr-2" /> Programa & Elenco</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setEditing(evento); setModalOpen(true); }}><Pencil size={13} className="mr-2" /> Editar evento</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => duplicateMut.mutate({ id: evento.id })} disabled={duplicateMut.isPending}><Copy size={13} className="mr-2" /> Duplicar</DropdownMenuItem>
+                          {evento.status === "confirmado" && <DropdownMenuItem onClick={() => setStatusMut.mutate({ id: evento.id, status: "realizado" })}><CheckCircle2 size={13} className="mr-2" /> Marcar realizado</DropdownMenuItem>}
+                          {evento.status === "cancelado" && <DropdownMenuItem onClick={() => setStatusMut.mutate({ id: evento.id, status: "confirmado" })}><CheckCircle2 size={13} className="mr-2" /> Reativar evento</DropdownMenuItem>}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-rose-600 focus:text-rose-600" onClick={() => setDeleting(evento)}><Trash2 size={13} className="mr-2" /> Excluir evento</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             );

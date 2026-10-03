@@ -26,6 +26,20 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.10.02.2",
+    date: "2026-10-02",
+    title: "Eventos & Espetáculos renovados",
+    summary: "Página de eventos com KPIs, filtros rápidos, cartões ricos com foto e métricas, publicação em 1 clique e duplicação de eventos.",
+    items: [
+      { type: "novo", title: "Painel de eventos com KPIs", description: "Total de eventos (com novos no mês), próximos 30 dias, realizados (% de conclusão) e total de participações." },
+      { type: "novo", title: "Filtros rápidos com contadores", description: "Chips: Todos, Próximos, Realizados, Rascunhos e Cancelados — mais busca por nome, local ou descrição e filtro por tipo." },
+      { type: "novo", title: "Cartões de evento completos", description: "Foto do evento com selo de data colorido por status, local, horário, tags e métricas ao vivo: participações, ingressos vendidos e receita." },
+      { type: "novo", title: "Publicar em 1 clique", description: "Rascunhos ganham botão \"Publicar evento\" (avisando as participantes) e eventos realizados ganham \"Ver relatório\" e \"Duplicar evento\"." },
+      { type: "novo", title: "Duplicar evento", description: "Recria o evento como rascunho mantendo programa, coreografias e convidando as mesmas alunas — ideal para temporadas seguintes." },
+      { type: "melhoria", title: "Foto no evento", description: "Novo campo de URL de foto no cadastro do evento, exibido no cartão da lista." },
+    ],
+  },
+  {
     version: "2026.10.02.1",
     date: "2026-10-02",
     title: "Loja completa: pedidos, promoções e analytics",

@@ -130,6 +130,7 @@ const eventInput = z.object({
   endsAt: z.coerce.date().nullable().optional(),
   status: z.enum(EVENT_STATUS).default("planejado"),
   requiresAuthorization: z.boolean().default(true),
+  photoUrl: z.string().max(1000).nullable().optional(),
 });
 
 export const eventosRouters = {
@@ -137,6 +138,7 @@ export const eventosRouters = {
     list: protectedProcedure.input(z.object({
       search: z.string().max(120).optional(),
       status: z.enum(EVENT_STATUS).optional(),
+      type: z.enum(EVENT_TYPES).optional(),
       upcomingOnly: z.boolean().default(false),
     }).optional()).query(async ({ ctx, input }) => {
       assertStaff(ctx);
@@ -160,20 +162,26 @@ export const eventosRouters = {
         endsAt: events.endsAt,
         status: events.status,
         requiresAuthorization: events.requiresAuthorization,
+        photoUrl: events.photoUrl,
         createdAt: events.createdAt,
         coreografiasCount,
         participantesCount,
         confirmadosCount,
         autorizadosCount,
+        vendasQty: sql<number>`(SELECT COALESCE(SUM(cs."quantity"), 0) FROM "costume_sales" cs WHERE cs."eventId" = ${events.id} AND cs."status" <> 'cancelado')`.as("vendasQty"),
+        receitaPrevista: sql<number>`(SELECT COALESCE(SUM(cs."totalPrice"), 0) FROM "costume_sales" cs WHERE cs."eventId" = ${events.id} AND cs."status" <> 'cancelado')`.as("receitaPrevista"),
+        receitaArrecadada: sql<number>`(SELECT COALESCE(SUM(cs."totalPrice"), 0) FROM "costume_sales" cs WHERE cs."eventId" = ${events.id} AND cs."status" IN ('pago', 'entregue'))`.as("receitaArrecadada"),
       })
         .from(events)
         .where(and(
           eq(events.organizationId, orgId),
           eq(events.active, true),
           input?.status ? eq(events.status, input.status) : undefined,
+          input?.type ? eq(events.type, input.type) : undefined,
           input?.upcomingOnly ? gte(events.startsAt, new Date()) : undefined,
+          input?.upcomingOnly ? inArray(events.status, ["planejado", "confirmado"]) : undefined,
           input?.search
-            ? or(ilike(events.name, `%${input.search}%`), ilike(events.venueName, `%${input.search}%`))
+            ? or(ilike(events.name, `%${input.search}%`), ilike(events.venueName, `%${input.search}%`), ilike(events.description, `%${input.search}%`))
             : undefined,
         ))
         .orderBy(asc(events.startsAt));
@@ -184,6 +192,9 @@ export const eventosRouters = {
         participantesCount: Number(row.participantesCount) || 0,
         confirmadosCount: Number(row.confirmadosCount) || 0,
         autorizadosCount: Number(row.autorizadosCount) || 0,
+        vendasQty: Number(row.vendasQty) || 0,
+        receitaPrevista: Number(row.receitaPrevista) || 0,
+        receitaArrecadada: Number(row.receitaArrecadada) || 0,
       }));
     }),
 
@@ -214,6 +225,21 @@ export const eventosRouters = {
           eq(events.active, true),
         ));
 
+      // KPIs extras (padrão da Loja/Eventos): novos no mês + janela de 30 dias
+      const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const in30Days = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const [novos] = await db.select({ count: sql<number>`CAST(COUNT(*) AS INT)` })
+        .from(events)
+        .where(and(eq(events.organizationId, orgId), gte(events.createdAt, monthStart)));
+      const [prox30] = await db.select({ count: sql<number>`CAST(COUNT(*) AS INT)` })
+        .from(events)
+        .where(and(
+          eq(events.organizationId, orgId),
+          inArray(events.status, ["planejado", "confirmado"]),
+          gte(events.startsAt, new Date()),
+          sql`${events.startsAt} <= ${in30Days}`,
+        ));
+
       const byStatus: Record<string, number> = {};
       let total = 0;
       for (const row of grouped) {
@@ -225,6 +251,11 @@ export const eventosRouters = {
         proximos: Number(proximos) || 0,
         realizados: byStatus.realizado || 0,
         participantes: Number(participantes) || 0,
+        novosEsteMes: Number(novos?.count) || 0,
+        proximos30: Number(prox30?.count) || 0,
+        planejados: byStatus.planejado || 0,
+        confirmados: byStatus.confirmado || 0,
+        cancelados: byStatus.cancelado || 0,
       };
     }),
 
@@ -298,6 +329,7 @@ export const eventosRouters = {
         endsAt: input.endsAt ?? null,
         status: input.status,
         requiresAuthorization: input.requiresAuthorization,
+        photoUrl: input.photoUrl?.trim() || null,
       }).returning({ id: events.id });
 
       return { success: true, id: created.id };
@@ -328,6 +360,7 @@ export const eventosRouters = {
         endsAt: input.endsAt ?? null,
         status: input.status,
         requiresAuthorization: input.requiresAuthorization,
+        photoUrl: input.photoUrl?.trim() || null,
         updatedAt: new Date(),
       }).where(eq(events.id, input.id));
 
@@ -362,6 +395,95 @@ export const eventosRouters = {
       // AUDITORIA: não deixar vendas de figurino apontando para evento excluído.
       await db.update(costumeSales).set({ eventId: null }).where(eq(costumeSales.eventId, input.id));
       await db.delete(events).where(eq(events.id, input.id));
+      return { success: true };
+    }),
+
+    /** Duplica um evento: campos + programa (coreografias) + participantes reconvidados. */
+    duplicate: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+
+      const [source] = await db.select().from(events)
+        .where(and(eq(events.id, input.id), eq(events.organizationId, orgId))).limit(1);
+      if (!source) throw new TRPCError({ code: "NOT_FOUND", message: "Evento não encontrado." });
+
+      const [copy] = await db.insert(events).values({
+        organizationId: orgId,
+        createdByUserId: ctx.user.id,
+        name: `${source.name} (cópia)`,
+        type: source.type,
+        description: source.description,
+        venueName: source.venueName,
+        venueAddress: source.venueAddress,
+        startsAt: source.startsAt,
+        endsAt: source.endsAt,
+        status: "planejado",
+        requiresAuthorization: source.requiresAuthorization,
+        photoUrl: source.photoUrl,
+      }).returning({ id: events.id });
+
+      const coreos = await db.select().from(eventChoreographies).where(eq(eventChoreographies.eventId, source.id));
+      if (coreos.length > 0) {
+        await db.insert(eventChoreographies).values(coreos.map((c: any) => ({
+          organizationId: orgId,
+          eventId: copy.id,
+          coreografiaId: c.coreografiaId,
+          ordem: c.ordem ?? 0,
+        })));
+      }
+      const parts = await db.select().from(eventParticipants).where(eq(eventParticipants.eventId, source.id));
+      if (parts.length > 0) {
+        await db.insert(eventParticipants).values(parts.map((p: any) => ({
+          organizationId: orgId,
+          eventId: copy.id,
+          studentId: p.studentId,
+          status: "convidado",
+          imageAuthorization: false,
+          participationAuthorization: false,
+          guardianName: p.guardianName ?? null,
+          costumeNotes: p.costumeNotes ?? null,
+          notes: p.notes ?? null,
+        })));
+      }
+      return { success: true, id: copy.id };
+    }),
+
+    /** Atalho de status do fluxo do evento (Publicar / Encerrar / Cancelar / Reativar). */
+    setStatus: protectedProcedure.input(z.object({
+      id: z.number(),
+      status: z.enum(EVENT_STATUS),
+    })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+
+      const [event] = await db.select({ id: events.id, status: events.status, name: events.name }).from(events)
+        .where(and(eq(events.id, input.id), eq(events.organizationId, orgId))).limit(1);
+      if (!event) throw new TRPCError({ code: "NOT_FOUND", message: "Evento não encontrado." });
+      if (event.status === input.status) return { success: true };
+      if (event.status === "realizado") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Evento realizado é terminal — duplique-o para criar um novo." });
+      }
+      // Transições permitidas: planejado↔confirmado, planejado/confirmado→realizado|cancelado, cancelado→confirmado
+      const from = event.status;
+      const to = input.status;
+      const allowed =
+        (from === "planejado" && ["confirmado", "realizado", "cancelado"].includes(to)) ||
+        (from === "confirmado" && ["planejado", "realizado", "cancelado"].includes(to)) ||
+        (from === "cancelado" && to === "confirmado");
+      if (!allowed) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Transição de status inválida (${from} → ${to}).` });
+      }
+      await db.update(events).set({ status: to, updatedAt: new Date() }).where(eq(events.id, input.id));
+      if (to === "cancelado") {
+        await notifyEventParticipants(db, orgId, input.id, "Evento cancelado", `O evento "${event.name}" foi cancelado pela escola.`, { whatsapp: false });
+      }
+      if (to === "confirmado" && from === "planejado") {
+        await notifyEventParticipants(db, orgId, input.id, "Evento confirmado", `O evento "${event.name}" está confirmado — confirme sua participação!`, { whatsapp: false });
+      }
       return { success: true };
     }),
 
