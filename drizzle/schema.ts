@@ -2677,6 +2677,8 @@ export const eventChoreographies = pgTable("event_choreographies", {
   dressingRoom: varchar("dressingRoom", { length: 60 }), // camarim
   stageEntry: varchar("stageEntry", { length: 10 }),     // entrada no palco (HH:mm, opcional manual)
   stageExit: varchar("stageExit", { length: 10 }),       // saída do palco (HH:mm, opcional manual)
+  // FASE 2 (aditivo): estado de palco da apresentação — aguardando | em_cena | finalizada
+  stageState: varchar("stageState", { length: 20 }).default("aguardando").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [
   uniqueIndex("event_choreographies_unique").on(table.eventId, table.coreografiaId),
@@ -2699,6 +2701,10 @@ export const eventParticipants = pgTable("event_participants", {
   // Responsável que autorizou (para menores)
   guardianName: varchar("guardianName", { length: 255 }),
   costumeNotes: text("costumeNotes"),
+  // FASE 2 (aditivo): status de palco/backstage do aluno no dia do evento
+  // nao_chegou | chegou | figurino_pronto | maquiagem_pronta | em_preparacao |
+  // aguardando_palco | no_palco | finalizado | liberado
+  stageStatus: varchar("stageStatus", { length: 30 }).default("nao_chegou").notNull(),
   notes: text("notes"),
   confirmedAt: timestamp("confirmedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -2711,6 +2717,84 @@ export const eventParticipants = pgTable("event_participants", {
 
 export type EventParticipant = typeof eventParticipants.$inferSelect;
 export type InsertEventParticipant = typeof eventParticipants.$inferInsert;
+
+// ═══════════════ FASE 2: Ingressos (independente da Loja) ═══════════════
+
+/** Tipos de ingresso do evento (Adulto, Infantil, VIP, Meia, Cortesia, Personalizado). */
+export const ticketTypes = pgTable("ticket_types", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").notNull(),
+  eventId: integer("eventId").notNull(),
+  name: varchar("name", { length: 60 }).notNull(),
+  price: decimal("price", { precision: 10, scale: 2 }).default("0.00").notNull(),
+  // Capacidade total do tipo (lote)
+  quantity: integer("quantity").default(0).notNull(),
+  // Janela de vendas (opcional)
+  salesStart: timestamp("salesStart"),
+  salesEnd: timestamp("salesEnd"),
+  // Benefício por aluno participante: quantos ingressos gratuitos cada um recebe
+  perStudentFree: integer("perStudentFree").default(0).notNull(),
+  admissionType: varchar("admissionType", { length: 20 }).default("adulto").notNull(), // adulto|infantil|vip|meia|cortesia|custom
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdateFn(() => new Date()).notNull(),
+}, (table) => [
+  index("ticket_types_event_idx").on(table.eventId),
+  index("ticket_types_org_idx").on(table.organizationId),
+]);
+
+/** Ingresso emitido (venda, cortesia ou reserva) com código único para check-in. */
+export const tickets = pgTable("tickets", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").notNull(),
+  eventId: integer("eventId").notNull(),
+  ticketTypeId: integer("ticketTypeId").notNull(),
+  // Código único exibido no QR (ex.: TE-8KQ2M1)
+  code: varchar("code", { length: 20 }).notNull(),
+  // vendido | cortesia | reservado | cancelado
+  status: varchar("status", { length: 20 }).default("vendido").notNull(),
+  // Aluno beneficiado (cortesias/benefício por participante)
+  studentId: integer("studentId"),
+  buyerName: varchar("buyerName", { length: 255 }),
+  buyerPhone: varchar("buyerPhone", { length: 30 }),
+  seatSector: varchar("seatSector", { length: 40 }),
+  seatRow: varchar("seatRow", { length: 10 }),
+  seatNumber: varchar("seatNumber", { length: 10 }),
+  checkedInAt: timestamp("checkedInAt"),
+  notes: text("notes"),
+  createdByUserId: integer("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdateFn(() => new Date()).notNull(),
+}, (table) => [
+  uniqueIndex("tickets_code_unique").on(table.code),
+  index("tickets_event_idx").on(table.eventId),
+  index("tickets_org_idx").on(table.organizationId),
+  index("tickets_type_idx").on(table.ticketTypeId),
+]);
+
+/** Mapa de assentos do evento (gerado por setor/fileira/assento). */
+export const eventSeats = pgTable("event_seats", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").notNull(),
+  eventId: integer("eventId").notNull(),
+  sector: varchar("sector", { length: 40 }).notNull(),
+  row: varchar("row", { length: 10 }).notNull(),
+  number: varchar("number", { length: 10 }).notNull(),
+  // disponivel | bloqueado
+  status: varchar("status", { length: 20 }).default("disponivel").notNull(),
+  note: varchar("note", { length: 120 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("event_seats_unique").on(table.eventId, table.sector, table.row, table.number),
+  index("event_seats_event_idx").on(table.eventId),
+]);
+
+export type TicketType = typeof ticketTypes.$inferSelect;
+export type InsertTicketType = typeof ticketTypes.$inferInsert;
+export type Ticket = typeof tickets.$inferSelect;
+export type InsertTicket = typeof tickets.$inferInsert;
+export type EventSeat = typeof eventSeats.$inferSelect;
+export type InsertEventSeat = typeof eventSeats.$inferInsert;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // FIGURINOS / VESTUÁRIO (DancePro) — acervo + empréstimos por aluno/coreografia

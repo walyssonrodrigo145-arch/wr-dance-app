@@ -16,6 +16,7 @@ import { fcmRouter } from "../fcmRouter";
 import { referralRouter } from "../referralRouter";
 import { holidaysRouters } from "./holidaysRouters";
 import { uploadsRouters } from "./uploadsRouters";
+import { ticketsRouters } from "./ticketsRouters";
 import { authRouters } from "./authRouters";
 import { progressRouters } from "./progressRouters";
 import { dashboardRouters } from "./dashboardRouters";
@@ -103,6 +104,8 @@ export const appRouter = router({
   ...holidaysRouters,
   // ── 🖼️ Uploads de imagem do sistema (novas chaves no fim — não reordenar as existentes) ──
   ...uploadsRouters,
+  // ── 🎟️ FASE 2 Ingressos: tipos, emissão, check-in e mapa de assentos (novas chaves no fim) ──
+  ...ticketsRouters,
 });
 
 export type AppRouter = typeof appRouter;

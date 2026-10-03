@@ -939,6 +939,58 @@ export async function runAutoMigrations() {
       { table: 'event_choreographies', sql: `ALTER TABLE "event_choreographies" ADD COLUMN IF NOT EXISTS "stageEntry" varchar(10)` },
       { table: 'event_choreographies', sql: `ALTER TABLE "event_choreographies" ADD COLUMN IF NOT EXISTS "stageExit" varchar(10)` },
       { table: 'events', sql: `ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "minIntervalMinutes" integer DEFAULT 6 NOT NULL` },
+
+      // ═══ FASE 2 Ingressos + Backstage (aditivo) ═══
+      { table: 'event_participants', sql: `ALTER TABLE "event_participants" ADD COLUMN IF NOT EXISTS "stageStatus" varchar(30) DEFAULT 'nao_chegou' NOT NULL` },
+      { table: 'event_choreographies', sql: `ALTER TABLE "event_choreographies" ADD COLUMN IF NOT EXISTS "stageState" varchar(20) DEFAULT 'aguardando' NOT NULL` },
+      { table: 'ticket_types', sql: `CREATE TABLE IF NOT EXISTS "ticket_types" (
+        "id" serial PRIMARY KEY,
+        "organizationId" integer NOT NULL,
+        "eventId" integer NOT NULL,
+        "name" varchar(60) NOT NULL,
+        "price" decimal(10,2) DEFAULT '0.00' NOT NULL,
+        "quantity" integer DEFAULT 0 NOT NULL,
+        "salesStart" timestamp,
+        "salesEnd" timestamp,
+        "perStudentFree" integer DEFAULT 0 NOT NULL,
+        "admissionType" varchar(20) DEFAULT 'adulto' NOT NULL,
+        "active" boolean DEFAULT true NOT NULL,
+        "createdAt" timestamp DEFAULT now() NOT NULL,
+        "updatedAt" timestamp DEFAULT now() NOT NULL
+      )` },
+      { table: 'tickets', sql: `CREATE TABLE IF NOT EXISTS "tickets" (
+        "id" serial PRIMARY KEY,
+        "organizationId" integer NOT NULL,
+        "eventId" integer NOT NULL,
+        "ticketTypeId" integer NOT NULL,
+        "code" varchar(20) NOT NULL,
+        "status" varchar(20) DEFAULT 'vendido' NOT NULL,
+        "studentId" integer,
+        "buyerName" varchar(255),
+        "buyerPhone" varchar(30),
+        "seatSector" varchar(40),
+        "seatRow" varchar(10),
+        "seatNumber" varchar(10),
+        "checkedInAt" timestamp,
+        "notes" text,
+        "createdByUserId" integer NOT NULL,
+        "createdAt" timestamp DEFAULT now() NOT NULL,
+        "updatedAt" timestamp DEFAULT now() NOT NULL
+      )` },
+      { table: 'tickets', sql: `CREATE UNIQUE INDEX IF NOT EXISTS "tickets_code_unique" ON "tickets" ("code")` },
+      { table: 'tickets', sql: `CREATE INDEX IF NOT EXISTS "tickets_event_idx" ON "tickets" ("eventId")` },
+      { table: 'event_seats', sql: `CREATE TABLE IF NOT EXISTS "event_seats" (
+        "id" serial PRIMARY KEY,
+        "organizationId" integer NOT NULL,
+        "eventId" integer NOT NULL,
+        "sector" varchar(40) NOT NULL,
+        "row" varchar(10) NOT NULL,
+        "number" varchar(10) NOT NULL,
+        "status" varchar(20) DEFAULT 'disponivel' NOT NULL,
+        "note" varchar(120),
+        "createdAt" timestamp DEFAULT now() NOT NULL
+      )` },
+      { table: 'event_seats', sql: `CREATE UNIQUE INDEX IF NOT EXISTS "event_seats_unique" ON "event_seats" ("eventId", "sector", "row", "number")` },
     ];
 
     for (const m of migrations) {

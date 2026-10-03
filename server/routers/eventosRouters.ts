@@ -12,8 +12,10 @@ import { notifyUser } from "../_core/notification";
 import { sendWhatsAppMessage } from "../utils/whatsapp";
 
 const EVENT_TYPES = ["recital", "festival", "competicao", "workshop", "audicao", "ensaio_geral", "outro"] as const;
-const EVENT_STATUS = ["planejado", "confirmado", "realizado", "cancelado"] as const;
-const PARTICIPANT_STATUS = ["convidado", "confirmado", "recusado"] as const;
+const EVENT_STATUS = ["planejado", "confirmado", "realizado", "cancelado"] as const;const PARTICIPANT_STATUS = ["convidado", "confirmado", "recusado"] as const;
+// FASE 2: backstage — status de palco do aluno e estado da apresentação
+const STAGE_STATUSES = ["nao_chegou", "chegou", "figurino_pronto", "maquiagem_pronta", "em_preparacao", "aguardando_palco", "no_palco", "finalizado", "liberado"] as const;
+const STAGE_STATES = ["aguardando", "em_cena", "finalizada"] as const;
 
 function assertStaff(ctx: { user: { role: string; openId: string } | null }) {
   if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "Não autenticado" });
@@ -299,6 +301,7 @@ export const eventosRouters = {
         dressingRoom: eventChoreographies.dressingRoom,
         stageEntry: eventChoreographies.stageEntry,
         stageExit: eventChoreographies.stageExit,
+        stageState: eventChoreographies.stageState,
         title: coreografias.title,
         formacao: coreografias.formacao,
         status: coreografias.status,
@@ -339,6 +342,7 @@ export const eventosRouters = {
         imageAuthorization: eventParticipants.imageAuthorization,
         participationAuthorization: eventParticipants.participationAuthorization,
         costumeNotes: eventParticipants.costumeNotes,
+        stageStatus: eventParticipants.stageStatus,
         notes: eventParticipants.notes,
         confirmedAt: eventParticipants.confirmedAt,
       })
@@ -811,6 +815,28 @@ export const eventosRouters = {
       return { success: true };
     }),
 
+    /** FASE 2 (backstage): estado de palco da apresentação — só uma "em_cena" por vez. */
+    setStageState: protectedProcedure.input(z.object({
+      id: z.number(),
+      state: z.enum(STAGE_STATES),
+    })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+
+      const [pres] = await db.select({ id: eventChoreographies.id, eventId: eventChoreographies.eventId }).from(eventChoreographies)
+        .where(and(eq(eventChoreographies.id, input.id), eq(eventChoreographies.organizationId, orgId))).limit(1);
+      if (!pres) throw new TRPCError({ code: "NOT_FOUND", message: "Apresentação não encontrada no programa." });
+
+      if (input.state === "em_cena") {
+        await db.update(eventChoreographies).set({ stageState: "finalizada" })
+          .where(and(eq(eventChoreographies.eventId, pres.eventId), eq(eventChoreographies.stageState, "em_cena")));
+      }
+      await db.update(eventChoreographies).set({ stageState: input.state }).where(eq(eventChoreographies.id, input.id));
+      return { success: true };
+    }),
+
     /** Adiciona participante ao evento (também aceita em lote via array). */
     addParticipant: protectedProcedure.input(z.object({
       eventId: z.number(),
@@ -866,6 +892,8 @@ export const eventosRouters = {
       guardianName: z.string().max(255).nullable().optional(),
       costumeNotes: z.string().max(2000).nullable().optional(),
       notes: z.string().max(2000).nullable().optional(),
+      // FASE 2: status de palco/backstage
+      stageStatus: z.enum(STAGE_STATUSES).optional(),
     })).mutation(async ({ ctx, input }) => {
       assertStaff(ctx);
       const db = await getDb();
@@ -882,6 +910,7 @@ export const eventosRouters = {
         ...(input.participationAuthorization !== undefined ? { participationAuthorization: input.participationAuthorization } : {}),
         ...(input.guardianName !== undefined ? { guardianName: input.guardianName?.trim() || null } : {}),
         ...(input.costumeNotes !== undefined ? { costumeNotes: input.costumeNotes?.trim() || null } : {}),
+        ...(input.stageStatus !== undefined ? { stageStatus: input.stageStatus } : {}),
         ...(input.notes !== undefined ? { notes: input.notes?.trim() || null } : {}),
         updatedAt: new Date(),
       }).where(eq(eventParticipants.id, input.id));

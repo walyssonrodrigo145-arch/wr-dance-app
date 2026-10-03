@@ -11,7 +11,7 @@ import {
   MapPin, CheckCircle2, Clock, TrendingUp, Pencil, Copy, Send, X, UserPlus,
   ShieldCheck, Search, Plus, Loader2, Trash2, ArrowUp, ArrowDown, ShoppingCart,
   QrCode, PackageCheck, ArrowUpRight, Download, Ticket, Ban, Truck,
-  GripVertical, AlertTriangle,
+  GripVertical, AlertTriangle, ClipboardList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,8 @@ import {
   PARTICIPANT_STATUS_META, EventoModal,
 } from "@/components/eventos/EventoModal";
 import { SaleChargeModal } from "./Figurinos";
+import { TicketsTab } from "@/components/eventos/TicketsTab";
+import { BackstageTab } from "@/components/eventos/BackstageTab";
 import { SmartImage } from "@/components/common/SmartImage";
 
 /** Deriva as duas dimensões a partir do status único da venda. */
@@ -478,6 +480,8 @@ export default function EventoGestao() {
             <TabsTrigger value="visao"><LayoutDashboard size={13} className="mr-1.5" /> Visão geral</TabsTrigger>
             <TabsTrigger value="participantes"><Users size={13} className="mr-1.5" /> Participações ({participantes.length})</TabsTrigger>
             <TabsTrigger value="programa"><Music size={13} className="mr-1.5" /> Programação ({coreografiasVinculadas.length})</TabsTrigger>
+            <TabsTrigger value="ingressos"><Ticket size={13} className="mr-1.5" /> Ingressos</TabsTrigger>
+            <TabsTrigger value="operacao"><ClipboardList size={13} className="mr-1.5" /> Operação</TabsTrigger>
             <TabsTrigger value="loja"><Shirt size={13} className="mr-1.5" /> Loja ({sales.length})</TabsTrigger>
             <TabsTrigger value="relatorios"><FileText size={13} className="mr-1.5" /> Relatórios</TabsTrigger>
           </TabsList>
@@ -1189,6 +1193,16 @@ export default function EventoGestao() {
                 <p className="text-[10px] font-bold text-muted-foreground">Arraste os cartões para reordenar o programa (ou use as setas). Horários previstos calculados a partir do início do evento + durações.</p>
               </div>
             )}
+          </TabsContent>
+
+          {/* ── INGRESSOS (FASE 2) ── */}
+          <TabsContent value="ingressos" className="mt-4">
+            <TicketsTab eventId={eventId} />
+          </TabsContent>
+
+          {/* ── OPERAÇÃO / BACKSTAGE (FASE 2) ── */}
+          <TabsContent value="operacao" className="mt-4">
+            <BackstageTab eventId={eventId} />
           </TabsContent>
 
           {/* ── LOJA DO EVENTO ── */}
