@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { formatBRL } from "@/lib/money";
 import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   Theater, Plus, Search, Pencil, Trash2, Users, Loader2, MapPin,
   CalendarDays, Music, X, UserPlus, ShieldCheck, CheckCircle2, Clock,
@@ -1181,7 +1182,7 @@ export default function Eventos() {
                       <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-indigo-500/15 via-violet-500/10 to-transparent"><Theater className="text-indigo-400/50" size={40} /></div>
                     )}
                     <div className={cn("absolute left-3 top-3 rounded-xl px-2.5 py-1.5 text-center text-white shadow-lg", DATE_BADGE_BG[evento.status] ?? DATE_BADGE_BG.planejado)}>
-                      <p className="text-[9px] font-black uppercase tracking-widest opacity-90">{format(startsAt, "MMM", { locale: undefined }).replace(".", "")}</p>
+                      <p className="text-[9px] font-black uppercase tracking-widest opacity-90">{format(startsAt, "MMM", { locale: ptBR }).replace(".", "")}</p>
                       <p className="text-xl font-black leading-none">{format(startsAt, "dd")}</p>
                       <p className="text-[9px] font-bold opacity-90">{format(startsAt, "yyyy")}</p>
                     </div>
@@ -1194,7 +1195,7 @@ export default function Eventos() {
                       <Badge variant="outline" className={cn("shrink-0 text-[10px] font-black", statusMeta.className)}>{statusMeta.label}</Badge>
                     </div>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-bold text-muted-foreground">
-                      <span className="flex items-center gap-1"><CalendarDays size={12} /> {format(startsAt, "dd 'de' MMMM 'de' yyyy")}</span>
+                      <span className="flex items-center gap-1"><CalendarDays size={12} /> {format(startsAt, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
                       <span className="flex items-center gap-1"><Clock size={12} /> {format(startsAt, "HH:mm")}{endsAt ? ` – ${format(endsAt, "HH:mm")}` : ""}</span>
                       {evento.venueName && <span className="flex items-center gap-1 truncate"><MapPin size={12} /> {evento.venueName}</span>}
                     </div>

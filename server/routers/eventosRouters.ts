@@ -3,7 +3,7 @@
 // apresentação e participantes com autorização de imagem/participação.
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, gte, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
 import { protectedProcedure, studentProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { coreografiaAlunos, coreografias, costumeSales, eventChoreographies, eventParticipants, events, instruments, settings, students } from "../../drizzle/schema";
@@ -237,7 +237,7 @@ export const eventosRouters = {
           eq(events.organizationId, orgId),
           inArray(events.status, ["planejado", "confirmado"]),
           gte(events.startsAt, new Date()),
-          sql`${events.startsAt} <= ${in30Days}`,
+          lte(events.startsAt, in30Days),
         ));
 
       const byStatus: Record<string, number> = {};
