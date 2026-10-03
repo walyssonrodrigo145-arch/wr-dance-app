@@ -26,6 +26,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.10.02.3",
+    date: "2026-10-02",
+    title: "Gestão de eventos em página completa",
+    summary: "Gerenciar evento agora abre uma página ampla com 5 abas, datas de vários dias corretas e métricas reais — e a Loja ficou com textos e seções organizados.",
+    items: [
+      { type: "novo", title: "Página Gerenciar evento", description: "Substitui o modal apertado: Visão geral, Participações, Programação, Loja e Relatórios — tudo com edição e exportação para CSV." },
+      { type: "novo", title: "Eventos de vários dias corretos", description: "Cartão e gestão mostram a faixa completa (início → término), com o selo de data agrupando os dias." },
+      { type: "novo", title: "Situação calculada × status manual", description: "Cada evento mostra o workflow (Rascunho/Confirmado/Realizado/Cancelado) separado da situação automática pelas datas (Futuro/Em andamento/Datas encerradas)." },
+      { type: "melhoria", title: "Métricas com base clara", description: "O indicador comum de ingressos foi trocado por Vendas da loja (itens vendidos) e Receita da loja (arrecadada/prevista) — sem percentuais sem fundamento." },
+      { type: "melhoria", title: "Loja com seções e textos de produto", description: "Novo produto organiza em Informações, Preços e Estoque & Acervo; campos de preço aparecem só para produtos vendáveis." },
+      { type: "melhoria", title: "Pagamento e entrega separados", description: "Vendas mostra badges de Pagamento; Pedidos mostra Pagamento + Entrega. O campo de venda agora se chama \"Como cobrar\"." },
+      { type: "correcao", title: "KPIs reais nos cartões", description: "Contadores de participações, vendas e receita dos cartões de evento e da Loja corrigidos (agregação server-side confiável)." },
+    ],
+  },
+  {
     version: "2026.10.02.2",
     date: "2026-10-02",
     title: "Eventos & Espetáculos renovados",
