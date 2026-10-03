@@ -15,7 +15,7 @@ services:
         VITE_FIREBASE_VAPID_KEY: ${VITE_FIREBASE_VAPID_KEY}
         VITE_VAPID_PUBLIC_KEY: ${VITE_VAPID_PUBLIC_KEY}
     ports:
-      - "3002:5000"
+      - "127.0.0.1:3002:5000"
     networks:
       - default
       - main-network

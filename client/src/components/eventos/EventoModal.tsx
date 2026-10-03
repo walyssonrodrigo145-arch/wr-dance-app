@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ImageUploadField } from "@/components/common/ImageUploadField";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -237,9 +238,14 @@ export function EventoModal({ open, onClose, editing }: {
             <Input value={form.venueAddress} onChange={(event) => set("venueAddress", event.target.value)} placeholder="Rua, número, cidade" maxLength={500} />
           </div>
 
-          <div className="sm:col-span-2 space-y-1.5">
-            <Label>Foto do evento (URL) — aparece no cartão da lista</Label>
-            <Input value={form.photoUrl} onChange={(event) => set("photoUrl", event.target.value)} placeholder="https://... (foto do palco, elenco ou divulgação)" maxLength={1000} />
+          <div className="sm:col-span-2">
+            <ImageUploadField
+              value={form.photoUrl}
+              onChange={(url) => set("photoUrl", url)}
+              label="Foto do evento"
+              hint="Aparece no cartão da lista e na página de gerenciamento."
+              fallbackIcon={<Theater size={18} />}
+            />
           </div>
 
           <div className="sm:col-span-2 space-y-1.5">

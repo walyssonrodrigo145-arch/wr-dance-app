@@ -33,6 +33,7 @@ import {
   PARTICIPANT_STATUS_META, EventoModal,
 } from "@/components/eventos/EventoModal";
 import { SaleChargeModal } from "./Figurinos";
+import { SmartImage } from "@/components/common/SmartImage";
 
 /** Deriva as duas dimensões a partir do status único da venda. */
 function saleDimensions(status: string): { payment: { label: string; className: string }; delivery: { label: string; className: string } | null } {
@@ -717,11 +718,12 @@ export default function EventoGestao() {
                   return (
                     <div key={product.id} className="rounded-2xl border border-border bg-card p-3 space-y-2 hover:shadow-md transition-shadow">
                       <div className="flex items-start gap-2.5">
-                        {product.photoUrl ? (
-                          <img src={product.photoUrl} alt={product.name} className="h-9 w-9 rounded-lg object-cover border border-border shrink-0" loading="lazy" />
-                        ) : (
-                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary/70"><Shirt size={14} /></span>
-                        )}
+                        <SmartImage
+                          src={product.photoUrl}
+                          alt={product.name}
+                          className="h-9 w-9 rounded-lg object-cover border border-border shrink-0"
+                          fallback={<span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary/70"><Shirt size={14} /></span>}
+                        />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-black text-foreground truncate">{product.name}</p>
                           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest truncate">

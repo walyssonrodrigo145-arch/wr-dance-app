@@ -15,6 +15,7 @@ import { schoolAiRouter } from "../schoolAiRouter";
 import { fcmRouter } from "../fcmRouter";
 import { referralRouter } from "../referralRouter";
 import { holidaysRouters } from "./holidaysRouters";
+import { uploadsRouters } from "./uploadsRouters";
 import { authRouters } from "./authRouters";
 import { progressRouters } from "./progressRouters";
 import { dashboardRouters } from "./dashboardRouters";
@@ -100,6 +101,8 @@ export const appRouter = router({
   referral: referralRouter,
   // ── 📅 Calendário Escolar: feriados, recessos e eventos (novas chaves no fim — não reordenar as existentes) ──
   ...holidaysRouters,
+  // ── 🖼️ Uploads de imagem do sistema (novas chaves no fim — não reordenar as existentes) ──
+  ...uploadsRouters,
 });
 
 export type AppRouter = typeof appRouter;

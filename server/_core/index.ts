@@ -1265,6 +1265,7 @@ async function startServer() {
         /^challenges\/org_(\d+)\//,
         /^support\/org_(\d+)\//,
         /^music-library\/(\d+)\//,
+        /^fotos\/org_(\d+)\//,
       ];
       const isSuperAdmin =
         (Boolean(ENV.ownerOpenId) && user.openId === ENV.ownerOpenId) ||

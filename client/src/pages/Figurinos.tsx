@@ -3,6 +3,8 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { EVENT_PAYMENT_META, EVENT_DELIVERY_META } from "@/components/eventos/EventoModal";
+import { SmartImage } from "@/components/common/SmartImage";
+import { ImageUploadField } from "@/components/common/ImageUploadField";
 
 /** Separa as duas dimensões do status único da venda: pagamento × entrega. */
 function saleDimensions(status: string): { payment: { label: string; className: string }; delivery: { label: string; className: string } | null } {
@@ -119,9 +121,10 @@ function CostumeModal({ open, onClose, editing }: { open: boolean; onClose: () =
     promoPrice: editing.promoPrice != null && Number(editing.promoPrice) > 0 ? String(editing.promoPrice) : "",
     sellable: editing.sellable === false ? "nao" : "sim",
     notes: editing.notes ?? "",
+    photoUrl: editing.photoUrl ?? "",
   } : {
     name: "", code: "", type: "outro", size: "", color: "",
-    quantity: "1", condition: "bom", cost: "0", salePrice: "0", promoPrice: "", sellable: "sim", notes: "",
+    quantity: "1", condition: "bom", cost: "0", salePrice: "0", promoPrice: "", sellable: "sim", notes: "", photoUrl: "",
   });
 
   const set = (key: string, value: string) => setForm((prev) => ({ ...prev, [key]: value }));
@@ -139,8 +142,7 @@ function CostumeModal({ open, onClose, editing }: { open: boolean; onClose: () =
     promoPrice: form.promoPrice.trim() ? Math.max(0, parseFloat(form.promoPrice.replace(",", ".")) || 0) : null,
     sellable: form.sellable === "sim",
     notes: form.notes.trim() || null,
-    // Preserva a foto existente ao editar (o modal não expõe upload ainda)
-    photoUrl: editing?.photoUrl ?? null,
+    photoUrl: form.photoUrl.trim() || null,
   });
 
   const createMutation = trpc.figurinos.create.useMutation({
@@ -254,6 +256,15 @@ function CostumeModal({ open, onClose, editing }: { open: boolean; onClose: () =
           <div className="space-y-1.5">
             <Label>Cor</Label>
             <Input value={form.color} onChange={(event) => set("color", event.target.value)} placeholder="Rosa, branco..." maxLength={60} />
+          </div>
+          <div className="sm:col-span-2">
+            <ImageUploadField
+              value={form.photoUrl}
+              onChange={(url) => set("photoUrl", url)}
+              label="Foto do produto"
+              hint="Aparece no catálogo, na Loja do evento e no portal da aluna."
+              fallbackIcon={<Shirt size={18} />}
+            />
           </div>
           <div className="sm:col-span-2 space-y-1.5">
             <Label>Observações</Label>
@@ -969,20 +980,21 @@ export default function Figurinos() {
   );
 
   const renderProductThumb = (item: any, size = "h-10 w-10") => (
-    item.photoUrl ? (
-      <img src={item.photoUrl} alt={item.name} className={cn(size, "rounded-xl object-cover border border-border")} loading="lazy" />
-    ) : (
-      <span className={cn(size, "flex items-center justify-center rounded-xl bg-primary/10 text-primary/70")}><Shirt size={16} /></span>
-    )
+    <SmartImage
+      src={item.photoUrl}
+      alt={item.name}
+      className={cn(size, "rounded-xl object-cover border border-border")}
+      fallback={<span className={cn(size, "flex items-center justify-center rounded-xl bg-primary/10 text-primary/70")}><Shirt size={16} /></span>}
+    />
   );
 
   const renderPrice = (item: any, big = false) => {
     const promo = Number(item.promoPrice) > 0;
     return (
-      <div className="flex items-center gap-1.5">
-        {promo && <span className={cn("text-muted-foreground line-through", big ? "text-xs" : "text-[10px]")}>{formatBRL(item.salePrice)}</span>}
-        <span className={cn("font-black", big ? "text-base" : "text-sm", promo && "text-emerald-600 dark:text-emerald-400")}>{formatBRL(effectiveSalePrice(item))}</span>
-        {promo && <Badge variant="outline" className="text-[9px] font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 px-1 py-0"><Percent size={8} className="mr-0.5" />Promo</Badge>}
+      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
+        {promo && <span className={cn("text-muted-foreground line-through whitespace-nowrap", big ? "text-xs" : "text-[10px]")}>{formatBRL(item.salePrice)}</span>}
+        <span className={cn("font-black whitespace-nowrap", big ? "text-base" : "text-sm", promo && "text-emerald-600 dark:text-emerald-400")}>{formatBRL(effectiveSalePrice(item))}</span>
+        {promo && big && <Badge variant="outline" className="text-[9px] font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 px-1 py-0"><Percent size={8} className="mr-0.5" />Promo</Badge>}
       </div>
     );
   };
@@ -992,11 +1004,12 @@ export default function Figurinos() {
       {list.map((costume: any, idx: number) => (
         <motion.div key={costume.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx * 0.04, 0.3) }} className="group rounded-2xl border border-border bg-card overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
           <div className="relative aspect-[4/3] bg-muted/40 overflow-hidden">
-            {costume.photoUrl ? (
-              <img src={costume.photoUrl} alt={costume.name} className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
-            ) : (
-              <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-primary/5 to-violet-500/10"><Shirt className="text-primary/30" size={44} /></div>
-            )}
+            <SmartImage
+              src={costume.photoUrl}
+              alt={costume.name}
+              className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+              fallback={<div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-primary/5 to-violet-500/10"><Shirt className="text-primary/30" size={44} /></div>}
+            />
             {Number(costume.promoPrice) > 0 && (
               <Badge className="absolute top-2 left-2 bg-emerald-600 hover:bg-emerald-600 text-white text-[9px] font-black border-0"><Percent size={8} className="mr-0.5" />Promo</Badge>
             )}
@@ -1042,7 +1055,7 @@ export default function Figurinos() {
     <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
         <div className="min-w-[760px]">
-          <div className="grid grid-cols-[36px_minmax(0,2.2fr)_120px_110px_130px_90px_150px] gap-3 px-4 py-3 border-b border-border bg-muted/30">
+          <div className="grid grid-cols-[36px_minmax(0,2fr)_110px_155px_150px_80px_150px] gap-3 px-4 py-3 border-b border-border bg-muted/30">
             <button className="flex items-center" onClick={togglePageSelection}>
               <span className={cn("h-4 w-4 rounded border flex items-center justify-center transition-colors", allPageSelected ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/40")}>
                 {allPageSelected && <CheckCircle2 size={11} />}
@@ -1056,7 +1069,7 @@ export default function Figurinos() {
             const st = stockState(costume.sellable ? costume.disponivelVenda : costume.disponivel);
             const selected = selectedIds.has(costume.id);
             return (
-              <div key={costume.id} className={cn("grid grid-cols-[36px_minmax(0,2.2fr)_120px_110px_130px_90px_150px] gap-3 px-4 py-3 border-b border-border/60 items-center hover:bg-primary/[0.03] transition-colors", selected && "bg-primary/[0.05]")}>
+              <div key={costume.id} className={cn("grid grid-cols-[36px_minmax(0,2fr)_110px_155px_150px_80px_150px] gap-3 px-4 py-3 border-b border-border/60 items-center hover:bg-primary/[0.03] transition-colors", selected && "bg-primary/[0.05]")}>
                 <button className="flex items-center" onClick={() => toggleSelect(costume.id)}>
                   <span className={cn("h-4 w-4 rounded border flex items-center justify-center transition-colors", selected ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/40")}>
                     {selected && <CheckCircle2 size={11} />}

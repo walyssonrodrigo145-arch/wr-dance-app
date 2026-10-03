@@ -28,6 +28,7 @@ import {
 import {
   EVENT_TYPE_LABEL, EVENT_STATUS_META, EventoModal, type EventoRow,
 } from "@/components/eventos/EventoModal";
+import { SmartImage } from "@/components/common/SmartImage";
 
 const CHIP_META: Array<{ key: string; label: string }> = [
   { key: "todos", label: "Todos" },
@@ -230,11 +231,12 @@ export default function Eventos() {
                 <div className="flex flex-col lg:flex-row lg:items-stretch">
                   {/* Foto + selo de data (um dia ou faixa) */}
                   <div className="relative h-[130px] lg:h-auto lg:w-[215px] lg:min-w-[215px] shrink-0">
-                    {evento.photoUrl ? (
-                      <img src={evento.photoUrl} alt={evento.name} className="h-full w-full object-cover" loading="lazy" />
-                    ) : (
-                      <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-indigo-500/15 via-violet-500/10 to-transparent"><Theater className="text-indigo-400/50" size={40} /></div>
-                    )}
+                    <SmartImage
+                      src={evento.photoUrl}
+                      alt={evento.name}
+                      className="h-full w-full object-cover"
+                      fallback={<div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-indigo-500/15 via-violet-500/10 to-transparent"><Theater className="text-indigo-400/50" size={40} /></div>}
+                    />
                     <div className={cn("absolute left-3 top-3 rounded-xl px-2.5 py-1.5 text-center text-white shadow-lg", DATE_BADGE_BG[evento.status] ?? DATE_BADGE_BG.planejado)}>
                       {multiDay && endsAt ? (
                         <>
