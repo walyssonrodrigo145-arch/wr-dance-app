@@ -5,12 +5,12 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { formatBRL } from "@/lib/money";
-import { format, formatEventPeriod, eventSituation } from "@/lib/dates";
+import { format, formatEventPeriod, eventSituation, isMultiDay } from "@/lib/dates";
 import {
   Theater, Users, Music, Shirt, FileText, LayoutDashboard, ArrowLeft, CalendarDays,
   MapPin, CheckCircle2, Clock, TrendingUp, Pencil, Copy, Send, X, UserPlus,
   ShieldCheck, Search, Plus, Loader2, Trash2, ArrowUp, ArrowDown, ShoppingCart,
-  QrCode, PackageCheck, ArrowUpRight, Download, Ticket, Ban,
+  QrCode, PackageCheck, ArrowUpRight, Download, Ticket, Ban, Truck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,12 +36,16 @@ import { SaleChargeModal } from "./Figurinos";
 import { SmartImage } from "@/components/common/SmartImage";
 
 /** Deriva as duas dimensões a partir do status único da venda. */
-function saleDimensions(status: string): { payment: { label: string; className: string }; delivery: { label: string; className: string } | null } {
+function saleDimensions(status: string, deliveryStatus?: string | null): { payment: { label: string; className: string }; delivery: { label: string; className: string } | null } {
   if (status === "cancelado") {
     return { payment: EVENT_PAYMENT_META.cancelado, delivery: null };
   }
-  const payment = status === "pago" || status === "entregue" ? EVENT_PAYMENT_META.pago : EVENT_PAYMENT_META.pendente;
-  const delivery = status === "em_separacao" ? EVENT_DELIVERY_META.em_separacao : status === "entregue" ? EVENT_DELIVERY_META.entregue : null;
+  const payment = status === "pago" ? EVENT_PAYMENT_META.pago : EVENT_PAYMENT_META.pendente;
+  const delivery = deliveryStatus === "entregue"
+    ? EVENT_DELIVERY_META.entregue
+    : deliveryStatus === "em_separacao"
+      ? EVENT_DELIVERY_META.em_separacao
+      : { label: "Entrega: pendente", className: "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/30" };
   return { payment, delivery };
 }
 
@@ -62,8 +66,8 @@ export default function EventoGestao() {
   const eventId = params?.id ? Number(params.id) : NaN;
   const hasId = Number.isFinite(eventId) && eventId > 0;
 
-  const abaFromUrl = typeof window !== "undefined" && window.location.hash.includes("aba=")
-    ? window.location.hash.split("aba=")[1]
+  const abaFromUrl = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("aba") ?? ""
     : "";
   const [tab, setTab] = useState(["visao", "participantes", "programa", "loja", "relatorios"].includes(abaFromUrl) ? abaFromUrl : "visao");
 
@@ -111,7 +115,7 @@ export default function EventoGestao() {
     { enabled: hasId }
   );
 
-  const { data, isLoading } = trpc.eventos.getById.useQuery(
+  const { data, isLoading, isError, error, refetch } = trpc.eventos.getById.useQuery(
     { id: eventId },
     { enabled: hasId }
   );
@@ -146,7 +150,17 @@ export default function EventoGestao() {
 
   const updateSaleStatus = trpc.figurinos.updateSaleStatus.useMutation({
     onSuccess: () => {
-      toast.success("Venda atualizada!");
+      toast.success("Pagamento atualizado!");
+      utils.figurinos.storeCatalog.invalidate();
+      utils.figurinos.sales.invalidate();
+      invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const updateSaleDelivery = trpc.figurinos.updateSaleDelivery.useMutation({
+    onSuccess: () => {
+      toast.success("Entrega atualizada!");
       utils.figurinos.storeCatalog.invalidate();
       utils.figurinos.sales.invalidate();
       invalidate();
@@ -244,11 +258,24 @@ export default function EventoGestao() {
   const autorizPendentes = participantes.filter((p: any) => !(p.imageAuthorization && p.participationAuthorization)).length;
   const vendasValidas = (sales as any[]).filter((s) => s.status !== "cancelado");
   const receitaPrevista = vendasValidas.reduce((acc, s) => acc + (Number(s.totalPrice) || 0), 0);
-  const receitaArrecadada = vendasValidas.filter((s) => s.status === "pago" || s.status === "entregue").reduce((acc, s) => acc + (Number(s.totalPrice) || 0), 0);
+  const receitaArrecadada = vendasValidas.filter((s) => s.status === "pago").reduce((acc, s) => acc + (Number(s.totalPrice) || 0), 0);
   const vendasQty = vendasValidas.reduce((acc, s) => acc + (Number(s.quantity) || 0), 0);
 
   const statusMeta = EVENT_STATUS_META[data?.status ?? "planejado"] ?? EVENT_STATUS_META.planejado;
   const situation = eventSituation(data?.startsAt, data?.endsAt);
+
+  // Conflito entre status manual e datas: realizado com término (ou início) futuro.
+  const dateConflict = (() => {
+    if (data?.status !== "realizado") return null;
+    const end = data?.endsAt ? new Date(String(data.endsAt)) : null;
+    const start = data?.startsAt ? new Date(String(data.startsAt)) : null;
+    const reference = end && !isNaN(end.getTime()) ? end : start && !isNaN(start.getTime()) ? start : null;
+    if (!reference || reference <= new Date()) return null;
+    return {
+      what: end ? "término" : "início",
+      label: reference.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) + " às " + reference.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+    };
+  })();
 
   const changeTab = (next: string) => {
     setTab(next);
@@ -266,8 +293,8 @@ export default function EventoGestao() {
   const relatorioVendasCsv = () => {
     const rows: string[][] = [["Pedido", "Produto", "Aluno", "Qtd", "Total", "Pagamento", "Entrega"]];
     for (const s of sales as any[]) {
-      const dims = saleDimensions(s.status);
-      rows.push([s.orderCode ?? `VDA-${1000 + s.id}`, s.costumeName, s.studentName, String(s.quantity), formatBRL(s.totalPrice), dims.payment.label.replace("Pagamento: ", ""), dims.delivery?.label ?? "—"]);
+      const dims = saleDimensions(s.status, s.deliveryStatus);
+      rows.push([s.orderCode ?? `VDA-${1000 + s.id}`, s.costumeName, s.studentName, String(s.quantity), formatBRL(s.totalPrice), dims.payment.label.replace("Pagamento: ", ""), dims.delivery?.label.replace("Entrega: ", "") ?? "—"]);
     }
     downloadCsv(`vendas-evento-${eventId}.csv`, rows);
   };
@@ -299,9 +326,15 @@ export default function EventoGestao() {
             </span>
             <div className="min-w-0">
               <h1 className="text-2xl lg:text-3xl font-outfit font-black tracking-tight text-foreground truncate">{data?.name ?? "Evento"}</h1>
-              <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                <Badge variant="outline" className={cn("text-[10px] font-black", statusMeta.className)}>{statusMeta.label}</Badge>
-                <Badge variant="outline" className={cn("text-[10px] font-black", situation.className)} title="Calculado pelas datas do evento">{situation.label}</Badge>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-1.5">
+                <span className="flex items-center gap-1.5">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Status do evento</span>
+                  <Badge variant="outline" className={cn("text-[10px] font-black", statusMeta.className)}>{statusMeta.label}</Badge>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Situação pelas datas</span>
+                  <Badge variant="outline" className={cn("text-[10px] font-black", situation.className)}>{situation.label}</Badge>
+                </span>
                 <Badge variant="outline" className="text-[10px] font-black bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30">{EVENT_TYPE_LABEL[data?.type ?? "recital"] ?? data?.type}</Badge>
               </div>
               <p className="text-[11px] font-bold text-muted-foreground mt-1.5 flex items-center gap-1.5 flex-wrap">
@@ -329,8 +362,24 @@ export default function EventoGestao() {
         </div>
       </motion.div>
 
+      {dateConflict && (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+          <p className="text-xs font-bold text-amber-700 dark:text-amber-400 flex-1">
+            Evento marcado como <span className="font-black">Realizado</span>, mas o {dateConflict.what} está previsto para {dateConflict.label}. Revise as datas ou o status.
+          </p>
+          <Button size="sm" variant="outline" onClick={() => setModalOpen(true)}><Pencil size={12} className="mr-1.5" /> Editar evento</Button>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="flex justify-center py-20"><Loader2 className="animate-spin text-primary" size={32} /></div>
+      ) : isError ? (
+        <div className="text-center py-16 rounded-3xl border-2 border-dashed border-rose-500/30 bg-rose-500/5">
+          <div className="flex justify-center mb-3"><span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-500"><X size={22} /></span></div>
+          <p className="font-black text-foreground">Não foi possível carregar este evento</p>
+          <p className="text-sm text-muted-foreground mt-1">{error?.message ?? "Falha de conexão. Tente novamente."}</p>
+          <Button size="sm" variant="outline" className="mt-3" onClick={() => refetch()}>Tentar novamente</Button>
+        </div>
       ) : (
         <Tabs value={tab} onValueChange={changeTab}>
           <TabsList className="w-full sm:w-auto h-auto flex-wrap">
@@ -345,7 +394,7 @@ export default function EventoGestao() {
           <TabsContent value="visao" className="mt-4 space-y-4">
             <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
               {[
-                { label: "Período", value: formatEventPeriod(data?.startsAt, data?.endsAt), icon: CalendarDays, tint: "bg-indigo-500/10 text-indigo-500", note: data?.endsAt ? "evento de vários dias" : "dia único" },
+                { label: "Período", value: formatEventPeriod(data?.startsAt, data?.endsAt), icon: CalendarDays, tint: "bg-indigo-500/10 text-indigo-500", note: !data?.endsAt ? "sem horário de término" : isMultiDay(data?.startsAt, data?.endsAt) ? "evento de vários dias" : "evento de um dia" },
                 { label: "Local", value: data?.venueName ?? "—", icon: MapPin, tint: "bg-blue-500/10 text-blue-500", note: data?.venueAddress ?? "sem endereço" },
                 { label: "Participações", value: `${confirmados} de ${participantes.length}`, icon: Users, tint: "bg-purple-500/10 text-purple-500", note: `${recusados} recusado(s) · ${participantes.length - confirmados - recusados} sem resposta` },
                 { label: "Autorizações", value: `${autorizCompletas} completas`, icon: ShieldCheck, tint: "bg-emerald-500/10 text-emerald-500", note: data?.requiresAuthorization ? `${autorizPendentes} pendente(s)` : "evento sem autorização exigida" },
@@ -373,16 +422,15 @@ export default function EventoGestao() {
               </div>
             )}
 
-            <div className="rounded-2xl border border-border bg-muted/30 p-4">
-              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">Como o status funciona</p>
-              <p className="text-xs font-medium text-muted-foreground leading-relaxed">
-                O <span className="font-black text-foreground">status</span> ({statusMeta.label}) é o workflow manual — Rascunho e Confirmado no formulário; Encerrar e Cancelar por ação. A <span className="font-black text-foreground">situação</span> ({situation.label}) é calculada automaticamente pelas datas: Futuro (antes do início), Em andamento (entre início e término) e Datas encerradas (após o término).
+            <div className="rounded-2xl border border-border bg-muted/30 p-3">
+              <p className="text-[11px] font-bold text-muted-foreground">
+                <span className="font-black text-foreground">Status do evento</span> é manual (Rascunho, Confirmado, Realizado, Cancelado). <span className="font-black text-foreground">Situação pelas datas</span> é automática: Futuro, Em andamento ou Datas encerradas.
               </p>
             </div>
           </TabsContent>
 
           {/* ── PARTICIPAÇÕES ── */}
-          <TabsContent value="participacoes" className="mt-4 space-y-3">
+          <TabsContent value="participantes" className="mt-4 space-y-3">
             <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-4 space-y-3">
               <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                 <UserPlus size={13} /> Adicionar por filtro (turma, modalidade ou coreografia)
@@ -768,7 +816,9 @@ export default function EventoGestao() {
               <div className="space-y-2 pt-1">
                 <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Vendas deste evento</p>
                 {(sales as any[]).map((sale) => {
-                  const dims = saleDimensions(sale.status);
+                  const dims = saleDimensions(sale.status, sale.deliveryStatus);
+                  const delivery = sale.deliveryStatus ?? "pendente";
+                  const cancelled = sale.status === "cancelado";
                   return (
                     <div key={sale.id} className="rounded-2xl border border-border bg-card p-3 flex flex-col lg:flex-row lg:items-center gap-3">
                       <div className="flex-1 min-w-0">
@@ -785,22 +835,29 @@ export default function EventoGestao() {
                         <Badge variant="outline" className={cn("text-[10px] font-black", dims.payment.className)}>{dims.payment.label}</Badge>
                         {dims.delivery && <Badge variant="outline" className={cn("text-[10px] font-black", dims.delivery.className)}>{dims.delivery.label}</Badge>}
                       </div>
-                      {(sale.status === "pendente" || sale.status === "em_separacao") && (
-                        <div className="flex items-center gap-2">
-                          <Button size="sm" variant="outline" onClick={() => setChargeSale(sale)}>
-                            <QrCode size={13} className="mr-1" /> Cobrar
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "pago" })} disabled={updateSaleStatus.isPending}>
-                            <CheckCircle2 size={13} className="mr-1" /> Pago
-                          </Button>
-                          <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-rose-500" title="Cancelar venda" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "cancelado" })} disabled={updateSaleStatus.isPending}>
-                            <X size={15} />
-                          </Button>
+                      {!cancelled && (
+                        <div className="flex flex-col gap-1.5 shrink-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground w-[70px] shrink-0">Pagamento</span>
+                            {sale.status === "pendente" && (
+                              <>
+                                <Button size="sm" variant="outline" onClick={() => setChargeSale(sale)}><QrCode size={12} className="mr-1" /> Cobrar</Button>
+                                <Button size="sm" variant="outline" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "pago" })} disabled={updateSaleStatus.isPending}><CheckCircle2 size={12} className="mr-1" /> Pago</Button>
+                              </>
+                            )}
+                            {sale.status === "pago" && <span className="flex items-center gap-1 text-[10px] font-black text-emerald-600 dark:text-emerald-400"><CheckCircle2 size={12} /> Pago</span>}
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground w-[70px] shrink-0">Entrega</span>
+                            {delivery === "pendente" && <Button size="sm" variant="outline" onClick={() => updateSaleDelivery.mutate({ id: sale.id, deliveryStatus: "em_separacao" })} disabled={updateSaleDelivery.isPending}><Truck size={12} className="mr-1" /> Em separação</Button>}
+                            {delivery === "em_separacao" && <Button size="sm" variant="outline" onClick={() => updateSaleDelivery.mutate({ id: sale.id, deliveryStatus: "entregue" })} disabled={updateSaleDelivery.isPending}><PackageCheck size={12} className="mr-1" /> Entregar</Button>}
+                            {delivery === "entregue" && <span className="flex items-center gap-1 text-[10px] font-black text-violet-600 dark:text-violet-400"><PackageCheck size={12} /> Entregue</span>}
+                          </div>
                         </div>
                       )}
-                      {sale.status === "pago" && (
-                        <Button size="sm" variant="outline" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "entregue" })} disabled={updateSaleStatus.isPending}>
-                          <PackageCheck size={13} className="mr-1" /> Entregar
+                      {!cancelled && (
+                        <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-rose-500 shrink-0" title="Cancelar venda" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "cancelado" })} disabled={updateSaleStatus.isPending}>
+                          <X size={15} />
                         </Button>
                       )}
                     </div>

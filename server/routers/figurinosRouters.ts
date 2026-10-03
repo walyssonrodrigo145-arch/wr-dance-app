@@ -935,6 +935,7 @@ export const figurinosRouters = {
         paymentProvider: costumeSales.paymentProvider,
         paymentLink: costumeSales.paymentLink,
         status: costumeSales.status,
+        deliveryStatus: costumeSales.deliveryStatus,
         orderCode: costumeSales.orderCode,
         deliveredAt: costumeSales.deliveredAt,
         notes: costumeSales.notes,
@@ -971,9 +972,10 @@ export const figurinosRouters = {
     }),
 
     /** Atualiza o status da venda (somente pendente → pago/cancelado). */
+    /** Situação FINANCEIRA da venda (pendente | pago | cancelado). Não mexe na entrega. */
     updateSaleStatus: protectedProcedure.input(z.object({
       id: z.number(),
-      status: z.enum(["pendente", "em_separacao", "pago", "entregue", "cancelado"]),
+      status: z.enum(["pendente", "pago", "cancelado"]),
     })).mutation(async ({ ctx, input }) => {
       assertStaff(ctx);
       const db = await getDb();
@@ -984,28 +986,57 @@ export const figurinosRouters = {
         .where(and(eq(costumeSales.id, input.id), eq(costumeSales.organizationId, orgId))).limit(1);
       if (!sale) throw new TRPCError({ code: "NOT_FOUND", message: "Venda não encontrada." });
 
-      // ── RN-002: transições válidas do fluxo de pedidos ──
       const from = sale.status;
       const to = input.status;
       if (from === to) return { success: true };
-      if (from === "entregue") {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Pedido já entregue — status final." });
-      }
       if (from === "cancelado") {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Venda cancelada não pode ser reaberta. Crie uma nova venda." });
       }
-      if (to === "entregue" && from !== "pago") {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Marque a venda como paga antes de registrar a entrega." });
-      }
-      if (to === "pendente" && (from === "pago" || from === "entregue")) {
+      if (to === "pendente" && from === "pago") {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Venda paga não volta para pendente." });
       }
 
       await db.update(costumeSales).set({
         status: to,
         paidAt: to === "pago" ? (sale.paidAt ?? new Date()) : undefined,
-        canceledAt: to === "cancelado" ? new Date() : (to === "pendente" || to === "em_separacao" ? null : undefined),
-        deliveredAt: to === "entregue" ? new Date() : (to === "cancelado" ? null : undefined),
+        canceledAt: to === "cancelado" ? new Date() : (to === "pendente" ? null : undefined),
+        updatedAt: new Date(),
+      }).where(eq(costumeSales.id, input.id));
+
+      return { success: true };
+    }),
+
+    /** Situação LOGÍSTICA do pedido (pendente | em_separacao | entregue). Não mexe no pagamento. */
+    updateSaleDelivery: protectedProcedure.input(z.object({
+      id: z.number(),
+      deliveryStatus: z.enum(["pendente", "em_separacao", "entregue"]),
+    })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+
+      const [sale] = await db.select({
+        id: costumeSales.id,
+        status: costumeSales.status,
+        deliveryStatus: costumeSales.deliveryStatus,
+      }).from(costumeSales)
+        .where(and(eq(costumeSales.id, input.id), eq(costumeSales.organizationId, orgId))).limit(1);
+      if (!sale) throw new TRPCError({ code: "NOT_FOUND", message: "Venda não encontrada." });
+      if (sale.status === "cancelado") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Venda cancelada — a entrega não pode ser alterada." });
+      }
+
+      const from = sale.deliveryStatus ?? "pendente";
+      const to = input.deliveryStatus;
+      if (from === to) return { success: true };
+      if (from === "entregue") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Pedido já entregue — situação final de entrega." });
+      }
+
+      await db.update(costumeSales).set({
+        deliveryStatus: to,
+        deliveredAt: to === "entregue" ? new Date() : null,
         updatedAt: new Date(),
       }).where(eq(costumeSales.id, input.id));
 
@@ -1028,6 +1059,7 @@ export const figurinosRouters = {
         totalPrice: costumeSales.totalPrice,
         paymentMode: costumeSales.paymentMode,
         status: costumeSales.status,
+        deliveryStatus: costumeSales.deliveryStatus,
         orderCode: costumeSales.orderCode,
         deliveredAt: costumeSales.deliveredAt,
         createdAt: costumeSales.createdAt,

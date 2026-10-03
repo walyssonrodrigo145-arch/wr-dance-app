@@ -51,20 +51,32 @@ function isValidSafe(d: Date): boolean {
 }
 
 /**
+ * O evento ocupa MAIS DE UM DIA? Compara as DATAS (ano-mês-dia) no fuso local
+ * do navegador — não basta existir término nem horários diferentes no mesmo dia.
+ * Sem término válido → false (nunca inventa duração).
+ */
+export function isMultiDay(startsAt: unknown, endsAt: unknown): boolean {
+  if (!startsAt || !endsAt) return false;
+  const start = new Date(String(startsAt));
+  const end = new Date(String(endsAt));
+  if (!isValidSafe(start) || !isValidSafe(end)) return false;
+  return format(start, "yyyy-MM-dd") !== format(end, "yyyy-MM-dd");
+}
+
+/**
  * Período do evento para cartão e detalhe — MESMA fonte nas duas telas.
  * Mesmo dia: "02/10/2026 · 09:00–22:00". Vários dias: "02/10/2026 09:00 → 05/10/2026 22:00".
  */
 export function formatEventPeriod(startsAt: unknown, endsAt: unknown): string {
   const start = startsAt ? new Date(String(startsAt)) : null;
   const end = endsAt ? new Date(String(endsAt)) : null;
+  const validEnd = end && isValidSafe(end) ? end : null;
   if (!start || !isValidSafe(start)) return "—";
-  const sameDay = end && isValidSafe(end) &&
-    format(start, "yyyy-MM-dd") === format(end, "yyyy-MM-dd");
-  if (sameDay && end) {
-    return `${format(start, "dd/MM/yyyy")} · ${format(start, "HH:mm")}–${format(end, "HH:mm")}`;
+  if (validEnd && !isMultiDay(start, validEnd)) {
+    return `${format(start, "dd/MM/yyyy")} · ${format(start, "HH:mm")}–${format(validEnd, "HH:mm")}`;
   }
-  if (end && isValidSafe(end)) {
-    return `${format(start, "dd/MM/yyyy")} ${format(start, "HH:mm")} → ${format(end, "dd/MM/yyyy")} ${format(end, "HH:mm")}`;
+  if (validEnd) {
+    return `${format(start, "dd/MM/yyyy")} ${format(start, "HH:mm")} → ${format(validEnd, "dd/MM/yyyy")} ${format(validEnd, "HH:mm")}`;
   }
-  return `${format(start, "dd/MM/yyyy")} ${format(start, "HH:mm")}`;
+  return `${format(start, "dd/MM/yyyy")} · ${format(start, "HH:mm")}`;
 }

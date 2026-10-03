@@ -2794,8 +2794,10 @@ export const costumeSales = pgTable("costume_sales", {
   discountPercent: decimal("discountPercent", { precision: 5, scale: 2 }).default("0.00").notNull(),
   // Venda sob encomenda (sem estoque disponível, permitida pelas regras)
   madeToOrder: boolean("madeToOrder").default(false).notNull(),
-  // pendente | em_separacao | pago | entregue | cancelado
+  // pendente | pago | cancelado  (SITUAÇÃO FINANCEIRA)
   status: varchar("status", { length: 20 }).default("pendente").notNull(),
+  // pendente | em_separacao | entregue  (SITUAÇÃO LOGÍSTICA, independente do pagamento)
+  deliveryStatus: varchar("deliveryStatus", { length: 20 }).default("pendente").notNull(),
   // Código do pedido (ex.: VDA-2847)
   orderCode: varchar("orderCode", { length: 30 }),
   // Data da entrega (status "entregue")

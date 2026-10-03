@@ -921,6 +921,17 @@ export async function runAutoMigrations() {
 
       // ═══ Eventos: banner do evento ═══
       { table: 'events', sql: `ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "photoUrl" text` },
+
+      // ═══ Pedidos: separar FINANCEIRO (status) de LOGÍSTICA (deliveryStatus) ═══
+      // Migração explícita e idempotente — preserva todos os registros:
+      // 1) cria a coluna com default 'pendente' (linhas existentes recebem o default);
+      // 2) backfill a partir dos valores antigos do status misto;
+      // 3) normaliza o status para o domínio financeiro (pendente|pago|cancelado).
+      { table: 'costume_sales', sql: `ALTER TABLE "costume_sales" ADD COLUMN IF NOT EXISTS "deliveryStatus" varchar(20) DEFAULT 'pendente' NOT NULL` },
+      { table: 'costume_sales', sql: `UPDATE "costume_sales" SET "deliveryStatus" = 'em_separacao' WHERE "status" = 'em_separacao' AND "deliveryStatus" = 'pendente'` },
+      { table: 'costume_sales', sql: `UPDATE "costume_sales" SET "deliveryStatus" = 'entregue' WHERE "status" = 'entregue'` },
+      { table: 'costume_sales', sql: `UPDATE "costume_sales" SET "status" = 'pendente' WHERE "status" = 'em_separacao'` },
+      { table: 'costume_sales', sql: `UPDATE "costume_sales" SET "status" = 'pago' WHERE "status" = 'entregue'` },
     ];
 
     for (const m of migrations) {

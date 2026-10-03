@@ -6,15 +6,22 @@ import { EVENT_PAYMENT_META, EVENT_DELIVERY_META } from "@/components/eventos/Ev
 import { SmartImage } from "@/components/common/SmartImage";
 import { ImageUploadField } from "@/components/common/ImageUploadField";
 
-/** Separa as duas dimensões do status único da venda: pagamento × entrega. */
-function saleDimensions(status: string): { payment: { label: string; className: string }; delivery: { label: string; className: string } | null } {
-  if (status === "cancelado") return { payment: { label: "Cancelado", className: SALE_STATUS_META.cancelado.className }, delivery: null };
-  const payment = status === "pago" || status === "entregue"
-    ? { label: "Pago", className: SALE_STATUS_META.pago.className }
-    : { label: "Pagamento pendente", className: SALE_STATUS_META.pendente.className };
-  const delivery = status === "em_separacao"
-    ? EVENT_DELIVERY_META.em_separacao
-    : status === "entregue" ? EVENT_DELIVERY_META.entregue : null;
+/** Dimensões INDEPENDENTES da venda: pagamento (status) × entrega (deliveryStatus). */
+function saleDimensions(status: string, deliveryStatus?: string | null): {
+  payment: { label: string; className: string };
+  delivery: { label: string; className: string } | null;
+} {
+  if (status === "cancelado") {
+    return { payment: { label: "Pagamento: cancelado", className: SALE_STATUS_META.cancelado.className }, delivery: null };
+  }
+  const payment = status === "pago"
+    ? { label: "Pagamento: pago", className: SALE_STATUS_META.pago.className }
+    : { label: "Pagamento: pendente", className: SALE_STATUS_META.pendente.className };
+  const delivery = deliveryStatus === "entregue"
+    ? { label: "Entrega: entregue", className: EVENT_DELIVERY_META.entregue.className }
+    : deliveryStatus === "em_separacao"
+      ? { label: "Entrega: em separação", className: EVENT_DELIVERY_META.em_separacao.className }
+      : { label: "Entrega: pendente", className: "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/30" };
   return { payment, delivery };
 }
 import { formatBRL } from "@/lib/money";
@@ -763,11 +770,15 @@ function growthPct(current: number, previous: number): { text: string; up: boole
 }
 
 const ORDER_TOAST: Record<string, string> = {
-  pendente: "Pedido voltou para pendente.",
+  pendente: "Pagamento voltou para pendente.",
+  pago: "Pagamento confirmado!",
+  cancelado: "Venda cancelada.",
+};
+
+const DELIVERY_TOAST: Record<string, string> = {
+  pendente: "Entrega voltou para pendente.",
   em_separacao: "Pedido em separação.",
-  pago: "Pedido marcado como pago!",
   entregue: "Pedido entregue!",
-  cancelado: "Pedido cancelado.",
 };
 
 export default function Figurinos() {
@@ -781,6 +792,7 @@ export default function Figurinos() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [loanStatus, setLoanStatus] = useState("em_uso");
   const [orderStatus, setOrderStatus] = useState("todos");
+  const [orderDelivery, setOrderDelivery] = useState("todas");
   const [orderSearch, setOrderSearch] = useState("");
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -801,9 +813,19 @@ export default function Figurinos() {
 
   const updateSaleStatus = trpc.figurinos.updateSaleStatus.useMutation({
     onSuccess: (_, variables) => {
-      toast.success(ORDER_TOAST[variables.status] ?? "Pedido atualizado.");
+      toast.success(ORDER_TOAST[variables.status] ?? "Pagamento atualizado.");
       utils.figurinos.sales.invalidate();
       utils.figurinos.list.invalidate();
+      utils.figurinos.storeCatalog.invalidate();
+      utils.figurinos.myPurchases.invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const updateSaleDelivery = trpc.figurinos.updateSaleDelivery.useMutation({
+    onSuccess: (_, variables) => {
+      toast.success(DELIVERY_TOAST[variables.deliveryStatus] ?? "Entrega atualizada.");
+      utils.figurinos.sales.invalidate();
       utils.figurinos.storeCatalog.invalidate();
       utils.figurinos.myPurchases.invalidate();
     },
@@ -845,7 +867,7 @@ export default function Figurinos() {
 
   const activeProducts = useMemo(() => costumes.filter((c: any) => c.active !== false), [costumes]);
   const validSales = useMemo(() => sales.filter((s: any) => s.status !== "cancelado"), [sales]);
-  const paidSales = useMemo(() => sales.filter((s: any) => s.status === "pago" || s.status === "entregue"), [sales]);
+  const paidSales = useMemo(() => sales.filter((s: any) => s.status === "pago"), [sales]);
   const monthSales = useMemo(() => validSales.filter((s: any) => new Date(s.createdAt) >= monthStart), [validSales, monthStart]);
   const prevMonthSales = useMemo(
     () => validSales.filter((s: any) => new Date(s.createdAt) >= prevMonthStart && new Date(s.createdAt) < monthStart),
@@ -859,7 +881,11 @@ export default function Figurinos() {
     () => paidSales.filter((s: any) => { const d = new Date(s.paidAt ?? s.createdAt); return d >= prevMonthStart && d < monthStart; }).reduce((acc: number, s: any) => acc + (Number(s.totalPrice) || 0), 0),
     [paidSales, prevMonthStart, monthStart],
   );
-  const pendingOrders = useMemo(() => sales.filter((s: any) => s.status === "pendente" || s.status === "em_separacao").length, [sales]);
+  // "Pedidos pendentes" = pagamento em aberto OU entrega não concluída (exclui cancelados).
+  const pendingOrders = useMemo(
+    () => sales.filter((s: any) => s.status !== "cancelado" && (s.status === "pendente" || (s.deliveryStatus ?? "pendente") !== "entregue")).length,
+    [sales],
+  );
   const lowStockProducts = useMemo(() => activeProducts.filter((c: any) => c.sellable && c.disponivelVenda <= 3), [activeProducts]);
   const newProductsMonth = useMemo(() => activeProducts.filter((c: any) => new Date(c.createdAt) >= monthStart).length, [activeProducts, monthStart]);
 
@@ -868,7 +894,7 @@ export default function Figurinos() {
     { label: "Estoque baixo", icon: AlertTriangle, iconBg: "bg-amber-500/10 text-amber-500", value: String(lowStockProducts.length), delta: null as any, sub: "produtos com estoque crítico" },
     { label: "Vendas do mês", icon: ShoppingBag, iconBg: "bg-emerald-500/10 text-emerald-500", value: String(monthSales.length), delta: growthPct(monthSales.length, prevMonthSales.length), sub: prevMonthSales.length > 0 ? `mês anterior: ${prevMonthSales.length}` : "mês anterior: sem vendas" },
     { label: "Faturamento do mês", icon: Wallet, iconBg: "bg-blue-500/10 text-blue-500", value: formatBRL(revenueMonth), delta: growthPct(revenueMonth, revenuePrevMonth), sub: revenuePrevMonth > 0 ? `mês anterior: ${formatBRL(revenuePrevMonth)}` : "mês anterior: sem vendas pagas" },
-    { label: "Pedidos pendentes", icon: Clock, iconBg: "bg-rose-500/10 text-rose-500", value: String(pendingOrders), delta: null as any, sub: "aguardando processamento" },
+    { label: "Pedidos pendentes", icon: Clock, iconBg: "bg-rose-500/10 text-rose-500", value: String(pendingOrders), delta: null as any, sub: "pagamento ou entrega em aberto" },
   ]), [activeProducts, lowStockProducts, monthSales, prevMonthSales, revenueMonth, revenuePrevMonth, pendingOrders, newProductsMonth]);
 
   // ─── Produtos: busca + filtros + ordenação + paginação (RF-004) ─────────────
@@ -960,10 +986,11 @@ export default function Figurinos() {
     const q = orderSearch.trim().toLowerCase();
     return (sales as any[]).filter((s) => {
       if (orderStatus !== "todos" && s.status !== orderStatus) return false;
+      if (orderDelivery !== "todas" && (s.deliveryStatus ?? "pendente") !== orderDelivery) return false;
       if (q && !((s.orderCode ?? "").toLowerCase().includes(q) || s.costumeName?.toLowerCase().includes(q) || s.studentName?.toLowerCase().includes(q))) return false;
       return true;
     });
-  }, [sales, orderStatus, orderSearch]);
+  }, [sales, orderStatus, orderDelivery, orderSearch]);
 
   const renderEmpty = (icon: any, title: string, subtitle?: string) => (
     <div className="text-center py-16 rounded-3xl border-2 border-dashed border-border">
@@ -1054,8 +1081,8 @@ export default function Figurinos() {
   const productsTable = (list: any[]) => (
     <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
-        <div className="min-w-[760px]">
-          <div className="grid grid-cols-[36px_minmax(0,2fr)_110px_155px_150px_80px_150px] gap-3 px-4 py-3 border-b border-border bg-muted/30">
+        <div className="min-w-[940px]">
+          <div className="grid grid-cols-[32px_minmax(0,1fr)_110px_160px_150px_80px_148px] gap-3 px-4 py-3 border-b border-border bg-muted/30">
             <button className="flex items-center" onClick={togglePageSelection}>
               <span className={cn("h-4 w-4 rounded border flex items-center justify-center transition-colors", allPageSelected ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/40")}>
                 {allPageSelected && <CheckCircle2 size={11} />}
@@ -1069,7 +1096,7 @@ export default function Figurinos() {
             const st = stockState(costume.sellable ? costume.disponivelVenda : costume.disponivel);
             const selected = selectedIds.has(costume.id);
             return (
-              <div key={costume.id} className={cn("grid grid-cols-[36px_minmax(0,2fr)_110px_155px_150px_80px_150px] gap-3 px-4 py-3 border-b border-border/60 items-center hover:bg-primary/[0.03] transition-colors", selected && "bg-primary/[0.05]")}>
+              <div key={costume.id} className={cn("grid grid-cols-[32px_minmax(0,1fr)_110px_160px_150px_80px_148px] gap-3 px-4 py-3 border-b border-border/60 items-center hover:bg-primary/[0.03] transition-colors", selected && "bg-primary/[0.05]")}>
                 <button className="flex items-center" onClick={() => toggleSelect(costume.id)}>
                   <span className={cn("h-4 w-4 rounded border flex items-center justify-center transition-colors", selected ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/40")}>
                     {selected && <CheckCircle2 size={11} />}
@@ -1077,18 +1104,18 @@ export default function Figurinos() {
                 </button>
                 <div className="flex items-center gap-3 min-w-0">
                   {renderProductThumb(costume)}
-                  <div className="min-w-0">
-                    <p className="text-sm font-black text-foreground truncate">{costume.name}</p>
-                    <p className="text-[11px] font-bold text-muted-foreground">SKU: {costume.code ?? "—"}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-black text-foreground truncate" title={costume.name}>{costume.name}</p>
+                    <p className="text-[11px] font-bold text-muted-foreground truncate" title={costume.code ?? ""}>SKU: {costume.code ?? "—"}</p>
                   </div>
                 </div>
-                <Badge variant="outline" className={cn("w-fit text-[10px] font-black", CAT_COLORS[costume.type] ?? CAT_COLORS.outro)}>
+                <Badge variant="outline" className={cn("w-fit max-w-full truncate text-[10px] font-black", CAT_COLORS[costume.type] ?? CAT_COLORS.outro)}>
                   {TYPE_LABEL[costume.type] ?? costume.type}
                 </Badge>
                 {renderPrice(costume)}
-                <span className={cn("flex items-center gap-2 text-xs font-bold", st.text)}>
-                  <span className={cn("h-2 w-2 rounded-full", st.dot)} />
-                  <span>{costume.sellable ? costume.disponivelVenda : costume.disponivel}<span className="font-medium opacity-80"> {st.label}</span></span>
+                <span className={cn("flex items-center gap-2 text-xs font-bold min-w-0", st.text)}>
+                  <span className={cn("h-2 w-2 rounded-full shrink-0", st.dot)} />
+                  <span className="truncate whitespace-nowrap">{costume.sellable ? costume.disponivelVenda : costume.disponivel}<span className="font-medium opacity-80"> {st.label.split(" ")[0]}</span></span>
                 </span>
                 <Badge variant="outline" className={cn("w-fit text-[10px] font-black", costume.active === false ? "bg-slate-500/10 text-slate-500 border-slate-500/30" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30")}>
                   {costume.active === false ? "Inativo" : "Ativo"}
@@ -1107,6 +1134,62 @@ export default function Figurinos() {
         </div>
       </div>
     </div>
+  );
+
+  const renderRail = (delay = 0) => (
+    <>
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }} className="rounded-2xl border border-border bg-card p-4 shadow-sm min-w-0">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-black text-foreground flex items-center gap-2"><History size={15} className="text-primary" /> Vendas recentes</p>
+          <button onClick={() => setTab("vendas")} className="text-[11px] font-black text-primary hover:underline">Ver todas</button>
+        </div>
+        {recentSales.length === 0 ? (
+          <p className="text-xs text-muted-foreground font-bold py-4 text-center">Sem vendas ainda.</p>
+        ) : (
+          <div className="space-y-2.5">
+            {recentSales.map((sale: any) => {
+              const dims = saleDimensions(sale.status, sale.deliveryStatus);
+              return (
+                <div key={sale.id} className="flex items-center gap-2.5">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary/80"><Shirt size={15} /></span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-black text-foreground truncate">{sale.costumeName}</p>
+                    <p className="text-[10px] font-bold text-muted-foreground">{sale.orderCode ?? ("VDA-" + (1000 + sale.id))} · {new Date(sale.createdAt).toLocaleDateString("pt-BR")}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-xs font-black text-foreground">{formatBRL(sale.totalPrice)}</p>
+                    <Badge variant="outline" className={cn("text-[9px] font-black px-1 py-0", dims.payment.className)}>{dims.payment.label.replace("Pagamento: ", "")}</Badge>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </motion.div>
+
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: delay + 0.08 }} className="rounded-2xl border border-border bg-card p-4 shadow-sm min-w-0">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-black text-foreground flex items-center gap-2"><TrendingUp size={15} className="text-emerald-500" /> Produtos mais vendidos</p>
+          <button onClick={() => setTab("produtos")} className="text-[11px] font-black text-primary hover:underline">Ver produtos</button>
+        </div>
+        {topProducts.length === 0 ? (
+          <p className="text-xs text-muted-foreground font-bold py-4 text-center">Sem vendas para o ranking.</p>
+        ) : (
+          <div className="space-y-2.5">
+            {topProducts.map((prod, idx) => (
+              <div key={prod.name} className="flex items-center gap-2.5">
+                <span className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black", idx === 0 ? "bg-amber-400/20 text-amber-600 dark:text-amber-400" : "bg-muted text-muted-foreground")}>{idx + 1}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-black text-foreground truncate">{prod.name}</p>
+                  <p className="text-[10px] font-bold text-muted-foreground">{prod.count} venda(s)</p>
+                </div>
+                <p className="text-xs font-black text-foreground shrink-0">{formatBRL(prod.price)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </motion.div>
+    </>
   );
 
   return (
@@ -1153,7 +1236,7 @@ export default function Figurinos() {
       </div>
 
       {/* ── Conteúdo + rail lateral ── */}
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
+      <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
         <div className="min-w-0">
           <Tabs value={tab} onValueChange={(value) => setTab(value)}>
             <TabsList className="w-full sm:w-auto h-auto flex-wrap">
@@ -1166,21 +1249,21 @@ export default function Figurinos() {
 
             {/* ── PRODUTOS ── */}
             <TabsContent value="produtos" className="mt-4 space-y-4">
-              <div className="flex flex-col xl:flex-row xl:items-center gap-2">
-                <div className="relative flex-1 min-w-0">
+              <div className="space-y-2">
+                <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={15} />
                   <Input value={search} onChange={(e) => { setSearch(e.target.value); resetPage(); }} placeholder="Buscar por nome do produto, categoria ou SKU..." className="pl-9" />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 xl:flex gap-2">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
                   <Select value={catFilter} onValueChange={(v) => { setCatFilter(v); resetPage(); }}>
-                    <SelectTrigger className="w-full xl:w-[180px]"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="todas">Todas as categorias</SelectItem>
                       {CATALOG_TYPES.map((t) => <SelectItem key={t} value={t}>{TYPE_LABEL[t]}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); resetPage(); }}>
-                    <SelectTrigger className="w-full xl:w-[150px]"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="todos">Todos os status</SelectItem>
                       <SelectItem value="ativos">Ativos</SelectItem>
@@ -1188,7 +1271,7 @@ export default function Figurinos() {
                     </SelectContent>
                   </Select>
                   <Select value={sortKey} onValueChange={(v) => { setSortKey(v); resetPage(); }}>
-                    <SelectTrigger className="w-full xl:w-[160px]"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="recentes">Mais recentes</SelectItem>
                       <SelectItem value="preco_asc">Menor preço</SelectItem>
@@ -1197,7 +1280,7 @@ export default function Figurinos() {
                       <SelectItem value="estoque">Menor estoque</SelectItem>
                     </SelectContent>
                   </Select>
-                  <div className="flex items-center rounded-lg border border-border bg-muted/30 p-0.5 shrink-0 sm:col-span-3 xl:col-span-1 justify-center">
+                  <div className="flex items-center rounded-lg border border-border bg-muted/30 p-0.5 justify-center">
                     <button onClick={() => setView("tabela")} className={cn("flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-black transition-colors", view === "tabela" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground")}><List size={13} /> Tabela</button>
                     <button onClick={() => setView("grade")} className={cn("flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-black transition-colors", view === "grade" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground")}><LayoutGrid size={13} /> Grade</button>
                   </div>
@@ -1261,12 +1344,12 @@ export default function Figurinos() {
             {/* ── VENDAS ── */}
             <TabsContent value="vendas" className="mt-4 space-y-4">
               <p className="text-[11px] font-bold text-muted-foreground">
-                Histórico financeiro das vendas da Loja: cobranças em aberto, valores pagos e cancelamentos. A preparação/entrega fica na aba Pedidos.
+                Situação financeira das vendas: cobranças em aberto, valores pagos e cancelamentos. Preparação e entrega ficam na aba Pedidos — são situações independentes.
               </p>
               {isLoadingSales ? spinner : sales.length === 0 ? renderEmpty(ShoppingBag, "Nenhuma venda registrada", 'Use o botão "Nova venda" para registrar a primeira.') : (
                 <div className="space-y-2">
                   {(sales as any[]).map((sale) => {
-                    const dims = saleDimensions(sale.status);
+                    const dims = saleDimensions(sale.status, sale.deliveryStatus);
                     return (
                       <div key={sale.id} className="rounded-2xl border border-border bg-card p-4 flex flex-col lg:flex-row lg:items-center gap-3">
                         <div className="flex-1 min-w-0">
@@ -1290,11 +1373,19 @@ export default function Figurinos() {
                           <Badge variant="outline" className={cn("text-[10px] font-black", dims.payment.className)}>{dims.payment.label}</Badge>
                           {dims.delivery && <Badge variant="outline" className={cn("text-[10px] font-black", dims.delivery.className)}>{dims.delivery.label}</Badge>}
                         </div>
-                        {(sale.status === "pendente" || sale.status === "em_separacao") && (
+                        {sale.status === "pendente" && (
                           <div className="flex items-center gap-2">
                             <Button size="sm" variant="outline" onClick={() => setChargeSale(sale)}><QrCode size={13} className="mr-1" /> Cobrar</Button>
                             <Button size="sm" variant="outline" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "pago" })} disabled={updateSaleStatus.isPending}><CheckCircle2 size={13} className="mr-1" /> Pago</Button>
                             <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-rose-500" title="Cancelar venda" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "cancelado" })} disabled={updateSaleStatus.isPending}><X size={15} /></Button>
+                          </div>
+                        )}
+                        {sale.status === "pago" && (
+                          <div className="flex items-center gap-2">
+                            <span className="flex items-center gap-1 text-[11px] font-black text-emerald-600 dark:text-emerald-400">
+                              <CheckCircle2 size={13} /> {sale.paidAt ? "Pago em " + new Date(sale.paidAt).toLocaleDateString("pt-BR") : "Pago"}
+                            </span>
+                            <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-rose-500" title="Cancelar venda (estorno manual)" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "cancelado" })} disabled={updateSaleStatus.isPending}><X size={15} /></Button>
                           </div>
                         )}
                       </div>
@@ -1307,29 +1398,40 @@ export default function Figurinos() {
             {/* ── PEDIDOS (RF-003) ── */}
             <TabsContent value="pedidos" className="mt-4 space-y-4">
               <p className="text-[11px] font-bold text-muted-foreground">
-                Preparação e entrega dos pedidos: em separação → pago → entregue. Cobranças e histórico financeiro ficam na aba Vendas.
+                Pagamento e entrega são situações <span className="font-black text-foreground">independentes</span>: ações financeiras não alteram a entrega e ações de entrega não alteram o pagamento.
               </p>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <div className="relative flex-1">
+              <div className="space-y-2">
+                <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={15} />
                   <Input value={orderSearch} onChange={(e) => setOrderSearch(e.target.value)} placeholder="Buscar por código do pedido, produto ou aluna..." className="pl-9" />
                 </div>
-                <Select value={orderStatus} onValueChange={setOrderStatus}>
-                  <SelectTrigger className="w-full sm:w-[190px]"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os status</SelectItem>
-                    <SelectItem value="pendente">Pendente</SelectItem>
-                    <SelectItem value="em_separacao">Em separação</SelectItem>
-                    <SelectItem value="pago">Pago</SelectItem>
-                    <SelectItem value="entregue">Entregue</SelectItem>
-                    <SelectItem value="cancelado">Cancelado</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <Select value={orderStatus} onValueChange={setOrderStatus}>
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Pagamento: todos</SelectItem>
+                      <SelectItem value="pendente">Pagamento: pendente</SelectItem>
+                      <SelectItem value="pago">Pagamento: pago</SelectItem>
+                      <SelectItem value="cancelado">Pagamento: cancelado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={orderDelivery} onValueChange={setOrderDelivery}>
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todas">Entrega: todas</SelectItem>
+                      <SelectItem value="pendente">Entrega: pendente</SelectItem>
+                      <SelectItem value="em_separacao">Entrega: em separação</SelectItem>
+                      <SelectItem value="entregue">Entrega: entregue</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               {isLoadingSales ? spinner : orders.length === 0 ? renderEmpty(PackageCheck, "Nenhum pedido neste filtro", "Pedidos aparecem aqui assim que uma venda é registrada.") : (
                 <div className="space-y-2">
                   {orders.map((sale: any) => {
-                    const dims = saleDimensions(sale.status);
+                    const dims = saleDimensions(sale.status, sale.deliveryStatus);
+                    const delivery = sale.deliveryStatus ?? "pendente";
+                    const cancelled = sale.status === "cancelado";
                     return (
                       <div key={sale.id} className="rounded-2xl border border-border bg-card p-4 flex flex-col lg:flex-row lg:items-center gap-3">
                         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><PackageCheck size={18} /></span>
@@ -1344,21 +1446,35 @@ export default function Figurinos() {
                           </p>
                         </div>
                         <p className="text-sm font-black text-foreground lg:text-right">{formatBRL(sale.totalPrice)}</p>
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {sale.status === "pendente" && (
-                            <>
-                              <Button size="sm" variant="outline" onClick={() => setChargeSale(sale)}><QrCode size={12} className="mr-1" /> Cobrar</Button>
-                              <Button size="sm" variant="outline" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "em_separacao" })} disabled={updateSaleStatus.isPending}><Truck size={12} className="mr-1" /> Em separação</Button>
-                            </>
-                          )}
-                          {(sale.status === "pendente" || sale.status === "em_separacao") && (
-                            <Button size="sm" variant="outline" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "pago" })} disabled={updateSaleStatus.isPending}><CheckCircle2 size={12} className="mr-1" /> Pago</Button>
-                          )}
-                          {sale.status === "pago" && (
-                            <Button size="sm" variant="outline" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "entregue" })} disabled={updateSaleStatus.isPending}><PackageCheck size={12} className="mr-1" /> Entregar</Button>
-                          )}
-                          {sale.status !== "entregue" && sale.status !== "cancelado" && (
-                            <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-rose-500" title="Cancelar pedido" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "cancelado" })} disabled={updateSaleStatus.isPending}><X size={15} /></Button>
+                        <div className="flex flex-col gap-1.5 shrink-0">
+                          {/* Financeiro */}
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground w-[70px] shrink-0">Pagamento</span>
+                            {sale.status === "pendente" && (
+                              <>
+                                <Button size="sm" variant="outline" onClick={() => setChargeSale(sale)}><QrCode size={12} className="mr-1" /> Cobrar</Button>
+                                <Button size="sm" variant="outline" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "pago" })} disabled={updateSaleStatus.isPending}><CheckCircle2 size={12} className="mr-1" /> Pago</Button>
+                              </>
+                            )}
+                            {sale.status === "pago" && <span className="flex items-center gap-1 text-[10px] font-black text-emerald-600 dark:text-emerald-400"><CheckCircle2 size={12} /> Pago</span>}
+                            {cancelled && <span className="flex items-center gap-1 text-[10px] font-black text-rose-600 dark:text-rose-400"><X size={12} /> Cancelada</span>}
+                          </div>
+                          {/* Logística */}
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground w-[70px] shrink-0">Entrega</span>
+                            {!cancelled && delivery === "pendente" && (
+                              <Button size="sm" variant="outline" onClick={() => updateSaleDelivery.mutate({ id: sale.id, deliveryStatus: "em_separacao" })} disabled={updateSaleDelivery.isPending}><Truck size={12} className="mr-1" /> Em separação</Button>
+                            )}
+                            {!cancelled && delivery === "em_separacao" && (
+                              <Button size="sm" variant="outline" onClick={() => updateSaleDelivery.mutate({ id: sale.id, deliveryStatus: "entregue" })} disabled={updateSaleDelivery.isPending}><PackageCheck size={12} className="mr-1" /> Entregar</Button>
+                            )}
+                            {delivery === "entregue" && <span className="flex items-center gap-1 text-[10px] font-black text-violet-600 dark:text-violet-400"><PackageCheck size={12} /> Entregue</span>}
+                            {cancelled && <span className="text-[10px] font-bold text-muted-foreground">—</span>}
+                          </div>
+                          {!cancelled && (
+                            <div className="flex justify-end">
+                              <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-rose-500" title="Cancelar venda" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "cancelado" })} disabled={updateSaleStatus.isPending}><X size={14} /></Button>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -1430,61 +1546,11 @@ export default function Figurinos() {
           </Tabs>
         </div>
 
-        {/* ── Rail (RF-008/RF-009) ── */}
-        <aside className="hidden xl:flex flex-col gap-4">
-          <motion.div initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-black text-foreground flex items-center gap-2"><History size={15} className="text-primary" /> Vendas recentes</p>
-              <button onClick={() => setTab("vendas")} className="text-[11px] font-black text-primary hover:underline">Ver todas</button>
-            </div>
-            {recentSales.length === 0 ? (
-              <p className="text-xs text-muted-foreground font-bold py-4 text-center">Sem vendas ainda.</p>
-            ) : (
-              <div className="space-y-2.5">
-                {recentSales.map((sale: any) => {
-                  const statusMeta = SALE_STATUS_META[sale.status] ?? SALE_STATUS_META.pendente;
-                  return (
-                    <div key={sale.id} className="flex items-center gap-2.5">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary/80"><Shirt size={15} /></span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-black text-foreground truncate">{sale.costumeName}</p>
-                        <p className="text-[10px] font-bold text-muted-foreground">{sale.orderCode ?? `VDA-${1000 + sale.id}`} · {new Date(sale.createdAt).toLocaleDateString("pt-BR")}</p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-xs font-black text-foreground">{formatBRL(sale.totalPrice)}</p>
-                        <Badge variant="outline" className={cn("text-[9px] font-black px-1 py-0", statusMeta.className)}>{statusMeta.label}</Badge>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </motion.div>
-
-          <motion.div initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.08 }} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-black text-foreground flex items-center gap-2"><TrendingUp size={15} className="text-emerald-500" /> Produtos mais vendidos</p>
-              <button onClick={() => setTab("produtos")} className="text-[11px] font-black text-primary hover:underline">Ver produtos</button>
-            </div>
-            {topProducts.length === 0 ? (
-              <p className="text-xs text-muted-foreground font-bold py-4 text-center">Sem vendas para o ranking.</p>
-            ) : (
-              <div className="space-y-2.5">
-                {topProducts.map((prod, idx) => (
-                  <div key={prod.name} className="flex items-center gap-2.5">
-                    <span className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black", idx === 0 ? "bg-amber-400/20 text-amber-600 dark:text-amber-400" : "bg-muted text-muted-foreground")}>{idx + 1}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-black text-foreground truncate">{prod.name}</p>
-                      <p className="text-[10px] font-bold text-muted-foreground">{prod.count} venda(s)</p>
-                    </div>
-                    <p className="text-xs font-black text-foreground shrink-0">{formatBRL(prod.price)}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </motion.div>
-        </aside>
+        {/* ── Rail (RF-008/RF-009): lateral em telas 2xl; abaixo do catálogo nas demais ── */}
+        <aside className="hidden 2xl:flex flex-col gap-4">{renderRail(0)}</aside>
       </div>
+
+      <div className="2xl:hidden grid grid-cols-1 lg:grid-cols-2 gap-4">{renderRail(0.08)}</div>
 
       {/* ── Modais ── */}
       {modalOpen && <CostumeModal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(null); }} editing={editing} />}

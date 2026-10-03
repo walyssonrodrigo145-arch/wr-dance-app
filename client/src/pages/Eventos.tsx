@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { formatBRL } from "@/lib/money";
-import { format, formatEventPeriod, eventSituation } from "@/lib/dates";
+import { format, formatEventPeriod, eventSituation, isMultiDay } from "@/lib/dates";
 import { ptBR } from "date-fns/locale";
 import {
   Theater, Plus, Search, Pencil, Trash2, Users, Loader2, MapPin,
@@ -219,7 +219,7 @@ export default function Eventos() {
             const startsAt = new Date(evento.startsAt);
             const endsAt = evento.endsAt ? new Date(evento.endsAt) : null;
             const situation = eventSituation(evento.startsAt, evento.endsAt);
-            const multiDay = endsAt ? format(startsAt, "yyyy-MM-dd") !== format(endsAt, "yyyy-MM-dd") : false;
+            const multiDay = isMultiDay(evento.startsAt, evento.endsAt);
             return (
               <motion.div
                 key={evento.id}
@@ -260,8 +260,8 @@ export default function Eventos() {
                     <div className="flex items-start justify-between gap-2 flex-wrap">
                       <h3 className="font-black text-foreground text-base lg:text-lg leading-tight truncate">{evento.name}</h3>
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <Badge variant="outline" className={cn("text-[10px] font-black", situation.className)} title="Calculado pelas datas">{situation.label}</Badge>
-                        <Badge variant="outline" className={cn("text-[10px] font-black", statusMeta.className)}>{statusMeta.label}</Badge>
+                        <Badge variant="outline" className={cn("text-[10px] font-black", situation.className)} title="Situação calculada pelas datas">{situation.label}</Badge>
+                        <Badge variant="outline" className={cn("text-[10px] font-black", statusMeta.className)} title="Status do evento (manual)">{statusMeta.label}</Badge>
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-bold text-muted-foreground">
