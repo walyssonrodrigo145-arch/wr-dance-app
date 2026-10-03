@@ -552,6 +552,7 @@ export const figurinosRouters = {
         photoUrl: costumes.photoUrl,
         quantity: costumes.quantity,
         salePrice: costumes.salePrice,
+        promoPrice: costumes.promoPrice,
         vendidos,
         vendidosEvento,
       })
@@ -568,6 +569,7 @@ export const figurinosRouters = {
         return {
           ...row,
           salePrice: Number(row.salePrice) || 0,
+          promoPrice: row.promoPrice != null && Number(row.promoPrice) > 0 ? Number(row.promoPrice) : null,
           vendidos: vendidosNum,
           vendidosEvento: Number(row.vendidosEvento) || 0,
           disponivelVenda: Math.max(0, row.quantity - vendidosNum),
@@ -611,6 +613,7 @@ export const figurinosRouters = {
         name: costumes.name,
         quantity: costumes.quantity,
         salePrice: costumes.salePrice,
+        promoPrice: costumes.promoPrice,
         sellable: costumes.sellable,
       }).from(costumes)
         .where(and(eq(costumes.id, input.costumeId), eq(costumes.organizationId, orgId), eq(costumes.active, true))).limit(1);

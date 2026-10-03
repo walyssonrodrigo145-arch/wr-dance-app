@@ -1,4 +1,5 @@
-// CAÇA-BUG (runtime em produção): probe da aba Eventos — fluxo completo de eventos.
+// CAÇA-BUG (runtime em produção): probe da aba Eventos v3 — página de gestão,
+// eventos de vários dias, venda com preço promocional e receita refletida.
 // Uso: node vps-script/cacabug_events_flow.mjs  |  Reuso: SCHOOL_EMAIL=... SCHOOL_PASS=... node ...
 
 import { createTRPCProxyClient, httpBatchLink } from "@trpc/client";
@@ -67,120 +68,99 @@ await step("Login admin", async () => {
 
 const ev = {};
 
-await step("stats inicial (vazio ou com eventos anteriores)", async () => {
-  const s = await admin.eventos.stats.query();
-  expect(typeof s.total === "number", "stats.total ausente");
-  return `total=${s.total} proximos=${s.proximos}`;
+await step("Criar aluna de teste", async () => {
+  const res = await admin.students.create.mutate({ name: `Aluna Cacabug ${stamp}`, phone: "(11) 97777-2000" });
+  expect(res?.id || res?.success, "aluna não criada");
+  ev.studentId = res.id ?? res.studentId;
+  return `aluna=${ev.studentId}`;
 });
 
-await step("Criar evento com foto (rascunho)", async () => {
+await step("Criar evento de VÁRIOS DIAS (rascunho)", async () => {
   const res = await admin.eventos.create.mutate({
-    name: `Recital Cacabug ${stamp}`,
-    type: "recital",
-    description: "Recital de fim de ano do caçabug.",
-    venueName: "Teatro Teste",
-    venueAddress: "Rua das Artes, 10",
-    startsAt: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000),
+    name: `Festival Multi-dias ${stamp}`,
+    type: "festival",
+    venueName: "Centro Cultural",
+    startsAt: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
+    endsAt: new Date(Date.now() + 13 * 24 * 60 * 60 * 1000 + 3 * 60 * 60 * 1000),
     status: "planejado",
     requiresAuthorization: true,
-    photoUrl: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2fc?w=600",
   });
-  expect(res?.id, "evento sem id");
   ev.id = res.id;
-  return `evento=${res.id}`;
+  return `evento=${ev.id}`;
 });
 
-await step("list devolve photoUrl + métricas zeradas", async () => {
+await step("list mostra início E término (cartão e detalhe na mesma fonte)", async () => {
   const rows = await admin.eventos.list.query();
   const found = rows.find((r) => r.id === ev.id);
   expect(found, "evento não listado");
-  expect(found.photoUrl?.includes("unsplash"), "photoUrl não persistido");
-  expect(found.vendasQty === 0 && Number(found.receitaPrevista) === 0, "métricas deveriam zerar");
-  ev.startsAt = found.startsAt;
-  return "photoUrl ok";
+  expect(found.endsAt != null, "término ausente no cartão");
+  const detail = await admin.eventos.getById.query({ id: ev.id });
+  expect(detail.endsAt != null, "término ausente no detalhe");
+  expect(String(detail.endsAt) === String(found.endsAt), "datas divergem entre cartão e detalhe");
+  return `fim=${String(detail.endsAt).slice(0, 16)}`;
 });
 
-await step("Publicar (setStatus planejado→confirmado)", async () => {
-  await admin.eventos.setStatus.mutate({ id: ev.id, status: "confirmado" });
-  const rows = await admin.eventos.list.query({ status: "confirmado" });
-  expect(rows.some((r) => r.id === ev.id), "evento não está confirmado");
+await step("Adicionar participações (fluxo do filtro)", async () => {
+  const cands = await admin.eventos.candidatesForEvent.query({ eventId: ev.id });
+  const ids = cands.slice(0, 2).map((c) => c.id);
+  expect(ids.length >= 1, "nenhum candidato");
+  const res = await admin.eventos.addParticipant.mutate({ eventId: ev.id, studentIds: ids });
+  expect(res.added === ids.length, "participações não adicionadas");
+  return `${res.added} adicionada(s)`;
+});
+
+await step("Autorizações da participação (checkboxes)", async () => {
+  const detail = await admin.eventos.getById.query({ id: ev.id });
+  const part = detail.participantes[0];
+  await admin.eventos.updateParticipant.mutate({ id: part.id, participationAuthorization: true, imageAuthorization: true });
+  const after = await admin.eventos.getById.query({ id: ev.id });
+  const updated = after.participantes.find((p) => p.id === part.id);
+  expect(updated.imageAuthorization === true && updated.participationAuthorization === true, "autorizações não persistiram");
   return "ok";
 });
 
-await step("Transições inválidas são bloqueadas (cancelado→planejado, realizado→cancelado)", async () => {
-  const res = await admin.eventos.create.mutate({
-    name: `Rascunho Transição ${stamp}`,
-    type: "workshop",
-    startsAt: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
-    status: "planejado",
-    requiresAuthorization: false,
+await step("Criar produto COM promo (R$ 100 → promo R$ 80) e vender no evento", async () => {
+  const costume = await admin.figurinos.create.mutate({
+    name: `Camiseta Promo ${stamp}`, type: "uniforme", quantity: 10, cost: 30, salePrice: 100, promoPrice: 80, sellable: true,
   });
-  ev.draftId = res.id;
-  // cancela e tenta voltar para planejado (inválido pela RN-002)
-  await admin.eventos.setStatus.mutate({ id: res.id, status: "cancelado" });
-  let rejected = false;
-  try {
-    await admin.eventos.setStatus.mutate({ id: res.id, status: "planejado" });
-  } catch {
-    rejected = true;
-  }
-  expect(rejected, "cancelado→planejado deveria ser bloqueado");
-  // evento realizado é terminal: cria, publica, encerra e tenta cancelar
-  const res2 = await admin.eventos.create.mutate({
-    name: `Realizado Terminal ${stamp}`,
-    type: "audicao",
-    startsAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-    status: "confirmado",
-    requiresAuthorization: false,
+  ev.costumeId = costume.id;
+  const res = await admin.figurinos.sell.mutate({
+    eventId: ev.id, costumeId: ev.costumeId, studentId: ev.studentId, quantity: 1, paymentMode: "avulso",
   });
-  ev.doneId = res2.id;
-  await admin.eventos.setStatus.mutate({ id: res2.id, status: "realizado" });
+  expect(res.orderCode, "venda sem orderCode");
+  expect(Number(res.totalPrice) === 80, `preço praticado deveria ser 80 (promocional), veio ${res.totalPrice}`);
+  ev.saleId = res.saleId ?? null;
+  ev.orderCode = res.orderCode;
+  return `pedido=${res.orderCode} total=80`;
+});
+
+await step("Receita do evento reflete a venda (prevista 80)", async () => {
+  const rows = await admin.eventos.list.query();
+  const found = rows.find((r) => r.id === ev.id);
+  expect(Number(found.receitaPrevista) === 80, `receita prevista deveria ser 80, veio ${found.receitaPrevista}`);
+  expect(found.vendasQty === 1, "vendasQty deveria ser 1");
+  return "ok";
+});
+
+await step("Publicar → Encerrar (realizado) com confirmação de regras", async () => {
+  await admin.eventos.setStatus.mutate({ id: ev.id, status: "confirmado" });
+  await admin.eventos.setStatus.mutate({ id: ev.id, status: "realizado" });
   let terminal = false;
   try {
-    await admin.eventos.setStatus.mutate({ id: res2.id, status: "cancelado" });
+    await admin.eventos.setStatus.mutate({ id: ev.id, status: "cancelado" });
   } catch {
     terminal = true;
   }
-  expect(terminal, "realizado→cancelado deveria ser bloqueado (terminal)");
+  expect(terminal, "realizado deveria ser terminal");
   return "ok";
 });
 
-await step("Duplicar evento confirmado (cópias coreografias/participantes)", async () => {
-  const res = await admin.eventos.duplicate.mutate({ id: ev.id });
-  expect(res?.id, "cópia sem id");
-  ev.copyId = res.id;
-  const rows = await admin.eventos.list.query();
-  const copy = rows.find((r) => r.id === res.id);
-  expect(copy, "cópia não listada");
-  expect(copy.name.includes("(cópia)"), "cópia sem sufixo");
-  expect(copy.status === "planejado", "cópia deveria nascer rascunho");
-  expect(copy.photoUrl?.includes("unsplash"), "cópia perdeu a foto");
-  return `cópia=${res.id}`;
-});
-
-await step("Encerrar evento como realizado + receita aparece", async () => {
-  await admin.eventos.setStatus.mutate({ id: ev.id, status: "realizado" });
-  const rows = await admin.eventos.list.query({ status: "realizado" });
-  expect(rows.some((r) => r.id === ev.id), "evento não realizado");
-  return "ok";
-});
-
-await step("stats reflete novosEsteMes + realizados", async () => {
-  const s = await admin.eventos.stats.query();
-  expect((s.novosEsteMes ?? 0) >= 1, "novosEsteMes deveria ser >= 1");
-  expect((s.realizados ?? 0) >= 1, "realizados deveria ser >= 1");
-  return `novosEsteMes=${s.novosEsteMes} realizados=${s.realizados} planejados=${s.planejados} cancelados=${s.cancelados}`;
-});
-
-await step("Cancelar evento com notificação não quebra", async () => {
-  await admin.eventos.setStatus.mutate({ id: ev.copyId, status: "cancelado" });
-  return "ok";
-});
-
-await step("Limpeza: excluir eventos de teste", async () => {
-  for (const id of [ev.id, ev.draftId, ev.copyId, ev.doneId].filter(Boolean)) {
+await step("Limpeza: excluir evento/produto", async () => {
+  const ids = [ev.id].filter(Boolean);
+  for (const id of ids) {
     try { await admin.eventos.delete.mutate({ id }); } catch { /* já removido */ }
   }
+  try { await admin.figurinos.delete.mutate({ id: ev.costumeId }); } catch { /* histórico → arquivado */ }
   return "ok";
 });
 

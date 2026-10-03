@@ -2,6 +2,19 @@ import { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { EVENT_PAYMENT_META, EVENT_DELIVERY_META } from "@/components/eventos/EventoModal";
+
+/** Separa as duas dimensões do status único da venda: pagamento × entrega. */
+function saleDimensions(status: string): { payment: { label: string; className: string }; delivery: { label: string; className: string } | null } {
+  if (status === "cancelado") return { payment: { label: "Cancelado", className: SALE_STATUS_META.cancelado.className }, delivery: null };
+  const payment = status === "pago" || status === "entregue"
+    ? { label: "Pago", className: SALE_STATUS_META.pago.className }
+    : { label: "Pagamento pendente", className: SALE_STATUS_META.pendente.className };
+  const delivery = status === "em_separacao"
+    ? EVENT_DELIVERY_META.em_separacao
+    : status === "entregue" ? EVENT_DELIVERY_META.entregue : null;
+  return { payment, delivery };
+}
 import { formatBRL } from "@/lib/money";
 import { formatDateOnly } from "@/lib/dates";
 import {
@@ -152,27 +165,84 @@ function CostumeModal({ open, onClose, editing }: { open: boolean; onClose: () =
       <DialogContent className="max-w-xl max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-lg font-black">
-            <Shirt className="text-indigo-500" size={20} />
-            {editing ? "Editar figurino" : "Novo figurino"}
+            <ShoppingBag className="text-indigo-500" size={20} />
+            {editing ? "Editar produto" : "Novo produto"}
           </DialogTitle>
         </DialogHeader>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-          <div className="sm:col-span-2 space-y-1.5">
-            <Label>Nome da peça *</Label>
+          <p className="sm:col-span-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+            <span className="h-3.5 w-1 rounded-full bg-indigo-500" /> Informações
+          </p>
+          <div className="space-y-1.5">
+            <Label>Nome do produto *</Label>
             <Input value={form.name} onChange={(event) => set("name", event.target.value)} placeholder="Ex.: Saia tutu clássico" maxLength={255} />
           </div>
           <div className="space-y-1.5">
-            <Label>Código / Tombamento</Label>
-            <Input value={form.code} onChange={(event) => set("code", event.target.value)} placeholder="FIG-001" maxLength={60} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Tipo</Label>
+            <Label>Categoria</Label>
             <Select value={form.type} onValueChange={(value) => set("type", value)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {Object.entries(TYPE_LABEL).map(([value, label]) => (
                   <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>SKU / Código</Label>
+            <Input value={form.code} onChange={(event) => set("code", event.target.value)} placeholder="COL-001" maxLength={60} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Disponível para venda</Label>
+            <Select value={form.sellable} onValueChange={(value) => set("sellable", value)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sim">Sim — Loja e eventos</SelectItem>
+                <SelectItem value="nao">Não — somente acervo</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <p className="sm:col-span-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+            <span className="h-3.5 w-1 rounded-full bg-emerald-500" /> Preços
+          </p>
+          <div className="space-y-1.5">
+            <Label>Custo unitário (R$)</Label>
+            <Input value={form.cost} onChange={(event) => set("cost", event.target.value)} placeholder="0,00" />
+          </div>
+          {form.sellable === "sim" ? (
+            <>
+              <div className="space-y-1.5">
+                <Label>Preço de venda (R$)</Label>
+                <Input value={form.salePrice} onChange={(event) => set("salePrice", event.target.value)} placeholder="0,00" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Preço promocional (opcional)</Label>
+                <Input value={form.promoPrice} onChange={(event) => set("promoPrice", event.target.value)} placeholder="Ex.: 69,90" />
+                <p className="text-[10px] text-muted-foreground font-medium">Quando definido, este é o preço praticado na Loja.</p>
+              </div>
+            </>
+          ) : (
+            <p className="sm:col-span-2 text-[11px] font-bold text-muted-foreground rounded-xl border border-border bg-muted/30 px-3 py-2">
+              Produto de acervo — sem preço de venda. Marque "Disponível para venda" para vender na Loja e nos eventos.
+            </p>
+          )}
+
+          <p className="sm:col-span-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+            <span className="h-3.5 w-1 rounded-full bg-amber-500" /> Estoque & Acervo
+          </p>
+          <div className="space-y-1.5">
+            <Label>Quantidade em estoque</Label>
+            <Input type="number" min={1} value={form.quantity} onChange={(event) => set("quantity", event.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Estado (conservação)</Label>
+            <Select value={form.condition} onValueChange={(value) => set("condition", value)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {Object.entries(CONDITION_META).map(([value, meta]) => (
+                  <SelectItem key={value} value={value}>{meta.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -185,44 +255,6 @@ function CostumeModal({ open, onClose, editing }: { open: boolean; onClose: () =
             <Label>Cor</Label>
             <Input value={form.color} onChange={(event) => set("color", event.target.value)} placeholder="Rosa, branco..." maxLength={60} />
           </div>
-          <div className="space-y-1.5">
-            <Label>Quantidade</Label>
-            <Input type="number" min={1} value={form.quantity} onChange={(event) => set("quantity", event.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Estado</Label>
-            <Select value={form.condition} onValueChange={(value) => set("condition", value)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {Object.entries(CONDITION_META).map(([value, meta]) => (
-                  <SelectItem key={value} value={value}>{meta.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Custo unitário (R$)</Label>
-            <Input value={form.cost} onChange={(event) => set("cost", event.target.value)} placeholder="0,00" />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Preço de venda (R$) — Loja</Label>
-            <Input value={form.salePrice} onChange={(event) => set("salePrice", event.target.value)} placeholder="0,00" />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Preço promocional (opcional)</Label>
-            <Input value={form.promoPrice} onChange={(event) => set("promoPrice", event.target.value)} placeholder="Ex.: 69,90" />
-            <p className="text-[10px] text-muted-foreground font-medium">Quando definido, este é o preço praticado na Loja.</p>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Disponível para venda</Label>
-            <Select value={form.sellable} onValueChange={(value) => set("sellable", value)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sim">Sim — aparece na Loja e no evento</SelectItem>
-                <SelectItem value="nao">Não — apenas empréstimo</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
           <div className="sm:col-span-2 space-y-1.5">
             <Label>Observações</Label>
             <Textarea value={form.notes} onChange={(event) => set("notes", event.target.value)} rows={2} maxLength={2000} placeholder="Conservação, onde está guardado..." />
@@ -233,7 +265,7 @@ function CostumeModal({ open, onClose, editing }: { open: boolean; onClose: () =
           <Button variant="outline" onClick={onClose} disabled={isPending}>Cancelar</Button>
           <Button onClick={handleSubmit} disabled={isPending}>
             {isPending && <Loader2 size={16} className="animate-spin mr-2" />}
-            {editing ? "Salvar" : "Cadastrar"}
+            {editing ? "Salvar produto" : "Cadastrar produto"}
           </Button>
         </div>
       </DialogContent>
@@ -483,7 +515,7 @@ function SellModal({ open, onClose, preselected }: { open: boolean; onClose: () 
               <Input type="number" min={1} value={quantity} onChange={(event) => setQuantity(event.target.value.replace(/\D/g, "") || "1")} />
             </div>
             <div className="space-y-1.5">
-              <Label>Pagamento</Label>
+              <Label>Como cobrar</Label>
               <Select value={paymentMode} onValueChange={setPaymentMode}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -558,7 +590,7 @@ const PROVIDER_LABEL: Record<string, string> = {
   pixkey: "Chave PIX da escola",
 };
 
-function SaleChargeModal({ sale, onClose }: { sale: any | null; onClose: () => void }) {
+export function SaleChargeModal({ sale, onClose }: { sale: any | null; onClose: () => void }) {
   const utils = trpc.useUtils();
   const [result, setResult] = useState<any>(null);
 
@@ -823,8 +855,8 @@ export default function Figurinos() {
   const kpis = useMemo(() => ([
     { label: "Total de produtos", icon: Package, iconBg: "bg-indigo-500/10 text-indigo-500", value: String(activeProducts.length), delta: null as any, sub: `${newProductsMonth} novo(s) este mês` },
     { label: "Estoque baixo", icon: AlertTriangle, iconBg: "bg-amber-500/10 text-amber-500", value: String(lowStockProducts.length), delta: null as any, sub: "produtos com estoque crítico" },
-    { label: "Vendas do mês", icon: ShoppingBag, iconBg: "bg-emerald-500/10 text-emerald-500", value: String(monthSales.length), delta: growthPct(monthSales.length, prevMonthSales.length), sub: "pedidos realizados" },
-    { label: "Faturamento do mês", icon: Wallet, iconBg: "bg-blue-500/10 text-blue-500", value: formatBRL(revenueMonth), delta: growthPct(revenueMonth, revenuePrevMonth), sub: "vs. mês anterior" },
+    { label: "Vendas do mês", icon: ShoppingBag, iconBg: "bg-emerald-500/10 text-emerald-500", value: String(monthSales.length), delta: growthPct(monthSales.length, prevMonthSales.length), sub: prevMonthSales.length > 0 ? `mês anterior: ${prevMonthSales.length}` : "mês anterior: sem vendas" },
+    { label: "Faturamento do mês", icon: Wallet, iconBg: "bg-blue-500/10 text-blue-500", value: formatBRL(revenueMonth), delta: growthPct(revenueMonth, revenuePrevMonth), sub: revenuePrevMonth > 0 ? `mês anterior: ${formatBRL(revenuePrevMonth)}` : "mês anterior: sem vendas pagas" },
     { label: "Pedidos pendentes", icon: Clock, iconBg: "bg-rose-500/10 text-rose-500", value: String(pendingOrders), delta: null as any, sub: "aguardando processamento" },
   ]), [activeProducts, lowStockProducts, monthSales, prevMonthSales, revenueMonth, revenuePrevMonth, pendingOrders, newProductsMonth]);
 
@@ -1121,39 +1153,41 @@ export default function Figurinos() {
 
             {/* ── PRODUTOS ── */}
             <TabsContent value="produtos" className="mt-4 space-y-4">
-              <div className="flex flex-col md:flex-row gap-2">
-                <div className="relative flex-1">
+              <div className="flex flex-col xl:flex-row xl:items-center gap-2">
+                <div className="relative flex-1 min-w-0">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={15} />
                   <Input value={search} onChange={(e) => { setSearch(e.target.value); resetPage(); }} placeholder="Buscar por nome do produto, categoria ou SKU..." className="pl-9" />
                 </div>
-                <Select value={catFilter} onValueChange={(v) => { setCatFilter(v); resetPage(); }}>
-                  <SelectTrigger className="w-full md:w-[180px]"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todas">Todas as categorias</SelectItem>
-                    {CATALOG_TYPES.map((t) => <SelectItem key={t} value={t}>{TYPE_LABEL[t]}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); resetPage(); }}>
-                  <SelectTrigger className="w-full md:w-[150px]"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os status</SelectItem>
-                    <SelectItem value="ativos">Ativos</SelectItem>
-                    <SelectItem value="inativos">Inativos</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={sortKey} onValueChange={(v) => { setSortKey(v); resetPage(); }}>
-                  <SelectTrigger className="w-full md:w-[160px]"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="recentes">Mais recentes</SelectItem>
-                    <SelectItem value="preco_asc">Menor preço</SelectItem>
-                    <SelectItem value="preco_desc">Maior preço</SelectItem>
-                    <SelectItem value="nome">Nome (A–Z)</SelectItem>
-                    <SelectItem value="estoque">Menor estoque</SelectItem>
-                  </SelectContent>
-                </Select>
-                <div className="flex items-center rounded-lg border border-border bg-muted/30 p-0.5 shrink-0 self-start md:self-auto">
-                  <button onClick={() => setView("tabela")} className={cn("flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-black transition-colors", view === "tabela" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground")}><List size={13} /> Tabela</button>
-                  <button onClick={() => setView("grade")} className={cn("flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-black transition-colors", view === "grade" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground")}><LayoutGrid size={13} /> Grade</button>
+                <div className="grid grid-cols-1 sm:grid-cols-3 xl:flex gap-2">
+                  <Select value={catFilter} onValueChange={(v) => { setCatFilter(v); resetPage(); }}>
+                    <SelectTrigger className="w-full xl:w-[180px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todas">Todas as categorias</SelectItem>
+                      {CATALOG_TYPES.map((t) => <SelectItem key={t} value={t}>{TYPE_LABEL[t]}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); resetPage(); }}>
+                    <SelectTrigger className="w-full xl:w-[150px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os status</SelectItem>
+                      <SelectItem value="ativos">Ativos</SelectItem>
+                      <SelectItem value="inativos">Inativos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={sortKey} onValueChange={(v) => { setSortKey(v); resetPage(); }}>
+                    <SelectTrigger className="w-full xl:w-[160px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="recentes">Mais recentes</SelectItem>
+                      <SelectItem value="preco_asc">Menor preço</SelectItem>
+                      <SelectItem value="preco_desc">Maior preço</SelectItem>
+                      <SelectItem value="nome">Nome (A–Z)</SelectItem>
+                      <SelectItem value="estoque">Menor estoque</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="flex items-center rounded-lg border border-border bg-muted/30 p-0.5 shrink-0 sm:col-span-3 xl:col-span-1 justify-center">
+                    <button onClick={() => setView("tabela")} className={cn("flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-black transition-colors", view === "tabela" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground")}><List size={13} /> Tabela</button>
+                    <button onClick={() => setView("grade")} className={cn("flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-black transition-colors", view === "grade" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground")}><LayoutGrid size={13} /> Grade</button>
+                  </div>
                 </div>
               </div>
 
@@ -1166,7 +1200,23 @@ export default function Figurinos() {
                 </div>
               )}
 
-              {isLoading ? spinner : filteredProducts.length === 0 ? renderEmpty(Shirt, "Nenhum produto encontrado", "Ajuste a busca ou cadastre um novo produto.") : (
+              {isLoading ? spinner : filteredProducts.length === 0 ? (
+                search.trim() || catFilter !== "todas" || statusFilter !== "todos" || sortKey !== "recentes" ? (
+                  <div className="text-center py-14 rounded-3xl border-2 border-dashed border-border">
+                    <div className="flex justify-center mb-3"><span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary/60"><Search size={24} /></span></div>
+                    <p className="font-black text-foreground">Nenhum produto com esses filtros</p>
+                    <p className="text-sm text-muted-foreground mt-1 mb-3">Ajuste a busca ou limpe os filtros para ver todo o catálogo.</p>
+                    <Button size="sm" variant="outline" onClick={() => { setSearch(""); setCatFilter("todas"); setStatusFilter("todos"); setSortKey("recentes"); resetPage(); }}>Limpar filtros</Button>
+                  </div>
+                ) : (
+                  <div className="text-center py-14 rounded-3xl border-2 border-dashed border-border">
+                    <div className="flex justify-center mb-3"><span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-500"><PackageOpen size={24} /></span></div>
+                    <p className="font-black text-foreground">Catálogo vazio</p>
+                    <p className="text-sm text-muted-foreground mt-1 mb-3">Cadastre seu primeiro produto para vender na Loja e nos eventos.</p>
+                    <Button onClick={() => { setEditing(null); setModalOpen(true); }} className="bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/25"><Plus size={15} className="mr-2" /> Cadastrar primeiro produto</Button>
+                  </div>
+                )
+              ) : (
                 <>
                   {view === "tabela" ? (
                     <>
@@ -1197,10 +1247,13 @@ export default function Figurinos() {
 
             {/* ── VENDAS ── */}
             <TabsContent value="vendas" className="mt-4 space-y-4">
+              <p className="text-[11px] font-bold text-muted-foreground">
+                Histórico financeiro das vendas da Loja: cobranças em aberto, valores pagos e cancelamentos. A preparação/entrega fica na aba Pedidos.
+              </p>
               {isLoadingSales ? spinner : sales.length === 0 ? renderEmpty(ShoppingBag, "Nenhuma venda registrada", 'Use o botão "Nova venda" para registrar a primeira.') : (
                 <div className="space-y-2">
                   {(sales as any[]).map((sale) => {
-                    const statusMeta = SALE_STATUS_META[sale.status] ?? SALE_STATUS_META.pendente;
+                    const dims = saleDimensions(sale.status);
                     return (
                       <div key={sale.id} className="rounded-2xl border border-border bg-card p-4 flex flex-col lg:flex-row lg:items-center gap-3">
                         <div className="flex-1 min-w-0">
@@ -1220,7 +1273,10 @@ export default function Figurinos() {
                         {sale.madeToOrder && (
                           <Badge variant="outline" className="w-fit text-[10px] font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30">Sob encomenda</Badge>
                         )}
-                        <Badge variant="outline" className={cn("w-fit text-[10px] font-black", statusMeta.className)}>{statusMeta.label}</Badge>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Badge variant="outline" className={cn("text-[10px] font-black", dims.payment.className)}>{dims.payment.label}</Badge>
+                          {dims.delivery && <Badge variant="outline" className={cn("text-[10px] font-black", dims.delivery.className)}>{dims.delivery.label}</Badge>}
+                        </div>
                         {(sale.status === "pendente" || sale.status === "em_separacao") && (
                           <div className="flex items-center gap-2">
                             <Button size="sm" variant="outline" onClick={() => setChargeSale(sale)}><QrCode size={13} className="mr-1" /> Cobrar</Button>
@@ -1237,6 +1293,9 @@ export default function Figurinos() {
 
             {/* ── PEDIDOS (RF-003) ── */}
             <TabsContent value="pedidos" className="mt-4 space-y-4">
+              <p className="text-[11px] font-bold text-muted-foreground">
+                Preparação e entrega dos pedidos: em separação → pago → entregue. Cobranças e histórico financeiro ficam na aba Vendas.
+              </p>
               <div className="flex flex-col sm:flex-row gap-2">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={15} />
@@ -1257,14 +1316,15 @@ export default function Figurinos() {
               {isLoadingSales ? spinner : orders.length === 0 ? renderEmpty(PackageCheck, "Nenhum pedido neste filtro", "Pedidos aparecem aqui assim que uma venda é registrada.") : (
                 <div className="space-y-2">
                   {orders.map((sale: any) => {
-                    const statusMeta = SALE_STATUS_META[sale.status] ?? SALE_STATUS_META.pendente;
+                    const dims = saleDimensions(sale.status);
                     return (
                       <div key={sale.id} className="rounded-2xl border border-border bg-card p-4 flex flex-col lg:flex-row lg:items-center gap-3">
                         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><PackageCheck size={18} /></span>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-black text-foreground flex flex-wrap items-center gap-2">
                             {sale.orderCode ?? `VDA-${1000 + sale.id}`}
-                            <Badge variant="outline" className={cn("text-[10px] font-black", statusMeta.className)}>{statusMeta.label}</Badge>
+                            <Badge variant="outline" className={cn("text-[10px] font-black", dims.payment.className)}>{dims.payment.label}</Badge>
+                            {dims.delivery && <Badge variant="outline" className={cn("text-[10px] font-black", dims.delivery.className)}>{dims.delivery.label}</Badge>}
                           </p>
                           <p className="text-[11px] font-bold text-muted-foreground mt-0.5 truncate">
                             {sale.costumeName} ×{sale.quantity} · {sale.studentName} · {new Date(sale.createdAt).toLocaleDateString("pt-BR")}

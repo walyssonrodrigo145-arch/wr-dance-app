@@ -4,13 +4,12 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { formatBRL } from "@/lib/money";
-import { format } from "date-fns";
+import { format, formatEventPeriod, eventSituation } from "@/lib/dates";
 import { ptBR } from "date-fns/locale";
 import {
   Theater, Plus, Search, Pencil, Trash2, Users, Loader2, MapPin,
-  CalendarDays, Music, X, UserPlus, ShieldCheck, CheckCircle2, Clock,
-  Shirt, ShoppingCart, ArrowUp, ArrowDown, Send, Copy, FileText, Ticket,
-  TrendingUp, MoreVertical, PartyPopper,
+  CalendarDays, Send, Copy, FileText, Shirt, ShieldCheck, CheckCircle2,
+  Clock, TrendingUp, MoreVertical, Settings2,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
@@ -18,973 +17,17 @@ import {
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-
-// ─── Metadados ────────────────────────────────────────────────────────────────
-
-const TYPE_LABEL: Record<string, string> = {
-  recital: "Recital",
-  festival: "Festival",
-  competicao: "Competição",
-  workshop: "Workshop",
-  audicao: "Audição",
-  ensaio_geral: "Ensaio geral",
-  outro: "Outro",
-};
-
-const STATUS_META: Record<string, { label: string; className: string }> = {
-  planejado: { label: "Planejado", className: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
-  confirmado: { label: "Confirmado", className: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
-  realizado: { label: "Realizado", className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
-  cancelado: { label: "Cancelado", className: "bg-rose-500/10 text-rose-600 border-rose-500/30" },
-};
-
-const PARTICIPANT_STATUS_META: Record<string, { label: string; className: string }> = {
-  convidado: { label: "Convidado", className: "bg-slate-500/10 text-slate-500 border-slate-500/30" },
-  confirmado: { label: "Confirmado", className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
-  recusado: { label: "Recusado", className: "bg-rose-500/10 text-rose-600 border-rose-500/30" },
-};
-
-const SALE_STATUS_META: Record<string, { label: string; className: string }> = {
-  pendente: { label: "Venda pendente", className: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
-  pago: { label: "Venda paga", className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
-  cancelado: { label: "Venda cancelada", className: "bg-rose-500/10 text-rose-600 border-rose-500/30" },
-};
-
-/** datetime-local exige "YYYY-MM-DDTHH:mm" no fuso local. */
-function toLocalInputValue(date: Date | string | null | undefined): string {
-  if (!date) return "";
-  const parsed = new Date(date);
-  if (isNaN(parsed.getTime())) return "";
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
-}
-
-type EventoRow = {
-  id: number;
-  name: string;
-  type: string;
-  description: string | null;
-  venueName: string | null;
-  venueAddress: string | null;
-  startsAt: string | Date;
-  endsAt: string | Date | null;
-  status: string;
-  requiresAuthorization: boolean;
-  photoUrl: string | null;
-  coreografiasCount: number;
-  participantesCount: number;
-  confirmadosCount: number;
-  autorizadosCount: number;
-  vendasQty: number;
-  receitaPrevista: number;
-  receitaArrecadada: number;
-};
-
-type EventoForm = {
-  name: string;
-  type: string;
-  status: string;
-  startsAt: string;
-  endsAt: string;
-  venueName: string;
-  venueAddress: string;
-  description: string;
-  requiresAuthorization: boolean;
-  photoUrl: string;
-};
-
-const EMPTY_FORM: EventoForm = {
-  name: "",
-  type: "recital",
-  status: "planejado",
-  startsAt: "",
-  endsAt: "",
-  venueName: "",
-  venueAddress: "",
-  description: "",
-  requiresAuthorization: true,
-  photoUrl: "",
-};
-
-// ─── Modal de criação/edição ─────────────────────────────────────────────────
-
-function EventoModal({ open, onClose, editing }: {
-  open: boolean;
-  onClose: () => void;
-  editing: EventoRow | null;
-}) {
-  const utils = trpc.useUtils();
-  const [form, setForm] = useState<EventoForm>(() => editing ? {
-    name: editing.name,
-    type: editing.type,
-    status: editing.status,
-    startsAt: toLocalInputValue(editing.startsAt),
-    endsAt: toLocalInputValue(editing.endsAt),
-    venueName: editing.venueName ?? "",
-    venueAddress: editing.venueAddress ?? "",
-    description: editing.description ?? "",
-    requiresAuthorization: editing.requiresAuthorization,
-    photoUrl: editing.photoUrl ?? "",
-  } : EMPTY_FORM);
-
-  const set = (key: keyof EventoForm, value: string | boolean) => setForm((prev) => ({ ...prev, [key]: value }));
-
-  const buildPayload = () => ({
-    name: form.name.trim(),
-    type: form.type as any,
-    status: form.status as any,
-    startsAt: new Date(form.startsAt),
-    endsAt: form.endsAt ? new Date(form.endsAt) : null,
-    venueName: form.venueName.trim() || null,
-    venueAddress: form.venueAddress.trim() || null,
-    description: form.description.trim() || null,
-    requiresAuthorization: form.requiresAuthorization,
-    photoUrl: form.photoUrl.trim() || null,
-  });
-
-  const createMutation = trpc.eventos.create.useMutation({
-    onSuccess: () => {
-      toast.success("Evento criado!");
-      utils.eventos.list.invalidate();
-      utils.eventos.stats.invalidate();
-      onClose();
-    },
-    onError: (error) => toast.error(error.message),
-  });
-
-  const updateMutation = trpc.eventos.update.useMutation({
-    onSuccess: () => {
-      toast.success("Evento atualizado!");
-      utils.eventos.list.invalidate();
-      utils.eventos.stats.invalidate();
-      utils.eventos.getById.invalidate({ id: editing!.id });
-      onClose();
-    },
-    onError: (error) => toast.error(error.message),
-  });
-
-  const handleSubmit = () => {
-    if (form.name.trim().length < 2) { toast.error("Informe o nome do evento."); return; }
-    if (!form.startsAt) { toast.error("Informe a data e hora de início."); return; }
-    if (editing) {
-      updateMutation.mutate({ id: editing.id, ...buildPayload() });
-    } else {
-      createMutation.mutate(buildPayload());
-    }
-  };
-
-  const isPending = createMutation.isPending || updateMutation.isPending;
-
-  return (
-    <Dialog open={open} onOpenChange={(value) => { if (!value) onClose(); }}>
-      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-lg font-black">
-            <Theater className="text-indigo-500" size={20} />
-            {editing ? "Editar evento" : "Novo evento"}
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-          <div className="sm:col-span-2 space-y-1.5">
-            <Label>Nome do evento *</Label>
-            <Input value={form.name} onChange={(event) => set("name", event.target.value)} placeholder="Ex.: Recital de Fim de Ano 2026" maxLength={255} />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Tipo</Label>
-            <Select value={form.type} onValueChange={(value) => set("type", value)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {Object.entries(TYPE_LABEL).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Status</Label>
-            <Select value={form.status} onValueChange={(value) => set("status", value)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {Object.entries(STATUS_META).map(([value, meta]) => (
-                  <SelectItem key={value} value={value}>{meta.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Início *</Label>
-            <Input type="datetime-local" value={form.startsAt} onChange={(event) => set("startsAt", event.target.value)} />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Término</Label>
-            <Input type="datetime-local" value={form.endsAt} onChange={(event) => set("endsAt", event.target.value)} />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Local</Label>
-            <Input value={form.venueName} onChange={(event) => set("venueName", event.target.value)} placeholder="Ex.: Teatro Municipal" maxLength={255} />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Endereço</Label>
-            <Input value={form.venueAddress} onChange={(event) => set("venueAddress", event.target.value)} placeholder="Rua, número, cidade" maxLength={500} />
-          </div>
-
-          <div className="sm:col-span-2 space-y-1.5">
-            <Label>Foto do evento (URL) — aparece no cartão da lista</Label>
-            <Input value={form.photoUrl} onChange={(event) => set("photoUrl", event.target.value)} placeholder="https://... (foto do palco, elenco ou divulgação)" maxLength={1000} />
-          </div>
-
-          <div className="sm:col-span-2 space-y-1.5">
-            <Label>Descrição / Orientações</Label>
-            <Textarea value={form.description} onChange={(event) => set("description", event.target.value)} placeholder="Horário de concentração, figurino, instruções aos responsáveis..." rows={3} maxLength={5000} />
-          </div>
-
-          <div className="sm:col-span-2 flex items-center gap-2 rounded-xl border border-border bg-muted/30 p-3">
-            <Checkbox
-              id="requiresAuthorization"
-              checked={form.requiresAuthorization}
-              onCheckedChange={(checked) => set("requiresAuthorization", checked === true)}
-            />
-            <label htmlFor="requiresAuthorization" className="text-sm font-bold text-foreground cursor-pointer select-none">
-              Exigir autorização de imagem e participação (recomendado para menores)
-            </label>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 mt-4">
-          <Button variant="outline" onClick={onClose} disabled={isPending}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={isPending}>
-            {isPending && <Loader2 size={16} className="animate-spin mr-2" />}
-            {editing ? "Salvar alterações" : "Criar evento"}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ─── Modal de detalhes (coreografias + participantes) ───────────────────────
-
-function EventoDetalhes({ eventId, onClose }: { eventId: number | null; onClose: () => void }) {
-  const utils = trpc.useUtils();
-  const [studentSearch, setStudentSearch] = useState("");
-  // Adição por filtro (turma / modalidade / coreografia) + seleção em massa
-  const [filterModalidade, setFilterModalidade] = useState("none");
-  const [filterTurma, setFilterTurma] = useState("none");
-  const [filterCoreografia, setFilterCoreografia] = useState("none");
-  const [selectedCandidateIds, setSelectedCandidateIds] = useState<number[]>([]);
-
-  const { data: modalidades = [] } = trpc.instruments.list.useQuery();
-  const { data: turmasAtivas = [] } = trpc.turmas.list.useQuery({ status: "ativa" });
-  const { data: coreografiasTodas = [] } = trpc.coreografias.list.useQuery({});
-
-  const { data: candidates = [], isLoading: isLoadingCandidates } = trpc.eventos.candidatesForEvent.useQuery(
-    {
-      eventId: eventId ?? 0,
-      modalidadeId: filterModalidade === "none" ? undefined : Number(filterModalidade),
-      turmaId: filterTurma === "none" ? undefined : Number(filterTurma),
-      coreografiaId: filterCoreografia === "none" ? undefined : Number(filterCoreografia),
-    },
-    { enabled: eventId !== null }
-  );
-
-  const turmasFiltradas = (turmasAtivas as any[]).filter((turma) =>
-    filterModalidade === "none" ? true : String(turma.modalidadeId) === filterModalidade
-  );
-  const availableCandidates = (candidates as any[]).filter((candidate) => !candidate.alreadyIn);
-
-  // ─── Loja do evento (venda de figurinos) ────────────────────────────────────
-  const [sellOpen, setSellOpen] = useState(false);
-  const [sellCostumeId, setSellCostumeId] = useState("");
-  const [sellStudentId, setSellStudentId] = useState("");
-  const [sellQuantity, setSellQuantity] = useState("1");
-  const [sellPaymentMode, setSellPaymentMode] = useState("mensalidade");
-  const [sellNotes, setSellNotes] = useState("");
-
-  const { data: storeCatalog = [] } = trpc.figurinos.storeCatalog.useQuery(
-    { eventId: eventId ?? undefined },
-    { enabled: eventId !== null }
-  );
-  const { data: sales = [] } = trpc.figurinos.sales.useQuery(
-    { eventId: eventId ?? undefined, status: "todos" },
-    { enabled: eventId !== null }
-  );
-
-  const sell = trpc.figurinos.sell.useMutation({
-    onSuccess: (result) => {
-      toast.success(`Venda registrada! Total ${formatBRL(result.totalPrice)}`);
-      setSellOpen(false);
-      utils.figurinos.storeCatalog.invalidate();
-      utils.figurinos.sales.invalidate();
-      invalidate();
-    },
-    onError: (error) => toast.error(error.message),
-  });
-
-  const updateSaleStatus = trpc.figurinos.updateSaleStatus.useMutation({
-    onSuccess: () => {
-      toast.success("Venda atualizada!");
-      utils.figurinos.storeCatalog.invalidate();
-      utils.figurinos.sales.invalidate();
-    },
-    onError: (error) => toast.error(error.message),
-  });
-
-  const { data, isLoading } = trpc.eventos.getById.useQuery(
-    { id: eventId! },
-    { enabled: eventId !== null }
-  );
-
-  const { data: coreografiasDisponiveis = [] } = trpc.eventos.coreografiasDisponiveis.useQuery(
-    { eventId: eventId ?? undefined },
-    { enabled: eventId !== null }
-  );
-
-  const { data: searchResults = [] } = trpc.eventos.searchAlunos.useQuery(
-    { q: studentSearch, eventId: eventId ?? undefined },
-    { enabled: eventId !== null && studentSearch.trim().length >= 2 }
-  );
-
-  const invalidate = () => {
-    utils.eventos.getById.invalidate({ id: eventId! });
-    utils.eventos.list.invalidate();
-    utils.eventos.stats.invalidate();
-  };
-
-  const linkCoreografia = trpc.eventos.linkCoreografia.useMutation({
-    onSuccess: (result: any) => {
-      toast.success(result?.castImported
-        ? `Coreografia vinculada + ${result.castImported} aluno(s) do elenco importado(s)!`
-        : "Coreografia vinculada!");
-      invalidate();
-    },
-    onError: (error) => toast.error(error.message),
-  });
-
-  const importCast = trpc.eventos.importCast.useMutation({
-    onSuccess: (result) => {
-      toast.success(result.added > 0
-        ? `${result.added} aluno(s) do elenco importado(s)!`
-        : "Todos os alunos do elenco já estão no evento.");
-      invalidate();
-    },
-    onError: (error) => toast.error(error.message),
-  });
-
-  const reorderCoreografia = trpc.eventos.reorderCoreografia.useMutation({
-    onSuccess: () => invalidate(),
-    onError: (error) => toast.error(error.message),
-  });
-
-  const unlinkCoreografia = trpc.eventos.unlinkCoreografia.useMutation({
-    onSuccess: () => invalidate(),
-    onError: (error) => toast.error(error.message),
-  });
-
-  const addParticipant = trpc.eventos.addParticipant.useMutation({
-    onSuccess: (result) => {
-      toast.success(`${result.added} aluno(s) adicionado(s)!`);
-      setStudentSearch("");
-      invalidate();
-    },
-    onError: (error) => toast.error(error.message),
-  });
-
-  const updateParticipant = trpc.eventos.updateParticipant.useMutation({
-    onSuccess: () => invalidate(),
-    onError: (error) => toast.error(error.message),
-  });
-
-  const removeParticipant = trpc.eventos.removeParticipant.useMutation({
-    onSuccess: () => invalidate(),
-    onError: (error) => toast.error(error.message),
-  });
-
-  const participantes = data?.participantes ?? [];
-  const coreografiasVinculadas = data?.coreografias ?? [];
-
-  return (
-    <Dialog open={eventId !== null} onOpenChange={(value) => { if (!value) onClose(); }}>
-      <DialogContent className="max-w-4xl max-h-[92dvh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-lg font-black">
-            <Theater className="text-indigo-500" size={20} />
-            {data?.name ?? "..."}
-          </DialogTitle>
-        </DialogHeader>
-
-        {isLoading ? (
-          <div className="flex justify-center py-10"><Loader2 className="animate-spin text-primary" size={28} /></div>
-        ) : (
-          <div className="space-y-8 mt-2">
-            {/* Resumo */}
-            <div className="flex flex-wrap gap-2 text-xs font-bold text-muted-foreground">
-              <span className="flex items-center gap-1.5"><CalendarDays size={13} className="text-indigo-500" /> {data?.startsAt ? format(new Date(data.startsAt), "dd/MM/yyyy 'às' HH:mm") : "-"}</span>
-              {data?.endsAt && <span className="flex items-center gap-1.5"><Clock size={13} className="text-indigo-500" /> até {format(new Date(data.endsAt), "dd/MM 'às' HH:mm")}</span>}
-              {data?.venueName && <span className="flex items-center gap-1.5"><MapPin size={13} className="text-indigo-500" /> {data.venueName}</span>}
-              {data?.venueAddress && <span className="flex items-center gap-1.5"><MapPin size={13} className="text-indigo-500" /> {data.venueAddress}</span>}
-              <span className="flex items-center gap-1.5"><CheckCircle2 size={13} className="text-emerald-500" /> {participantes.filter((p: any) => p.status === "confirmado").length} confirmado(s)</span>
-              <Badge variant="outline" className={cn("text-[10px] font-black", STATUS_META[data?.status ?? "planejado"]?.className)}>
-                {STATUS_META[data?.status ?? "planejado"]?.label}
-              </Badge>
-            </div>
-
-            {data?.description && (
-              <p className="text-sm font-medium text-muted-foreground leading-relaxed whitespace-pre-line -mt-4">
-                {data.description}
-              </p>
-            )}
-
-            {/* Coreografias */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                  <Music size={14} /> Coreografias no programa ({coreografiasVinculadas.length})
-                </p>
-                {coreografiasVinculadas.length > 0 && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 text-[11px] font-bold"
-                    disabled={importCast.isPending}
-                    onClick={() => eventId && importCast.mutate({ eventId })}
-                    title="Adiciona ao evento todos os alunos do elenco das coreografias vinculadas"
-                  >
-                    {importCast.isPending ? <Loader2 size={13} className="animate-spin mr-1.5" /> : <UserPlus size={13} className="mr-1.5" />}
-                    Importar elenco
-                  </Button>
-                )}
-              </div>
-
-              <div className="flex gap-2">
-                <Select
-                  value=""
-                  onValueChange={(value) => {
-                    if (!value || !eventId) return;
-                    linkCoreografia.mutate({ eventId, coreografiaId: Number(value) });
-                  }}
-                >
-                  <SelectTrigger className="flex-1"><SelectValue placeholder="Vincular coreografia..." /></SelectTrigger>
-                  <SelectContent>
-                    {coreografiasDisponiveis.length === 0 && (
-                      <SelectItem value="__none" disabled>Nenhuma coreografia disponível</SelectItem>
-                    )}
-                    {coreografiasDisponiveis.map((coreografia: any) => (
-                      <SelectItem key={coreografia.id} value={String(coreografia.id)}>{coreografia.title}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {coreografiasVinculadas.length === 0 ? (
-                <p className="text-sm font-medium text-muted-foreground text-center py-6 rounded-2xl border-2 border-dashed border-border">
-                  Nenhuma coreografia vinculada ainda.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {coreografiasVinculadas.map((coreografia: any) => (
-                    <div key={coreografia.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
-                      <span className="w-7 h-7 rounded-lg bg-indigo-600/10 text-indigo-600 text-xs font-black flex items-center justify-center shrink-0">
-                        {coreografia.ordem}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-black text-foreground truncate">{coreografia.title}</p>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{coreografia.formacao}</p>
-                      </div>
-                      <div className="flex flex-col -my-1 shrink-0">
-                        <button
-                          type="button"
-                          className="text-muted-foreground hover:text-indigo-600 disabled:opacity-30 p-0.5"
-                          disabled={reorderCoreografia.isPending || coreografia.ordem <= 1}
-                          onClick={() => reorderCoreografia.mutate({ id: coreografia.id, direction: "up" })}
-                          title="Subir no programa"
-                        >
-                          <ArrowUp size={13} />
-                        </button>
-                        <button
-                          type="button"
-                          className="text-muted-foreground hover:text-indigo-600 disabled:opacity-30 p-0.5"
-                          disabled={reorderCoreografia.isPending || coreografia.ordem >= coreografiasVinculadas.length}
-                          onClick={() => reorderCoreografia.mutate({ id: coreografia.id, direction: "down" })}
-                          title="Descer no programa"
-                        >
-                          <ArrowDown size={13} />
-                        </button>
-                      </div>
-                      <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-rose-500" onClick={() => unlinkCoreografia.mutate({ id: coreografia.id })} title="Remover do evento">
-                        <X size={15} />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Participantes */}
-            <div className="space-y-3">
-              <p className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                <Users size={14} /> Participantes ({participantes.length})
-              </p>
-
-              {/* Adicionar por filtro (turma / modalidade / coreografia) + seleção em massa */}
-              <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-4 space-y-3">
-                <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">
-                  Adicionar por filtro (turma, modalidade ou coreografia)
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <Select
-                    value={filterModalidade}
-                    onValueChange={(value) => { setFilterModalidade(value); setFilterTurma("none"); setSelectedCandidateIds([]); }}
-                  >
-                    <SelectTrigger className="h-11 text-xs"><SelectValue placeholder="Modalidade" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Todas as modalidades</SelectItem>
-                      {(modalidades as any[]).map((modalidade) => (
-                        <SelectItem key={modalidade.id} value={String(modalidade.id)}>{modalidade.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Select
-                    value={filterTurma}
-                    onValueChange={(value) => { setFilterTurma(value); setSelectedCandidateIds([]); }}
-                  >
-                    <SelectTrigger className="h-11 text-xs"><SelectValue placeholder="Turma" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Todas as turmas</SelectItem>
-                      {turmasFiltradas.map((turma: any) => (
-                        <SelectItem key={turma.id} value={String(turma.id)}>{turma.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Select
-                    value={filterCoreografia}
-                    onValueChange={(value) => { setFilterCoreografia(value); setSelectedCandidateIds([]); }}
-                  >
-                    <SelectTrigger className="h-11 text-xs"><SelectValue placeholder="Coreografia" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Todas as coreografias</SelectItem>
-                      {(coreografiasTodas as any[]).map((coreografia) => (
-                        <SelectItem key={coreografia.id} value={String(coreografia.id)}>{coreografia.title}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="rounded-xl border border-border bg-card max-h-56 overflow-y-auto">
-                  {isLoadingCandidates ? (
-                    <div className="flex justify-center py-6"><Loader2 className="animate-spin text-primary" size={20} /></div>
-                  ) : (candidates as any[]).length === 0 ? (
-                    <p className="text-xs font-bold text-muted-foreground text-center py-6">
-                      Nenhum aluno ativo encontrado com esses filtros.
-                    </p>
-                  ) : (
-                    (candidates as any[]).map((candidate) => (
-                      <label
-                        key={candidate.id}
-                        className={cn(
-                          "flex items-center gap-3 px-3 py-2.5 border-b border-border/50 last:border-0 cursor-pointer hover:bg-muted/40 transition-colors",
-                          candidate.alreadyIn && "opacity-50 cursor-not-allowed"
-                        )}
-                      >
-                        <Checkbox
-                          disabled={candidate.alreadyIn}
-                          checked={selectedCandidateIds.includes(candidate.id)}
-                          onCheckedChange={(checked) => {
-                            setSelectedCandidateIds((prev) =>
-                              checked ? [...prev, candidate.id] : prev.filter((id) => id !== candidate.id)
-                            );
-                          }}
-                        />
-                        <span className="text-sm font-bold text-foreground flex-1 truncate">{candidate.name}</span>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground truncate">
-                          {candidate.instrumentName || "—"}
-                        </span>
-                        {candidate.alreadyIn && (
-                          <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600">No evento</span>
-                        )}
-                      </label>
-                    ))
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const allSelected = availableCandidates.length > 0 && selectedCandidateIds.length === availableCandidates.length;
-                      setSelectedCandidateIds(allSelected ? [] : availableCandidates.map((candidate: any) => candidate.id));
-                    }}
-                    className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 hover:underline"
-                  >
-                    {availableCandidates.length > 0 && selectedCandidateIds.length === availableCandidates.length
-                      ? "Limpar seleção"
-                      : `Selecionar todos disponíveis (${availableCandidates.length})`}
-                  </button>
-                  <Button
-                    size="sm"
-                    disabled={selectedCandidateIds.length === 0 || addParticipant.isPending}
-                    onClick={() => {
-                      if (!eventId) return;
-                      addParticipant.mutate({ eventId, studentIds: selectedCandidateIds });
-                      setSelectedCandidateIds([]);
-                    }}
-                  >
-                    {addParticipant.isPending ? <Loader2 size={14} className="animate-spin mr-1.5" /> : <Plus size={14} className="mr-1.5" />}
-                    Adicionar selecionados ({selectedCandidateIds.length})
-                  </Button>
-                </div>
-              </div>
-
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
-                <Input
-                  value={studentSearch}
-                  onChange={(event) => setStudentSearch(event.target.value)}
-                  placeholder="Buscar aluno ativo para adicionar..."
-                  className="pl-9"
-                />
-                {searchResults.length > 0 && (
-                  <div className="absolute z-50 mt-1 w-full rounded-xl border border-border bg-popover shadow-lg max-h-48 overflow-y-auto">
-                    {searchResults.map((student: any) => (
-                      <button
-                        key={student.id}
-                        onClick={() => {
-                          if (!eventId) return;
-                          addParticipant.mutate({ eventId, studentIds: [student.id] });
-                          setStudentSearch("");
-                        }}
-                        className="w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-muted transition-colors"
-                      >
-                        {student.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {participantes.length === 0 ? (
-                <p className="text-sm font-medium text-muted-foreground text-center py-6 rounded-2xl border-2 border-dashed border-border">
-                  Nenhum participante adicionado ainda.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {participantes.map((participante: any) => {
-                    const isMinor = participante.birthDate
-                      ? (Date.now() - new Date(participante.birthDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000) < 18
-                      : false;
-                    const fullyAuthorized = participante.imageAuthorization && participante.participationAuthorization;
-                    return (
-                      <div key={participante.id} className="rounded-2xl border border-border bg-card p-4 flex flex-col xl:flex-row xl:items-center gap-4">
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <Avatar className="w-10 h-10 shrink-0">
-                            {participante.studentAvatar ? (
-                              <img src={participante.studentAvatar} alt={participante.studentName} className="w-full h-full object-cover" />
-                            ) : (
-                              <AvatarFallback className="bg-indigo-600 text-white text-xs font-black">
-                                {participante.studentName?.split(" ").map((part: string) => part[0]).join("").slice(0, 2).toUpperCase()}
-                              </AvatarFallback>
-                            )}
-                          </Avatar>
-                          <div className="min-w-0">
-                            <p className="text-sm font-black text-foreground truncate flex items-center gap-2">
-                              {participante.studentName}
-                              {isMinor && <Badge variant="outline" className="text-[9px] font-black">MENOR</Badge>}
-                            </p>
-                            {data?.requiresAuthorization && (
-                              <p className="text-[11px] font-bold text-muted-foreground flex items-center gap-1 mt-0.5">
-                                {fullyAuthorized ? (
-                                  <><ShieldCheck size={12} className="text-emerald-500" /> Autorizações em dia</>
-                                ) : (
-                                  <><Clock size={12} className="text-amber-500" /> Autorização pendente</>
-                                )}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        {data?.requiresAuthorization && (
-                          <div className="flex flex-wrap items-center gap-4">
-                            <label className="flex items-center gap-2 text-xs font-bold text-muted-foreground cursor-pointer select-none">
-                              <Checkbox
-                                checked={participante.participationAuthorization}
-                                onCheckedChange={(checked) => updateParticipant.mutate({ id: participante.id, participationAuthorization: checked === true })}
-                              />
-                              Participação
-                            </label>
-                            <label className="flex items-center gap-2 text-xs font-bold text-muted-foreground cursor-pointer select-none">
-                              <Checkbox
-                                checked={participante.imageAuthorization}
-                                onCheckedChange={(checked) => updateParticipant.mutate({ id: participante.id, imageAuthorization: checked === true })}
-                              />
-                              Imagem
-                            </label>
-                          </div>
-                        )}
-
-                        <div className="flex items-center gap-2">
-                          <Select
-                            value={participante.status}
-                            onValueChange={(value) => updateParticipant.mutate({ id: participante.id, status: value as any })}
-                          >
-                            <SelectTrigger className="w-[140px] h-9 text-xs"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {Object.entries(PARTICIPANT_STATUS_META).map(([value, meta]) => (
-                                <SelectItem key={value} value={value}>{meta.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-rose-500" onClick={() => removeParticipant.mutate({ id: participante.id })} title="Remover participante">
-                            <Trash2 size={15} />
-                          </Button>
-                        </div>
-                      </div>
-                     );
-                   })}
-                </div>
-              )}
-            </div>
-
-            {/* Loja do evento: venda de figurinos para os participantes (qtd > 1) */}
-            <div className="space-y-3">
-              <p className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                <Shirt size={14} /> Loja do evento
-              </p>
-
-              {storeCatalog.length === 0 ? (
-                <p className="text-sm font-medium text-muted-foreground text-center py-6 rounded-2xl border-2 border-dashed border-border">
-                  Nenhum produto disponível para venda. Cadastre o preço de venda na Loja (aba Acervo) para vender no evento.
-                </p>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
-                  {(storeCatalog as any[]).map((product) => {
-                    const esgotado = product.disponivelVenda === 0;
-                    return (
-                      <div key={product.id} className="rounded-2xl border border-border bg-card p-3 space-y-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="text-sm font-black text-foreground truncate">{product.name}</p>
-                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest truncate">
-                              {product.size ? `Tam. ${product.size}` : ""}{product.color ? ` · ${product.color}` : ""}
-                            </p>
-                          </div>
-                          <span className={cn(
-                            "shrink-0 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest",
-                            esgotado ? "bg-rose-500/10 text-rose-600" : "bg-emerald-500/10 text-emerald-600"
-                          )}>
-                            {esgotado ? "Esgotado" : `${product.disponivelVenda} disp.`}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-black text-indigo-600 dark:text-indigo-400">
-                            {formatBRL(product.salePrice)}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={esgotado}
-                            onClick={() => {
-                              setSellCostumeId(String(product.id));
-                              setSellStudentId("");
-                              setSellQuantity("1");
-                              setSellPaymentMode("mensalidade");
-                              setSellNotes("");
-                              setSellOpen(true);
-                            }}
-                          >
-                            <ShoppingCart size={13} className="mr-1.5" /> Vender
-                          </Button>
-                        </div>
-                        {product.vendidosEvento > 0 && (
-                          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                            {product.vendidosEvento} vendido(s) neste evento
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Vendas do evento */}
-              {sales.length > 0 && (
-                <div className="space-y-2">
-                  {(sales as any[]).map((sale) => {
-                    const statusMeta = SALE_STATUS_META[sale.status] ?? SALE_STATUS_META.pendente;
-                    return (
-                      <div key={sale.id} className="rounded-2xl border border-border bg-card p-3 flex flex-col lg:flex-row lg:items-center gap-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-black text-foreground truncate">
-                            {sale.costumeName} <span className="text-muted-foreground font-bold">×{sale.quantity}</span>
-                            <span className="text-indigo-600 dark:text-indigo-400 ml-2">{formatBRL(sale.totalPrice)}</span>
-                          </p>
-                          <p className="text-[11px] font-bold text-muted-foreground mt-0.5 truncate">
-                            {sale.studentName} · {sale.paymentMode === "mensalidade" ? "junto com a mensalidade" : "cobrança avulsa"}
-                          </p>
-                        </div>
-                        <Badge variant="outline" className={cn("w-fit text-[10px] font-black", statusMeta.className)}>
-                          {statusMeta.label}
-                        </Badge>
-                        {sale.status === "pendente" && (
-                          <div className="flex items-center gap-2">
-                            <Button size="sm" variant="outline" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "pago" })} disabled={updateSaleStatus.isPending}>
-                              <CheckCircle2 size={13} className="mr-1" /> Marcar pago
-                            </Button>
-                            <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-rose-500" title="Cancelar venda" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "cancelado" })} disabled={updateSaleStatus.isPending}>
-                              <X size={15} />
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </DialogContent>
-
-      {/* Dialog: vender figurino do evento */}
-      <Dialog open={sellOpen} onOpenChange={setSellOpen}>
-        <DialogContent className="max-w-lg max-h-[90dvh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg font-black">
-              <ShoppingCart className="text-indigo-500" size={20} />
-              Vender figurino do evento
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4 mt-2">
-            <div className="space-y-1.5">
-              <Label>Produto *</Label>
-              <Select value={sellCostumeId} onValueChange={setSellCostumeId}>
-                <SelectTrigger><SelectValue placeholder="Selecione o produto" /></SelectTrigger>
-                <SelectContent>
-                  {(storeCatalog as any[]).map((product) => (
-                    <SelectItem key={product.id} value={String(product.id)} disabled={product.disponivelVenda === 0}>
-                      {product.name} — {formatBRL(product.salePrice)} ({product.disponivelVenda} disp.)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Participante *</Label>
-              <Select value={sellStudentId} onValueChange={setSellStudentId}>
-                <SelectTrigger><SelectValue placeholder="Selecione o participante" /></SelectTrigger>
-                <SelectContent>
-                  {(participantes as any[]).map((participante) => (
-                    <SelectItem key={participante.studentId} value={String(participante.studentId)}>
-                      {participante.studentName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Quantidade</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={sellQuantity}
-                  onChange={(event) => setSellQuantity(event.target.value.replace(/\D/g, "") || "1")}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Pagamento</Label>
-                <Select value={sellPaymentMode} onValueChange={setSellPaymentMode}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="mensalidade">Junto com a mensalidade</SelectItem>
-                    <SelectItem value="avulso">Cobrança avulsa</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Observações</Label>
-              <Textarea value={sellNotes} onChange={(event) => setSellNotes(event.target.value)} rows={2} maxLength={2000} />
-            </div>
-
-            {(() => {
-              const product = (storeCatalog as any[]).find((item) => String(item.id) === sellCostumeId);
-              const quantity = Math.max(1, parseInt(sellQuantity, 10) || 1);
-              if (!product) return null;
-              return (
-                <p className="text-sm font-bold text-foreground text-right">
-                  Total: <span className="text-indigo-600 dark:text-indigo-400 font-black">{formatBRL(product.salePrice * quantity)}</span>
-                </p>
-              );
-            })()}
-          </div>
-
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setSellOpen(false)} disabled={sell.isPending}>Cancelar</Button>
-            <Button
-              disabled={!sellCostumeId || !sellStudentId || sell.isPending}
-              onClick={() => {
-                if (!eventId) return;
-                sell.mutate({
-                  eventId,
-                  costumeId: Number(sellCostumeId),
-                  studentId: Number(sellStudentId),
-                  quantity: Math.max(1, parseInt(sellQuantity, 10) || 1),
-                  paymentMode: sellPaymentMode as "mensalidade" | "avulso",
-                  notes: sellNotes.trim() || null,
-                });
-              }}
-            >
-              {sell.isPending && <Loader2 size={15} className="animate-spin mr-1.5" />}
-              Registrar venda
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </Dialog>
-  );
-}
-
-// ─── Página ───────────────────────────────────────────────────────────────────
+  EVENT_TYPE_LABEL, EVENT_STATUS_META, EventoModal, type EventoRow,
+} from "@/components/eventos/EventoModal";
 
 const CHIP_META: Array<{ key: string; label: string }> = [
   { key: "todos", label: "Todos" },
@@ -1007,9 +50,8 @@ export default function Eventos() {
   const [typeFilter, setTypeFilter] = useState("todos");
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<EventoRow | null>(null);
-  const [detailsId, setDetailsId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<EventoRow | null>(null);
-  const [, navigate] = useLocation();
+  const [, setLocation] = useLocation();
 
   const { data: stats } = trpc.eventos.stats.useQuery();
   const queryParams = useMemo(() => {
@@ -1078,6 +120,8 @@ export default function Eventos() {
     { label: "Total de participações", value: String(stats?.participantes ?? 0), icon: Users, iconBg: "bg-purple-500/10 text-purple-500", sub: "alunas convidadas nos eventos", subClass: "" },
   ]), [stats, concl]);
 
+  const hasActiveFilters = search.trim() !== "" || typeFilter !== "todos" || chip !== "todos";
+
   return (
     <div className="flex-1 space-y-6 p-4 sm:p-6 lg:p-8">
       {/* ── Header ── */}
@@ -1090,7 +134,7 @@ export default function Eventos() {
           <p className="text-muted-foreground font-medium text-sm mt-1.5">Organize recitais, festivais, competições e workshops da sua escola em um só lugar.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => navigate("/aulas")}><CalendarDays size={16} className="mr-2" /> Calendário</Button>
+          <Button variant="outline" onClick={() => setLocation("/aulas")}><CalendarDays size={16} className="mr-2" /> Calendário</Button>
           <Button onClick={() => { setEditing(null); setModalOpen(true); }} className="bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/25"><Plus size={16} className="mr-2" /> Novo evento</Button>
         </div>
       </motion.div>
@@ -1116,7 +160,7 @@ export default function Eventos() {
         })}
       </div>
 
-      {/* ── Chips de filtro + busca + selects ── */}
+      {/* ── Chips + busca + tipo ── */}
       <div className="flex flex-col xl:flex-row xl:items-center gap-3">
         <div className="flex flex-wrap items-center gap-1.5">
           {CHIP_META.map((c) => (
@@ -1132,16 +176,16 @@ export default function Eventos() {
             </button>
           ))}
         </div>
-        <div className="flex flex-col sm:flex-row gap-2 xl:ml-auto xl:w-[640px]">
-          <div className="relative flex-1">
+        <div className="flex flex-col sm:flex-row gap-2 xl:ml-auto xl:w-[560px] xl:min-w-[420px]">
+          <div className="relative flex-1 min-w-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={15} />
             <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome, local ou descrição..." className="pl-9" />
           </div>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-full sm:w-[160px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-[170px] shrink-0"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os tipos</SelectItem>
-              {Object.entries(TYPE_LABEL).map(([value, label]) => (
+              {Object.entries(EVENT_TYPE_LABEL).map(([value, label]) => (
                 <SelectItem key={value} value={value}>{label}</SelectItem>
               ))}
             </SelectContent>
@@ -1149,22 +193,32 @@ export default function Eventos() {
         </div>
       </div>
 
-      {/* ── Lista de eventos ── */}
+      {/* ── Lista ── */}
       {isLoading ? (
         <div className="flex justify-center py-20"><Loader2 className="animate-spin text-primary" size={32} /></div>
       ) : eventos.length === 0 ? (
-        <div className="text-center py-20 rounded-3xl border-2 border-dashed border-border">
-          <Theater className="mx-auto text-muted-foreground opacity-20 mb-4" size={48} />
-          <p className="font-black text-foreground">Nenhum evento encontrado</p>
-          <p className="text-sm text-muted-foreground mt-1">Crie o primeiro evento para organizar o próximo espetáculo.</p>
-        </div>
+        hasActiveFilters ? (
+          <div className="text-center py-16 rounded-3xl border-2 border-dashed border-border">
+            <Theater className="mx-auto text-muted-foreground opacity-20 mb-4" size={44} />
+            <p className="font-black text-foreground">Nenhum evento com esses filtros</p>
+            <Button size="sm" variant="outline" className="mt-3" onClick={() => { setSearch(""); setTypeFilter("todos"); setChip("todos"); }}>Limpar filtros</Button>
+          </div>
+        ) : (
+          <div className="text-center py-16 rounded-3xl border-2 border-dashed border-border">
+            <Theater className="mx-auto text-muted-foreground opacity-20 mb-4" size={44} />
+            <p className="font-black text-foreground">Nenhum evento cadastrado</p>
+            <p className="text-sm text-muted-foreground mt-1 mb-3">Crie o primeiro evento para organizar o próximo espetáculo.</p>
+            <Button onClick={() => { setEditing(null); setModalOpen(true); }} className="bg-indigo-600 hover:bg-indigo-700"><Plus size={15} className="mr-2" /> Cadastrar primeiro evento</Button>
+          </div>
+        )
       ) : (
         <div className="space-y-3">
           {eventos.map((evento: EventoRow, index: number) => {
-            const statusMeta = STATUS_META[evento.status] ?? STATUS_META.planejado;
+            const statusMeta = EVENT_STATUS_META[evento.status] ?? EVENT_STATUS_META.planejado;
             const startsAt = new Date(evento.startsAt);
             const endsAt = evento.endsAt ? new Date(evento.endsAt) : null;
-            const progressPct = evento.receitaPrevista > 0 ? Math.min(100, Math.round((evento.receitaArrecadada / evento.receitaPrevista) * 100)) : 0;
+            const situation = eventSituation(evento.startsAt, evento.endsAt);
+            const multiDay = endsAt ? format(startsAt, "yyyy-MM-dd") !== format(endsAt, "yyyy-MM-dd") : false;
             return (
               <motion.div
                 key={evento.id}
@@ -1174,7 +228,7 @@ export default function Eventos() {
                 className="rounded-3xl border border-border bg-card shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden"
               >
                 <div className="flex flex-col lg:flex-row lg:items-stretch">
-                  {/* Foto + badge de data */}
+                  {/* Foto + selo de data (um dia ou faixa) */}
                   <div className="relative h-[130px] lg:h-auto lg:w-[215px] lg:min-w-[215px] shrink-0">
                     {evento.photoUrl ? (
                       <img src={evento.photoUrl} alt={evento.name} className="h-full w-full object-cover" loading="lazy" />
@@ -1182,36 +236,49 @@ export default function Eventos() {
                       <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-indigo-500/15 via-violet-500/10 to-transparent"><Theater className="text-indigo-400/50" size={40} /></div>
                     )}
                     <div className={cn("absolute left-3 top-3 rounded-xl px-2.5 py-1.5 text-center text-white shadow-lg", DATE_BADGE_BG[evento.status] ?? DATE_BADGE_BG.planejado)}>
-                      <p className="text-[9px] font-black uppercase tracking-widest opacity-90">{format(startsAt, "MMM", { locale: ptBR }).replace(".", "")}</p>
-                      <p className="text-xl font-black leading-none">{format(startsAt, "dd")}</p>
-                      <p className="text-[9px] font-bold opacity-90">{format(startsAt, "yyyy")}</p>
+                      {multiDay && endsAt ? (
+                        <>
+                          <p className="text-[9px] font-black uppercase tracking-widest opacity-90">
+                            {format(startsAt, "dd MMM", { locale: ptBR }).replace(".", "")} – {format(endsAt, "dd MMM", { locale: ptBR }).replace(".", "")}
+                          </p>
+                          <p className="text-lg font-black leading-none">{format(startsAt, "yyyy")}</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-[9px] font-black uppercase tracking-widest opacity-90">{format(startsAt, "MMM", { locale: ptBR }).replace(".", "")}</p>
+                          <p className="text-xl font-black leading-none">{format(startsAt, "dd")}</p>
+                          <p className="text-[9px] font-bold opacity-90">{format(startsAt, "yyyy")}</p>
+                        </>
+                      )}
                     </div>
                   </div>
 
                   {/* Informações */}
                   <div className="flex-1 min-w-0 p-4 space-y-2">
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start justify-between gap-2 flex-wrap">
                       <h3 className="font-black text-foreground text-base lg:text-lg leading-tight truncate">{evento.name}</h3>
-                      <Badge variant="outline" className={cn("shrink-0 text-[10px] font-black", statusMeta.className)}>{statusMeta.label}</Badge>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Badge variant="outline" className={cn("text-[10px] font-black", situation.className)} title="Calculado pelas datas">{situation.label}</Badge>
+                        <Badge variant="outline" className={cn("text-[10px] font-black", statusMeta.className)}>{statusMeta.label}</Badge>
+                      </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-bold text-muted-foreground">
-                      <span className="flex items-center gap-1"><CalendarDays size={12} /> {format(startsAt, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
-                      <span className="flex items-center gap-1"><Clock size={12} /> {format(startsAt, "HH:mm")}{endsAt ? ` – ${format(endsAt, "HH:mm")}` : ""}</span>
-                      {evento.venueName && <span className="flex items-center gap-1 truncate"><MapPin size={12} /> {evento.venueName}</span>}
+                      <span className="flex items-center gap-1"><CalendarDays size={12} /> {formatEventPeriod(evento.startsAt, evento.endsAt)}</span>
+                      {evento.venueName && <span className="flex items-center gap-1 truncate max-w-full"><MapPin size={12} /> {evento.venueName}</span>}
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                      <Badge variant="outline" className="text-[10px] font-black bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30">{TYPE_LABEL[evento.type] ?? evento.type}</Badge>
+                      <Badge variant="outline" className="text-[10px] font-black bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30">{EVENT_TYPE_LABEL[evento.type] ?? evento.type}</Badge>
                       <Badge variant="outline" className={cn("text-[10px] font-black", evento.requiresAuthorization ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30")}>
-                        <ShieldCheck size={9} className="mr-1" /> {evento.requiresAuthorization ? "Autorização necessária" : "Autorização livre"}
+                        <ShieldCheck size={9} className="mr-1" /> {evento.requiresAuthorization ? "Autorização" : "Sem autorização"}
                       </Badge>
                       {evento.coreografiasCount > 0 && (
-                        <Badge variant="outline" className="text-[10px] font-black bg-primary/5 text-muted-foreground border-border"><Music size={9} className="mr-1" /> {evento.coreografiasCount} coreografia(s)</Badge>
+                        <Badge variant="outline" className="text-[10px] font-black bg-primary/5 text-muted-foreground border-border">{evento.coreografiasCount} coreografia(s)</Badge>
                       )}
                     </div>
                   </div>
 
-                  {/* Métricas (Participações · Ingressos · Receita) */}
-                  <div className="flex items-center gap-4 sm:gap-6 px-4 py-3 lg:py-0 lg:px-0 lg:pr-7 lg:border-l border-border lg:min-w-[330px]">
+                  {/* Métricas (Participações · Vendas · Receita — base: loja do evento) */}
+                  <div className="flex flex-wrap items-center gap-4 sm:gap-6 px-4 py-3 lg:py-0 lg:px-0 lg:pr-7 lg:border-l border-border">
                     <div className="flex items-center gap-2">
                       <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-500/10 text-purple-500"><Users size={16} /></span>
                       <div>
@@ -1220,23 +287,17 @@ export default function Eventos() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-500/10 text-teal-500"><Ticket size={16} /></span>
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-500/10 text-teal-500"><Shirt size={16} /></span>
                       <div>
                         <p className="text-lg font-outfit font-black leading-none text-foreground">{evento.vendasQty}</p>
-                        <p className="text-[10px] font-bold text-muted-foreground">Ingressos</p>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="h-1.5 w-14 rounded-full bg-muted overflow-hidden">
-                            <span className={cn("block h-full rounded-full transition-all", progressPct >= 100 ? "bg-emerald-500" : "bg-indigo-500")} style={{ width: `${progressPct}%` }} />
-                          </span>
-                          <span className="text-[9px] font-black text-muted-foreground">{progressPct}%</span>
-                        </div>
+                        <p className="text-[10px] font-bold text-muted-foreground">Vendas da loja</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500"><TrendingUp size={16} /></span>
                       <div>
                         <p className="text-lg font-outfit font-black leading-none text-foreground">{formatBRL(evento.status === "realizado" ? evento.receitaArrecadada : evento.receitaPrevista)}</p>
-                        <p className="text-[10px] font-bold text-muted-foreground">{evento.status === "realizado" ? "Receita arrecadada" : "Receita estimada"}</p>
+                        <p className="text-[10px] font-bold text-muted-foreground">{evento.status === "realizado" ? "Receita arrecadada" : "Receita prevista"}</p>
                       </div>
                     </div>
                   </div>
@@ -1251,29 +312,29 @@ export default function Eventos() {
                     )}
                     {evento.status === "confirmado" && (
                       <>
-                        <Button size="sm" variant="outline" onClick={() => setDetailsId(evento.id)}><Users size={13} className="mr-1.5" /> Ver detalhes</Button>
-                        <Button size="sm" onClick={() => setDetailsId(evento.id)} className="bg-indigo-600 hover:bg-indigo-700"><Ticket size={13} className="mr-1.5" /> Gerenciar ingressos</Button>
+                        <Button size="sm" onClick={() => setLocation(`/eventos/${evento.id}`)} className="bg-indigo-600 hover:bg-indigo-700"><Settings2 size={13} className="mr-1.5" /> Gerenciar evento</Button>
+                        <Button size="sm" variant="outline" onClick={() => setLocation(`/eventos/${evento.id}?aba=loja`)}><Shirt size={13} className="mr-1.5" /> Loja do evento</Button>
                       </>
                     )}
                     {evento.status === "realizado" && (
                       <>
-                        <Button size="sm" variant="outline" onClick={() => setDetailsId(evento.id)}><FileText size={13} className="mr-1.5" /> Ver relatório</Button>
-                        <Button size="sm" variant="outline" onClick={() => duplicateMut.mutate({ id: evento.id })} disabled={duplicateMut.isPending}><Copy size={13} className="mr-1.5" /> Duplicar evento</Button>
+                        <Button size="sm" onClick={() => setLocation(`/eventos/${evento.id}`)} className="bg-indigo-600 hover:bg-indigo-700"><Settings2 size={13} className="mr-1.5" /> Gerenciar evento</Button>
+                        <Button size="sm" variant="outline" onClick={() => setLocation(`/eventos/${evento.id}?aba=relatorios`)}><FileText size={13} className="mr-1.5" /> Relatório</Button>
                       </>
                     )}
                     {evento.status === "cancelado" && (
-                      <Button size="sm" variant="outline" onClick={() => setDetailsId(evento.id)}><Users size={13} className="mr-1.5" /> Ver detalhes</Button>
+                      <Button size="sm" variant="outline" onClick={() => setLocation(`/eventos/${evento.id}`)}><Settings2 size={13} className="mr-1.5" /> Gerenciar evento</Button>
                     )}
                     <div className="flex items-center justify-center gap-1">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground"><MoreVertical size={15} /></Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
-                          <DropdownMenuItem onClick={() => setDetailsId(evento.id)}><Users size={13} className="mr-2" /> Programa & Elenco</DropdownMenuItem>
+                        <DropdownMenuContent align="end" className="w-52">
+                          <DropdownMenuItem onClick={() => setLocation(`/eventos/${evento.id}`)}><Settings2 size={13} className="mr-2" /> Gerenciar evento</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => { setEditing(evento); setModalOpen(true); }}><Pencil size={13} className="mr-2" /> Editar evento</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => duplicateMut.mutate({ id: evento.id })} disabled={duplicateMut.isPending}><Copy size={13} className="mr-2" /> Duplicar</DropdownMenuItem>
-                          {evento.status === "confirmado" && <DropdownMenuItem onClick={() => setStatusMut.mutate({ id: evento.id, status: "realizado" })}><CheckCircle2 size={13} className="mr-2" /> Marcar realizado</DropdownMenuItem>}
+                          {evento.status === "confirmado" && <DropdownMenuItem onClick={() => setStatusMut.mutate({ id: evento.id, status: "realizado" })}><CheckCircle2 size={13} className="mr-2" /> Encerrar como realizado</DropdownMenuItem>}
                           {evento.status === "cancelado" && <DropdownMenuItem onClick={() => setStatusMut.mutate({ id: evento.id, status: "confirmado" })}><CheckCircle2 size={13} className="mr-2" /> Reativar evento</DropdownMenuItem>}
                           <DropdownMenuSeparator />
                           <DropdownMenuItem className="text-rose-600 focus:text-rose-600" onClick={() => setDeleting(evento)}><Trash2 size={13} className="mr-2" /> Excluir evento</DropdownMenuItem>
@@ -1291,8 +352,6 @@ export default function Eventos() {
       {modalOpen && (
         <EventoModal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(null); }} editing={editing} />
       )}
-
-      <EventoDetalhes eventId={detailsId} onClose={() => setDetailsId(null)} />
 
       <AlertDialog open={deleting !== null} onOpenChange={(value) => { if (!value) setDeleting(null); }}>
         <AlertDialogContent>
