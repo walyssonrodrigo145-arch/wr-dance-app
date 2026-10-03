@@ -135,6 +135,8 @@ await step("Criar produto COM promo (R$ 100 → promo R$ 80) e vender no evento"
 });
 
 await step("Receita do evento reflete a venda (prevista 80)", async () => {
+  const salesOfEvent = await admin.figurinos.sales.query({ eventId: ev.id, status: "todos" });
+  expect(salesOfEvent.length === 1, `sales do evento deveria ter 1, veio ${salesOfEvent.length} (eventId perdido no insert?)`);
   const rows = await admin.eventos.list.query();
   const found = rows.find((r) => r.id === ev.id);
   expect(Number(found.receitaPrevista) === 80, `receita prevista deveria ser 80, veio ${found.receitaPrevista}`);

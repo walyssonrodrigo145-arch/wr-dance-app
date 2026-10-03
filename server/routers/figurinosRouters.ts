@@ -3,7 +3,7 @@
 // Disponibilidade = quantidade total − quantidade em uso (não devolvida).
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { protectedProcedure, studentProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { coreografias, costumeLoans, costumeSales, costumes, events, organizations, asaasCustomers, paymentDues, settings, students } from "../../drizzle/schema";
@@ -180,9 +180,6 @@ export const figurinosRouters = {
       if (!db) return [];
       const orgId = ctx.user.organizationId!;
 
-      const emUso = sql<number>`(SELECT COALESCE(SUM(cl."quantity"), 0) FROM "costume_loans" cl WHERE cl."costumeId" = ${costumes.id} AND cl."returnedAt" IS NULL)`.as("emUso");
-      const vendidos = sql<number>`(SELECT COALESCE(SUM(cs."quantity"), 0) FROM "costume_sales" cs WHERE cs."costumeId" = ${costumes.id} AND cs."status" <> 'cancelado')`.as("vendidos");
-
       const rows = await db.select({
         id: costumes.id,
         name: costumes.name,
@@ -200,8 +197,6 @@ export const figurinosRouters = {
         notes: costumes.notes,
         active: costumes.active,
         createdAt: costumes.createdAt,
-        emUso,
-        vendidos,
       })
         .from(costumes)
         .where(and(
@@ -213,10 +208,30 @@ export const figurinosRouters = {
         ))
         .orderBy(asc(costumes.name));
 
+      // AUDITORIA postgres.js: aliases em subqueries escalares (.as()) vinham 0 —
+      // empréstimos/vendidos agregados por costumeId (groupBy) e mesclados em JS.
+      const costumeIds = rows.map((row) => row.id);
+      const loanRows = costumeIds.length > 0 ? await db.select({
+        costumeId: costumeLoans.costumeId,
+        total: sql<number>`CAST(COALESCE(SUM(${costumeLoans.quantity}), 0) AS INT)`,
+      }).from(costumeLoans).where(and(
+        inArray(costumeLoans.costumeId, costumeIds),
+        isNull(costumeLoans.returnedAt),
+      )).groupBy(costumeLoans.costumeId) : [];
+      const soldRows = costumeIds.length > 0 ? await db.select({
+        costumeId: costumeSales.costumeId,
+        total: sql<number>`CAST(COALESCE(SUM(${costumeSales.quantity}), 0) AS INT)`,
+      }).from(costumeSales).where(and(
+        inArray(costumeSales.costumeId, costumeIds),
+        sql`${costumeSales.status} <> 'cancelado'`,
+      )).groupBy(costumeSales.costumeId) : [];
+      const loanMap = new Map<number, number>(loanRows.map((r: any) => [r.costumeId, Number(r.total) || 0]));
+      const soldMap = new Map<number, number>(soldRows.map((r: any) => [r.costumeId, Number(r.total) || 0]));
+
       return rows
         .map((row) => {
-          const emUsoNum = Number(row.emUso) || 0;
-          const vendidosNum = Number(row.vendidos) || 0;
+          const emUsoNum = loanMap.get(row.id) ?? 0;
+          const vendidosNum = soldMap.get(row.id) ?? 0;
           return {
             ...row,
             emUso: emUsoNum,
@@ -538,10 +553,22 @@ export const figurinosRouters = {
         if (!event) throw new TRPCError({ code: "NOT_FOUND", message: "Evento não encontrado." });
       }
 
-      const vendidos = sql<number>`(SELECT COALESCE(SUM(cs."quantity"), 0) FROM "costume_sales" cs WHERE cs."costumeId" = ${costumes.id} AND cs."status" <> 'cancelado')`.as("vendidos");
-      const vendidosEvento = input?.eventId
-        ? sql<number>`(SELECT COALESCE(SUM(cs2."quantity"), 0) FROM "costume_sales" cs2 WHERE cs2."costumeId" = ${costumes.id} AND cs2."eventId" = ${input.eventId} AND cs2."status" <> 'cancelado')`.as("vendidosEvento")
-        : sql<number>`0`.as("vendidosEvento");
+      const allSoldRows = await db.select({
+        costumeId: costumeSales.costumeId,
+        total: sql<number>`CAST(COALESCE(SUM(${costumeSales.quantity}), 0) AS INT)`,
+      }).from(costumeSales).where(and(
+        eq(costumeSales.organizationId, orgId),
+        sql`${costumeSales.status} <> 'cancelado'`,
+      )).groupBy(costumeSales.costumeId);
+      const eventSoldRows = input?.eventId ? await db.select({
+        costumeId: costumeSales.costumeId,
+        total: sql<number>`CAST(COALESCE(SUM(${costumeSales.quantity}), 0) AS INT)`,
+      }).from(costumeSales).where(and(
+        eq(costumeSales.eventId, input.eventId),
+        sql`${costumeSales.status} <> 'cancelado'`,
+      )).groupBy(costumeSales.costumeId) : [];
+      const allSoldMap = new Map<number, number>(allSoldRows.map((r: any) => [r.costumeId, Number(r.total) || 0]));
+      const eventSoldMap = new Map<number, number>(eventSoldRows.map((r: any) => [r.costumeId, Number(r.total) || 0]));
 
       const rows = await db.select({
         id: costumes.id,
@@ -553,8 +580,6 @@ export const figurinosRouters = {
         quantity: costumes.quantity,
         salePrice: costumes.salePrice,
         promoPrice: costumes.promoPrice,
-        vendidos,
-        vendidosEvento,
       })
         .from(costumes)
         .where(and(
@@ -565,14 +590,14 @@ export const figurinosRouters = {
         .orderBy(asc(costumes.name));
 
       return rows.map((row) => {
-        const vendidosNum = Number(row.vendidos) || 0;
+        const vendidosNum = allSoldMap.get(row.id) ?? 0;
         return {
           ...row,
           salePrice: Number(row.salePrice) || 0,
           promoPrice: row.promoPrice != null && Number(row.promoPrice) > 0 ? Number(row.promoPrice) : null,
-          vendidos: vendidosNum,
-          vendidosEvento: Number(row.vendidosEvento) || 0,
-          disponivelVenda: Math.max(0, row.quantity - vendidosNum),
+          vendidos: allSoldMap.get(row.id) ?? 0,
+          vendidosEvento: eventSoldMap.get(row.id) ?? 0,
+          disponivelVenda: Math.max(0, row.quantity - (allSoldMap.get(row.id) ?? 0)),
         };
       });
     }),

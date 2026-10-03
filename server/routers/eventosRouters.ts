@@ -146,11 +146,6 @@ export const eventosRouters = {
       if (!db) return [];
       const orgId = ctx.user.organizationId!;
 
-      const coreografiasCount = sql<number>`(SELECT COUNT(*) FROM "event_choreographies" ec WHERE ec."eventId" = ${events.id})`.as("coreografiasCount");
-      const participantesCount = sql<number>`(SELECT COUNT(*) FROM "event_participants" ep WHERE ep."eventId" = ${events.id})`.as("participantesCount");
-      const confirmadosCount = sql<number>`(SELECT COUNT(*) FROM "event_participants" ep2 WHERE ep2."eventId" = ${events.id} AND ep2."status" = 'confirmado')`.as("confirmadosCount");
-      const autorizadosCount = sql<number>`(SELECT COUNT(*) FROM "event_participants" ep3 WHERE ep3."eventId" = ${events.id} AND ep3."imageAuthorization" = true AND ep3."participationAuthorization" = true)`.as("autorizadosCount");
-
       const rows = await db.select({
         id: events.id,
         name: events.name,
@@ -164,13 +159,6 @@ export const eventosRouters = {
         requiresAuthorization: events.requiresAuthorization,
         photoUrl: events.photoUrl,
         createdAt: events.createdAt,
-        coreografiasCount,
-        participantesCount,
-        confirmadosCount,
-        autorizadosCount,
-        vendasQty: sql<number>`(SELECT COALESCE(SUM(cs."quantity"), 0) FROM "costume_sales" cs WHERE cs."eventId" = ${events.id} AND cs."status" <> 'cancelado')`.as("vendasQty"),
-        receitaPrevista: sql<number>`(SELECT COALESCE(SUM(cs."totalPrice"), 0) FROM "costume_sales" cs WHERE cs."eventId" = ${events.id} AND cs."status" <> 'cancelado')`.as("receitaPrevista"),
-        receitaArrecadada: sql<number>`(SELECT COALESCE(SUM(cs."totalPrice"), 0) FROM "costume_sales" cs WHERE cs."eventId" = ${events.id} AND cs."status" IN ('pago', 'entregue'))`.as("receitaArrecadada"),
       })
         .from(events)
         .where(and(
@@ -186,16 +174,49 @@ export const eventosRouters = {
         ))
         .orderBy(asc(events.startsAt));
 
-      return rows.map((row) => ({
-        ...row,
-        coreografiasCount: Number(row.coreografiasCount) || 0,
-        participantesCount: Number(row.participantesCount) || 0,
-        confirmadosCount: Number(row.confirmadosCount) || 0,
-        autorizadosCount: Number(row.autorizadosCount) || 0,
-        vendasQty: Number(row.vendasQty) || 0,
-        receitaPrevista: Number(row.receitaPrevista) || 0,
-        receitaArrecadada: Number(row.receitaArrecadada) || 0,
-      }));
+      // AUDITORIA postgres.js: subqueries escalares com alias (.as()) vinham
+      // zeradas na resposta — os KPIs agora são agregados por eventId (groupBy)
+      // e mesclados em JS (mesmo caminho do stats, testado e confiável).
+      const eventIds = rows.map((row) => row.id);
+      const coreoRows = eventIds.length > 0 ? await db.select({
+        eventId: eventChoreographies.eventId,
+        count: sql<number>`CAST(COUNT(*) AS INT)`,
+      }).from(eventChoreographies).where(inArray(eventChoreographies.eventId, eventIds)).groupBy(eventChoreographies.eventId) : [];
+      const partRows = eventIds.length > 0 ? await db.select({
+        eventId: eventParticipants.eventId,
+        total: sql<number>`CAST(COUNT(*) AS INT)`,
+        confirmados: sql<number>`CAST(SUM(CASE WHEN ${eventParticipants.status} = 'confirmado' THEN 1 ELSE 0 END) AS INT)`,
+        autorizados: sql<number>`CAST(SUM(CASE WHEN ${eventParticipants.imageAuthorization} = true AND ${eventParticipants.participationAuthorization} = true THEN 1 ELSE 0 END) AS INT)`,
+      }).from(eventParticipants).where(inArray(eventParticipants.eventId, eventIds)).groupBy(eventParticipants.eventId) : [];
+      const saleRows = eventIds.length > 0 ? await db.select({
+        eventId: costumeSales.eventId,
+        qty: sql<number>`CAST(COALESCE(SUM(${costumeSales.quantity}), 0) AS INT)`,
+        previsto: sql<number>`COALESCE(SUM(${costumeSales.totalPrice}), 0)`,
+        arrecadado: sql<number>`COALESCE(SUM(CASE WHEN ${costumeSales.status} IN ('pago', 'entregue') THEN ${costumeSales.totalPrice} ELSE 0 END), 0)`,
+      }).from(costumeSales).where(and(
+        inArray(costumeSales.eventId, eventIds),
+        sql`${costumeSales.status} <> 'cancelado'`,
+      )).groupBy(costumeSales.eventId) : [];
+
+      // inArray já ignora eventId IS NULL — agrupamentos garantem 1 linha/evento
+      const coreoMap = new Map<number, number>(coreoRows.map((r: any) => [r.eventId, Number(r.count) || 0]));
+      const partMap = new Map<number, { total: number; confirmados: number; autorizados: number }>(partRows.map((r: any) => [r.eventId, { total: Number(r.total) || 0, confirmados: Number(r.confirmados) || 0, autorizados: Number(r.autorizados) || 0 }]));
+      const saleMap = new Map<number, { qty: number; previsto: number; arrecadado: number }>(saleRows.map((r: any) => [r.eventId, { qty: Number(r.qty) || 0, previsto: Number(r.previsto) || 0, arrecadado: Number(r.arrecadado) || 0 }]));
+
+      return rows.map((row) => {
+        const part = partMap.get(row.id) ?? { total: 0, confirmados: 0, autorizados: 0 };
+        const sale = saleMap.get(row.id) ?? { qty: 0, previsto: 0, arrecadado: 0 };
+        return {
+          ...row,
+          coreografiasCount: coreoMap.get(row.id) ?? 0,
+          participantesCount: part.total,
+          confirmadosCount: part.confirmados,
+          autorizadosCount: part.autorizados,
+          vendasQty: sale.qty,
+          receitaPrevista: sale.previsto,
+          receitaArrecadada: sale.arrecadado,
+        };
+      });
     }),
 
     stats: protectedProcedure.query(async ({ ctx }) => {
