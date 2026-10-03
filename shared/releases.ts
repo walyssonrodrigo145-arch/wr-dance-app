@@ -26,6 +26,20 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.10.03.1",
+    date: "2026-10-03",
+    title: "Loja e Eventos: correções de usabilidade",
+    summary: "Aba de participações corrigida, tabela e busca da Loja reorganizadas, pagamento e entrega separados nos pedidos e alerta de conflito entre status e datas.",
+    items: [
+      { type: "correcao", title: "Aba de Participações funcionando", description: "A aba não abria o painel de participantes (nome de aba divergente). Agora mostra lista, filtros, autorizações e ações — com estados de carregamento, erro e lista vazia." },
+      { type: "melhoria", title: "Tabela da Loja sem sobreposição", description: "Colunas alinhadas com rolagem apenas dentro da tabela; nome e SKU organizados; resumos de vendas descem para baixo do catálogo quando falta largura." },
+      { type: "melhoria", title: "Busca e filtros da Loja", description: "Busca em linha própria com largura útil; filtros em grade; botões Tabela/Grade sempre visíveis." },
+      { type: "correcao", title: "Duração correta do evento", description: "Evento de um dia não aparece mais como \"vários dias\"; sem término, o sistema não inventa duração." },
+      { type: "novo", title: "Pagamento e entrega separados", description: "Pedidos agora têm situação financeira (pendente/pago/cancelado) e logística (pendente/em separação/entregue) independentes — uma ação nunca altera a outra. Dados existentes migrados automaticamente." },
+      { type: "melhoria", title: "Conflito de status × datas", description: "Status do evento (manual) e situação pelas datas (automática) ficam rotulados; se um evento realizado tiver término futuro, aparece um aviso curto com acesso à edição — sem alterar nada automaticamente." },
+    ],
+  },
+  {
     version: "2026.10.02.3",
     date: "2026-10-02",
     title: "Gestão de eventos em página completa",
