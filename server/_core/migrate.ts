@@ -991,6 +991,58 @@ export async function runAutoMigrations() {
         "createdAt" timestamp DEFAULT now() NOT NULL
       )` },
       { table: 'event_seats', sql: `CREATE UNIQUE INDEX IF NOT EXISTS "event_seats_unique" ON "event_seats" ("eventId", "sector", "row", "number")` },
+
+      // ═══ FASE 3 Eventos: equipe, checklist, ocorrências e financeiro (aditivo) ═══
+      { table: 'event_staff', sql: `CREATE TABLE IF NOT EXISTS "event_staff" (
+        "id" serial PRIMARY KEY,
+        "organizationId" integer NOT NULL,
+        "eventId" integer NOT NULL,
+        "name" varchar(120) NOT NULL,
+        "role" varchar(80) NOT NULL,
+        "timeLabel" varchar(40),
+        "location" varchar(120),
+        "responsibility" text,
+        "phone" varchar(30),
+        "createdAt" timestamp DEFAULT now() NOT NULL,
+        "updatedAt" timestamp DEFAULT now() NOT NULL
+      )` },
+      { table: 'event_tasks', sql: `CREATE TABLE IF NOT EXISTS "event_tasks" (
+        "id" serial PRIMARY KEY,
+        "organizationId" integer NOT NULL,
+        "eventId" integer NOT NULL,
+        "title" varchar(200) NOT NULL,
+        "responsible" varchar(120),
+        "dueDate" timestamp,
+        "priority" varchar(10) DEFAULT 'media' NOT NULL,
+        "status" varchar(20) DEFAULT 'pendente' NOT NULL,
+        "notes" text,
+        "createdAt" timestamp DEFAULT now() NOT NULL,
+        "updatedAt" timestamp DEFAULT now() NOT NULL
+      )` },
+      { table: 'event_incidents', sql: `CREATE TABLE IF NOT EXISTS "event_incidents" (
+        "id" serial PRIMARY KEY,
+        "organizationId" integer NOT NULL,
+        "eventId" integer NOT NULL,
+        "title" varchar(200) NOT NULL,
+        "description" text,
+        "severity" varchar(10) DEFAULT 'media' NOT NULL,
+        "status" varchar(20) DEFAULT 'aberto' NOT NULL,
+        "resolvedAt" timestamp,
+        "createdByUserId" integer NOT NULL,
+        "createdAt" timestamp DEFAULT now() NOT NULL
+      )` },
+      { table: 'event_finances', sql: `CREATE TABLE IF NOT EXISTS "event_finances" (
+        "id" serial PRIMARY KEY,
+        "organizationId" integer NOT NULL,
+        "eventId" integer NOT NULL,
+        "kind" varchar(10) NOT NULL,
+        "category" varchar(60) NOT NULL,
+        "description" varchar(255),
+        "amount" decimal(10,2) NOT NULL,
+        "date" timestamp DEFAULT now() NOT NULL,
+        "status" varchar(20) DEFAULT 'pago' NOT NULL,
+        "createdAt" timestamp DEFAULT now() NOT NULL
+      )` },
     ];
 
     for (const m of migrations) {

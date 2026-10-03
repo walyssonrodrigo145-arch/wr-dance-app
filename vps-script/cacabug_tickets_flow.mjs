@@ -162,7 +162,7 @@ await step("Cancelar ingresso libera assento e invalida QR", async () => {
   await admin.tickets.cancel.mutate({ id: target.id });
   const seats = await admin.tickets.seatsList.query({ eventId: ev.id });
   const freed = seats.filter((s) => !s.occupant);
-  expect(freed.length === 4, `esperava 4 assentos livres, veio ${freed.length}`);
+  expect(freed.length === 5, `esperava 5 assentos livres (só 1 continua ocupado), veio ${freed.length}`);
   const checkin = await admin.tickets.checkin.mutate({ code: ev.codes[0] });
   expect(checkin.result === "cancelado", `QR cancelado deveria responder cancelado, veio ${checkin.result}`);
   return "assento liberado";

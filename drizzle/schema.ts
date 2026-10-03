@@ -2796,6 +2796,79 @@ export type InsertTicket = typeof tickets.$inferInsert;
 export type EventSeat = typeof eventSeats.$inferSelect;
 export type InsertEventSeat = typeof eventSeats.$inferInsert;
 
+// ═══════════════ FASE 3: Operação, Equipe, Checklist, Ocorrências e Financeiro ═══════════════
+
+/** Equipe do evento (backstage, camarim, check-in, palco, som...). */
+export const eventStaff = pgTable("event_staff", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").notNull(),
+  eventId: integer("eventId").notNull(),
+  name: varchar("name", { length: 120 }).notNull(),
+  role: varchar("role", { length: 80 }).notNull(),
+  timeLabel: varchar("timeLabel", { length: 40 }),
+  location: varchar("location", { length: 120 }),
+  responsibility: text("responsibility"),
+  phone: varchar("phone", { length: 30 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdateFn(() => new Date()).notNull(),
+}, (table) => [
+  index("event_staff_event_idx").on(table.eventId),
+]);
+
+/** Checklist de tarefas do evento. */
+export const eventTasks = pgTable("event_tasks", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").notNull(),
+  eventId: integer("eventId").notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  responsible: varchar("responsible", { length: 120 }),
+  dueDate: timestamp("dueDate"),
+  priority: varchar("priority", { length: 10 }).default("media").notNull(), // baixa|media|alta
+  status: varchar("status", { length: 20 }).default("pendente").notNull(), // pendente|fazendo|concluida
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdateFn(() => new Date()).notNull(),
+}, (table) => [
+  index("event_tasks_event_idx").on(table.eventId),
+]);
+
+/** Ocorrências registradas durante a operação do evento. */
+export const eventIncidents = pgTable("event_incidents", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").notNull(),
+  eventId: integer("eventId").notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  severity: varchar("severity", { length: 10 }).default("media").notNull(), // baixa|media|alta
+  status: varchar("status", { length: 20 }).default("aberto").notNull(), // aberto|resolvido
+  resolvedAt: timestamp("resolvedAt"),
+  createdByUserId: integer("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  index("event_incidents_event_idx").on(table.eventId),
+]);
+
+/** Receitas e despesas específicas do evento (integra o financeiro geral via relatórios). */
+export const eventFinances = pgTable("event_finances", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organizationId").notNull(),
+  eventId: integer("eventId").notNull(),
+  kind: varchar("kind", { length: 10 }).notNull(), // receita|despesa
+  category: varchar("category", { length: 60 }).notNull(),
+  description: varchar("description", { length: 255 }),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  date: timestamp("date").defaultNow().notNull(),
+  status: varchar("status", { length: 20 }).default("pago").notNull(), // pago|pendente
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  index("event_finances_event_idx").on(table.eventId),
+]);
+
+export type EventStaff = typeof eventStaff.$inferSelect;
+export type EventTask = typeof eventTasks.$inferSelect;
+export type EventIncident = typeof eventIncidents.$inferSelect;
+export type EventFinance = typeof eventFinances.$inferSelect;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // FIGURINOS / VESTUÁRIO (DancePro) — acervo + empréstimos por aluno/coreografia
 // Controle de saída e devolução com disponibilidade calculada em tempo real.

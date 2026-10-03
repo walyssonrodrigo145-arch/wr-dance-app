@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useLocation, Redirect } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -11,7 +11,7 @@ import {
   MapPin, CheckCircle2, Clock, TrendingUp, Pencil, Copy, Send, X, UserPlus,
   ShieldCheck, Search, Plus, Loader2, Trash2, ArrowUp, ArrowDown, ShoppingCart,
   QrCode, PackageCheck, ArrowUpRight, Download, Ticket, Ban, Truck,
-  GripVertical, AlertTriangle, ClipboardList,
+  GripVertical, AlertTriangle, ClipboardList, Wallet, Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +35,7 @@ import {
 } from "@/components/eventos/EventoModal";
 import { SaleChargeModal } from "./Figurinos";
 import { TicketsTab } from "@/components/eventos/TicketsTab";
-import { BackstageTab } from "@/components/eventos/BackstageTab";
+import { OperationsTab, FinanceiroTab } from "@/components/eventos/OperationsTab";
 import { SmartImage } from "@/components/common/SmartImage";
 
 /** Deriva as duas dimensões a partir do status único da venda. */
@@ -86,6 +86,7 @@ export default function EventoGestao() {
   const [costumeDraft, setCostumeDraft] = useState<Record<number, string>>({});
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [minIntervalDraft, setMinIntervalDraft] = useState("");
+  const [smartOrderOpen, setSmartOrderOpen] = useState(false);
   const [chargeSale, setChargeSale] = useState<any | null>(null);
 
   const [sellOpen, setSellOpen] = useState(false);
@@ -438,6 +439,7 @@ export default function EventoGestao() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2 shrink-0">
+            <Button variant="outline" onClick={() => setLocation(`/eventos/${eventId}/modo`)}><Play size={15} className="mr-2" /> Modo Evento</Button>
             <Button variant="outline" onClick={() => setModalOpen(true)}><Pencil size={15} className="mr-2" /> Editar</Button>
             <Button variant="outline" onClick={() => duplicateMut.mutate({ id: eventId })} disabled={duplicateMut.isPending}><Copy size={15} className="mr-2" /> Duplicar</Button>
             {data?.status === "planejado" && (
@@ -483,6 +485,7 @@ export default function EventoGestao() {
             <TabsTrigger value="ingressos"><Ticket size={13} className="mr-1.5" /> Ingressos</TabsTrigger>
             <TabsTrigger value="operacao"><ClipboardList size={13} className="mr-1.5" /> Operação</TabsTrigger>
             <TabsTrigger value="loja"><Shirt size={13} className="mr-1.5" /> Loja ({sales.length})</TabsTrigger>
+            <TabsTrigger value="financeiro"><Wallet size={13} className="mr-1.5" /> Financeiro</TabsTrigger>
             <TabsTrigger value="relatorios"><FileText size={13} className="mr-1.5" /> Relatórios</TabsTrigger>
           </TabsList>
 
@@ -1045,6 +1048,16 @@ export default function EventoGestao() {
                   Importar elenco
                 </Button>
               )}
+              {coreografiasVinculadas.length > 1 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-[11px] font-black"
+                  onClick={() => setSmartOrderOpen(true)}
+                >
+                  <TrendingUp size={12} className="mr-1.5" /> Gerar ordem inteligente
+                </Button>
+              )}
             </div>
 
             <Select
@@ -1200,9 +1213,14 @@ export default function EventoGestao() {
             <TicketsTab eventId={eventId} />
           </TabsContent>
 
-          {/* ── OPERAÇÃO / BACKSTAGE (FASE 2) ── */}
+          {/* ── OPERAÇÃO (FASE 2/3) ── */}
           <TabsContent value="operacao" className="mt-4">
-            <BackstageTab eventId={eventId} />
+            <OperationsTab eventId={eventId} />
+          </TabsContent>
+
+          {/* ── FINANCEIRO DO EVENTO (FASE 3) ── */}
+          <TabsContent value="financeiro" className="mt-4">
+            <FinanceiroTab eventId={eventId} />
           </TabsContent>
 
           {/* ── LOJA DO EVENTO ── */}
@@ -1456,6 +1474,10 @@ export default function EventoGestao() {
 
       <SaleChargeModal sale={chargeSale} onClose={() => setChargeSale(null)} />
 
+      {smartOrderOpen && (
+        <SmartOrderDialog eventId={eventId} currentIds={(data?.coreografias ?? []).map((c: any) => c.id)} onClose={() => setSmartOrderOpen(false)} />
+      )}
+
       {choreoEdit && (
         <ChoreoMetaDialog
           row={choreoEdit}
@@ -1670,3 +1692,76 @@ function ChoreoMetaDialog({ row, saving, onClose, onSave }: {
   );
 }
 
+
+/** FASE 3: prévia da ordem inteligente do programa (greedy por elenco compartilhado). */
+function SmartOrderDialog({ eventId, currentIds, onClose }: { eventId: number; currentIds: number[]; onClose: () => void }) {
+  const utils = trpc.useUtils();
+  const [suggestion, setSuggestion] = useState<any | null>(null);
+
+  const suggest = trpc.eventos.suggestOrder.useMutation({
+    onSuccess: (r) => setSuggestion(r),
+    onError: (e) => toast.error(e.message),
+  });
+  const apply = trpc.eventos.reorderPresentations.useMutation({
+    onSuccess: () => {
+      toast.success("Ordem inteligente aplicada!");
+      utils.eventos.getById.invalidate({ id: eventId });
+      onClose();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  useEffect(() => {
+    suggest.mutate({ eventId });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="w-[95vw] max-w-lg max-h-[90dvh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-lg font-black">
+            <TrendingUp className="text-indigo-500" size={20} /> Ordem inteligente
+          </DialogTitle>
+        </DialogHeader>
+        {suggest.isPending || !suggestion ? (
+          <div className="flex justify-center py-8"><Loader2 className="animate-spin text-primary" size={24} /></div>
+        ) : (
+          <div className="space-y-3 mt-2">
+            <p className="text-xs font-bold text-muted-foreground">
+              O algoritmo agrupa apresentações que compartilham alunas (menos trocas de figurino), mantendo o intervalo mínimo configurado.
+            </p>
+            {(suggestion.notes ?? []).length > 0 && (
+              <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3 space-y-1">
+                {(suggestion.notes as string[]).map((n, i) => (
+                  <p key={i} className="text-[11px] font-bold text-muted-foreground">• {n}</p>
+                ))}
+              </div>
+            )}
+            {suggestion.remainingConflicts > 0 ? (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+                <p className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                  Restam {suggestion.remainingConflicts} conflito(s) de intervalo — ajuste durações ou o intervalo mínimo na Programação.
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-3 py-2">
+                <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">Sem conflitos de intervalo na ordem sugerida.</p>
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={onClose} disabled={apply.isPending}>Cancelar</Button>
+              <Button
+                onClick={() => apply.mutate({ eventId, orderedIds: suggestion.orderedIds as number[] })}
+                disabled={apply.isPending || JSON.stringify(suggestion.orderedIds) === JSON.stringify(currentIds)}
+                className="bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-500/20"
+              >
+                {apply.isPending && <Loader2 size={14} className="animate-spin mr-2" />} Aplicar ordem
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}

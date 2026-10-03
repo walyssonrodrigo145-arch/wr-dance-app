@@ -6,7 +6,7 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
 import { protectedProcedure, studentProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { coreografiaAlunos, coreografias, costumeSales, eventChoreographies, eventParticipants, events, instruments, paymentDues, settings, students, turmas, turmaAlunos, users } from "../../drizzle/schema";
+import { coreografiaAlunos, coreografias, costumeSales, eventChoreographies, eventFinances, eventIncidents, eventParticipants, eventStaff, eventTasks, events, instruments, paymentDues, settings, students, ticketTypes, tickets, turmas, turmaAlunos, users } from "../../drizzle/schema";
 import { ENV } from "../_core/env";
 import { notifyUser } from "../_core/notification";
 import { sendWhatsAppMessage } from "../utils/whatsapp";
@@ -835,6 +835,449 @@ export const eventosRouters = {
       }
       await db.update(eventChoreographies).set({ stageState: input.state }).where(eq(eventChoreographies.id, input.id));
       return { success: true };
+    }),
+
+    // ═════════════════ FASE 3: Equipe ═════════════════
+    staffList: protectedProcedure.input(z.object({ eventId: z.number() })).query(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) return [];
+      const orgId = ctx.user.organizationId!;
+      return db.select().from(eventStaff)
+        .where(and(eq(eventStaff.organizationId, orgId), eq(eventStaff.eventId, input.eventId)))
+        .orderBy(asc(eventStaff.name), asc(eventStaff.id));
+    }),
+
+    staffCreate: protectedProcedure.input(z.object({
+      eventId: z.number(),
+      name: z.string().min(2, "Informe o nome").max(120),
+      role: z.string().min(2, "Informe a função").max(80),
+      timeLabel: z.string().max(40).nullable().optional(),
+      location: z.string().max(120).nullable().optional(),
+      responsibility: z.string().max(2000).nullable().optional(),
+      phone: z.string().max(30).nullable().optional(),
+    })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+      const [event] = await db.select({ id: events.id }).from(events)
+        .where(and(eq(events.id, input.eventId), eq(events.organizationId, orgId))).limit(1);
+      if (!event) throw new TRPCError({ code: "NOT_FOUND", message: "Evento não encontrado." });
+      const [created] = await db.insert(eventStaff).values({
+        organizationId: orgId,
+        eventId: input.eventId,
+        name: input.name.trim(),
+        role: input.role.trim(),
+        timeLabel: input.timeLabel?.trim() || null,
+        location: input.location?.trim() || null,
+        responsibility: input.responsibility?.trim() || null,
+        phone: input.phone?.trim() || null,
+      }).returning({ id: eventStaff.id });
+      return { success: true, id: created.id };
+    }),
+
+    staffUpdate: protectedProcedure.input(z.object({
+      id: z.number(),
+      name: z.string().min(2).max(120),
+      role: z.string().min(2).max(80),
+      timeLabel: z.string().max(40).nullable().optional(),
+      location: z.string().max(120).nullable().optional(),
+      responsibility: z.string().max(2000).nullable().optional(),
+      phone: z.string().max(30).nullable().optional(),
+    })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+      const [existing] = await db.select({ id: eventStaff.id }).from(eventStaff)
+        .where(and(eq(eventStaff.id, input.id), eq(eventStaff.organizationId, orgId))).limit(1);
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Membro da equipe não encontrado." });
+      await db.update(eventStaff).set({
+        name: input.name.trim(),
+        role: input.role.trim(),
+        timeLabel: input.timeLabel?.trim() || null,
+        location: input.location?.trim() || null,
+        responsibility: input.responsibility?.trim() || null,
+        phone: input.phone?.trim() || null,
+        updatedAt: new Date(),
+      }).where(eq(eventStaff.id, input.id));
+      return { success: true };
+    }),
+
+    staffDelete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+      const [existing] = await db.select({ id: eventStaff.id }).from(eventStaff)
+        .where(and(eq(eventStaff.id, input.id), eq(eventStaff.organizationId, orgId))).limit(1);
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Membro da equipe não encontrado." });
+      await db.delete(eventStaff).where(eq(eventStaff.id, input.id));
+      return { success: true };
+    }),
+
+    // ═════════════════ FASE 3: Checklist ═════════════════
+    tasksList: protectedProcedure.input(z.object({ eventId: z.number() })).query(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) return [];
+      const orgId = ctx.user.organizationId!;
+      return db.select().from(eventTasks)
+        .where(and(eq(eventTasks.organizationId, orgId), eq(eventTasks.eventId, input.eventId)))
+        .orderBy(asc(eventTasks.status), asc(eventTasks.dueDate), asc(eventTasks.id));
+    }),
+
+    taskCreate: protectedProcedure.input(z.object({
+      eventId: z.number(),
+      title: z.string().min(2, "Informe o título").max(200),
+      responsible: z.string().max(120).nullable().optional(),
+      dueDate: z.coerce.date().nullable().optional(),
+      priority: z.enum(["baixa", "media", "alta"]).default("media"),
+      notes: z.string().max(2000).nullable().optional(),
+    })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+      const [event] = await db.select({ id: events.id }).from(events)
+        .where(and(eq(events.id, input.eventId), eq(events.organizationId, orgId))).limit(1);
+      if (!event) throw new TRPCError({ code: "NOT_FOUND", message: "Evento não encontrado." });
+      const [created] = await db.insert(eventTasks).values({
+        organizationId: orgId,
+        eventId: input.eventId,
+        title: input.title.trim(),
+        responsible: input.responsible?.trim() || null,
+        dueDate: input.dueDate ?? null,
+        priority: input.priority,
+        notes: input.notes?.trim() || null,
+      }).returning({ id: eventTasks.id });
+      return { success: true, id: created.id };
+    }),
+
+    taskUpdate: protectedProcedure.input(z.object({
+      id: z.number(),
+      status: z.enum(["pendente", "fazendo", "concluida"]).optional(),
+      priority: z.enum(["baixa", "media", "alta"]).optional(),
+      responsible: z.string().max(120).nullable().optional(),
+      dueDate: z.coerce.date().nullable().optional(),
+      notes: z.string().max(2000).nullable().optional(),
+      title: z.string().min(2).max(200).optional(),
+    })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+      const [existing] = await db.select({ id: eventTasks.id }).from(eventTasks)
+        .where(and(eq(eventTasks.id, input.id), eq(eventTasks.organizationId, orgId))).limit(1);
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Tarefa não encontrada." });
+      await db.update(eventTasks).set({
+        ...(input.status !== undefined ? { status: input.status } : {}),
+        ...(input.priority !== undefined ? { priority: input.priority } : {}),
+        ...(input.responsible !== undefined ? { responsible: input.responsible?.trim() || null } : {}),
+        ...(input.dueDate !== undefined ? { dueDate: input.dueDate } : {}),
+        ...(input.notes !== undefined ? { notes: input.notes?.trim() || null } : {}),
+        ...(input.title !== undefined ? { title: input.title.trim() } : {}),
+        updatedAt: new Date(),
+      }).where(eq(eventTasks.id, input.id));
+      return { success: true };
+    }),
+
+    taskDelete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+      const [existing] = await db.select({ id: eventTasks.id }).from(eventTasks)
+        .where(and(eq(eventTasks.id, input.id), eq(eventTasks.organizationId, orgId))).limit(1);
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Tarefa não encontrada." });
+      await db.delete(eventTasks).where(eq(eventTasks.id, input.id));
+      return { success: true };
+    }),
+
+    // ═════════════════ FASE 3: Ocorrências ═════════════════
+    incidentsList: protectedProcedure.input(z.object({ eventId: z.number() })).query(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) return [];
+      const orgId = ctx.user.organizationId!;
+      return db.select().from(eventIncidents)
+        .where(and(eq(eventIncidents.organizationId, orgId), eq(eventIncidents.eventId, input.eventId)))
+        .orderBy(desc(eventIncidents.createdAt))
+        .limit(200);
+    }),
+
+    incidentCreate: protectedProcedure.input(z.object({
+      eventId: z.number(),
+      title: z.string().min(2, "Descreva a ocorrência").max(200),
+      description: z.string().max(2000).nullable().optional(),
+      severity: z.enum(["baixa", "media", "alta"]).default("media"),
+    })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+      const [event] = await db.select({ id: events.id }).from(events)
+        .where(and(eq(events.id, input.eventId), eq(events.organizationId, orgId))).limit(1);
+      if (!event) throw new TRPCError({ code: "NOT_FOUND", message: "Evento não encontrado." });
+      const [created] = await db.insert(eventIncidents).values({
+        organizationId: orgId,
+        eventId: input.eventId,
+        title: input.title.trim(),
+        description: input.description?.trim() || null,
+        severity: input.severity,
+        createdByUserId: ctx.user.id,
+      }).returning({ id: eventIncidents.id });
+      return { success: true, id: created.id };
+    }),
+
+    incidentResolve: protectedProcedure.input(z.object({ id: z.number(), resolved: z.boolean().default(true) })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+      const [existing] = await db.select({ id: eventIncidents.id }).from(eventIncidents)
+        .where(and(eq(eventIncidents.id, input.id), eq(eventIncidents.organizationId, orgId))).limit(1);
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Ocorrência não encontrada." });
+      await db.update(eventIncidents).set({
+        status: input.resolved ? "resolvido" : "aberto",
+        resolvedAt: input.resolved ? new Date() : null,
+      }).where(eq(eventIncidents.id, input.id));
+      return { success: true };
+    }),
+
+    incidentDelete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+      const [existing] = await db.select({ id: eventIncidents.id }).from(eventIncidents)
+        .where(and(eq(eventIncidents.id, input.id), eq(eventIncidents.organizationId, orgId))).limit(1);
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Ocorrência não encontrada." });
+      await db.delete(eventIncidents).where(eq(eventIncidents.id, input.id));
+      return { success: true };
+    }),
+
+    // ═════════════════ FASE 3: Financeiro do evento ═════════════════
+    financesList: protectedProcedure.input(z.object({ eventId: z.number() })).query(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) return [];
+      const orgId = ctx.user.organizationId!;
+      const rows = await db.select().from(eventFinances)
+        .where(and(eq(eventFinances.organizationId, orgId), eq(eventFinances.eventId, input.eventId)))
+        .orderBy(desc(eventFinances.date), desc(eventFinances.id));
+      return rows.map((r) => ({ ...r, amount: Number(r.amount) || 0 }));
+    }),
+
+    financeCreate: protectedProcedure.input(z.object({
+      eventId: z.number(),
+      kind: z.enum(["receita", "despesa"]),
+      category: z.string().min(1, "Informe a categoria").max(60),
+      description: z.string().max(255).nullable().optional(),
+      amount: z.number().min(0.01, "Informe o valor").max(10000000),
+      date: z.coerce.date().nullable().optional(),
+      status: z.enum(["pago", "pendente"]).default("pago"),
+    })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+      const [event] = await db.select({ id: events.id }).from(events)
+        .where(and(eq(events.id, input.eventId), eq(events.organizationId, orgId))).limit(1);
+      if (!event) throw new TRPCError({ code: "NOT_FOUND", message: "Evento não encontrado." });
+      const [created] = await db.insert(eventFinances).values({
+        organizationId: orgId,
+        eventId: input.eventId,
+        kind: input.kind,
+        category: input.category.trim(),
+        description: input.description?.trim() || null,
+        amount: input.amount.toFixed(2),
+        date: input.date ?? new Date(),
+        status: input.status,
+      }).returning({ id: eventFinances.id });
+      return { success: true, id: created.id };
+    }),
+
+    financeDelete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+      const [existing] = await db.select({ id: eventFinances.id }).from(eventFinances)
+        .where(and(eq(eventFinances.id, input.id), eq(eventFinances.organizationId, orgId))).limit(1);
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Lançamento não encontrado." });
+      await db.delete(eventFinances).where(eq(eventFinances.id, input.id));
+      return { success: true };
+    }),
+
+    /** Resumo financeiro do evento: loja + ingressos + lançamentos × despesas. */
+    financeSummary: protectedProcedure.input(z.object({ eventId: z.number() })).query(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) {
+        return { lojaArrecadado: 0, lojaPrevisto: 0, ingressos: 0, receitasManuais: 0, despesas: 0, despesasPendentes: 0, receitaTotal: 0, resultado: 0, ticketMedioLoja: 0, occupancyPct: 0, ticketsSold: 0, pedidosLoja: 0 };
+      }
+      const orgId = ctx.user.organizationId!;
+
+      const [lojaPaid] = await db.select({
+        paid: sql<number>`COALESCE(SUM(CASE WHEN ${costumeSales.status} = 'pago' THEN ${costumeSales.totalPrice} ELSE 0 END), 0)`,
+        previsto: sql<number>`COALESCE(SUM(CASE WHEN ${costumeSales.status} <> 'cancelado' THEN ${costumeSales.totalPrice} ELSE 0 END), 0)`,
+        pedidos: sql<number>`CAST(SUM(CASE WHEN ${costumeSales.status} <> 'cancelado' THEN 1 ELSE 0 END) AS INT)`,
+      }).from(costumeSales)
+        .where(and(eq(costumeSales.organizationId, orgId), eq(costumeSales.eventId, input.eventId)));
+
+      const soldRows = await db.select({ price: ticketTypes.price, count: sql<number>`CAST(COUNT(*) AS INT)` })
+        .from(tickets)
+        .innerJoin(ticketTypes, eq(ticketTypes.id, tickets.ticketTypeId))
+        .where(and(eq(tickets.organizationId, orgId), eq(tickets.eventId, input.eventId), eq(tickets.status, "vendido")))
+        .groupBy(ticketTypes.price);
+      const ingressos = soldRows.reduce((acc, r: any) => acc + (Number(r.price) || 0) * (Number(r.count) || 0), 0);
+      const ticketsSold = soldRows.reduce((acc: number, r: any) => acc + (Number(r.count) || 0), 0);
+
+      const [capacityRow] = await db.select({ capacity: sql<number>`CAST(COALESCE(SUM(${ticketTypes.quantity}), 0) AS INT)` })
+        .from(ticketTypes)
+        .where(and(eq(ticketTypes.organizationId, orgId), eq(ticketTypes.eventId, input.eventId), eq(ticketTypes.active, true)));
+      const [issuedRow] = await db.select({ issued: sql<number>`CAST(COUNT(*) AS INT)` })
+        .from(tickets)
+        .where(and(eq(tickets.organizationId, orgId), eq(tickets.eventId, input.eventId), sql`${tickets.status} <> 'cancelado'`));
+
+      const manualRows = await db.select({
+        kind: eventFinances.kind,
+        status: eventFinances.status,
+        total: sql<number>`COALESCE(SUM(${eventFinances.amount}), 0)`,
+      }).from(eventFinances)
+        .where(and(eq(eventFinances.organizationId, orgId), eq(eventFinances.eventId, input.eventId)))
+        .groupBy(eventFinances.kind, eventFinances.status);
+
+      let receitasManuais = 0;
+      let despesas = 0;
+      let despesasPendentes = 0;
+      for (const r of manualRows as any[]) {
+        const total = Number(r.total) || 0;
+        if (r.kind === "receita") receitasManuais += total;
+        else {
+          despesas += total;
+          if (r.status !== "pago") despesasPendentes += total;
+        }
+      }
+
+      const lojaArrecadado = Number((lojaPaid as any)?.paid) || 0;
+      const lojaPrevisto = Number((lojaPaid as any)?.previsto) || 0;
+      const pedidosLoja = Number((lojaPaid as any)?.pedidos) || 0;
+      const receitaTotal = lojaArrecadado + ingressos + receitasManuais;
+      const capacity = Number((capacityRow as any)?.capacity) || 0;
+      const issued = Number((issuedRow as any)?.issued) || 0;
+
+      return {
+        lojaArrecadado,
+        lojaPrevisto,
+        ingressos,
+        receitasManuais,
+        despesas,
+        despesasPendentes,
+        receitaTotal,
+        resultado: receitaTotal - despesas,
+        ticketMedioLoja: pedidosLoja > 0 ? lojaArrecadado / pedidosLoja : 0,
+        occupancyPct: capacity > 0 ? Math.round((issued / capacity) * 100) : 0,
+        ticketsSold,
+        pedidosLoja,
+      };
+    }),
+
+    /** FASE 3: sugestão de ordem inteligente do programa (greedy por elenco compartilhado). */
+    suggestOrder: protectedProcedure.input(z.object({ eventId: z.number() })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+
+      const [event] = await db.select({ id: events.id, minIntervalMinutes: events.minIntervalMinutes }).from(events)
+        .where(and(eq(events.id, input.eventId), eq(events.organizationId, orgId))).limit(1);
+      if (!event) throw new TRPCError({ code: "NOT_FOUND", message: "Evento não encontrado." });
+
+      const pres = await db.select({
+        id: eventChoreographies.id,
+        coreografiaId: eventChoreographies.coreografiaId,
+        ordem: eventChoreographies.ordem,
+        durationMinutes: eventChoreographies.durationMinutes,
+        title: coreografias.title,
+      })
+        .from(eventChoreographies)
+        .innerJoin(coreografias, eq(coreografias.id, eventChoreographies.coreografiaId))
+        .where(eq(eventChoreographies.eventId, input.eventId))
+        .orderBy(asc(eventChoreographies.ordem));
+
+      if (pres.length < 2) {
+        return { orderedIds: pres.map((p) => p.id), notes: ["Programa com menos de 2 apresentações — nada a reordenar."], remainingConflicts: 0 };
+      }
+
+      const coreoIds = pres.map((p) => p.coreografiaId);
+      const roster = await db.select({ coreografiaId: coreografiaAlunos.coreografiaId, studentId: coreografiaAlunos.studentId })
+        .from(coreografiaAlunos).where(inArray(coreografiaAlunos.coreografiaId, coreoIds));
+      const alunosByCoreo = new Map<number, Set<number>>();
+      for (const r of roster) {
+        const set = alunosByCoreo.get(r.coreografiaId) ?? new Set<number>();
+        set.add(r.studentId);
+        alunosByCoreo.set(r.coreografiaId, set);
+      }
+      const alunosOf = (p: any) => alunosByCoreo.get(p.coreografiaId) ?? new Set<number>();
+      const overlap = (a: Set<number>, b: Set<number>) => {
+        let n = 0;
+        a.forEach((x) => { if (b.has(x)) n += 1; });
+        return n;
+      };
+
+      // Greedy: começa pela maior elenco; depois sempre a maior interseção com a anterior
+      const remaining = [...pres];
+      const ordered: any[] = [];
+      const notes: string[] = [];
+      while (remaining.length > 0) {
+        let bestIdx = 0;
+        if (ordered.length === 0) {
+          bestIdx = remaining.reduce((bi, p, i) => (alunosOf(p).size > alunosOf(remaining[bi]).size ? i : bi), 0);
+        } else {
+          const lastSet = alunosOf(ordered[ordered.length - 1]);
+          bestIdx = remaining.reduce((bi, p, i) => {
+            const oi = overlap(alunosOf(p), lastSet);
+            const ob = overlap(alunosOf(remaining[bi]), lastSet);
+            if (oi !== ob) return oi > ob ? i : bi;
+            return alunosOf(p).size > alunosOf(remaining[bi]).size ? i : bi;
+          }, 0);
+        }
+        const chosen = remaining.splice(bestIdx, 1)[0];
+        if (ordered.length > 0) {
+          const shared = overlap(alunosOf(chosen), alunosOf(ordered[ordered.length - 1]));
+          if (shared > 0 && notes.length < 6) {
+            notes.push(`"${ordered[ordered.length - 1].title}" e "${chosen.title}" ficam juntas (⌘ ${shared} aluna(s) em comum).`.replace("⌘ ", ""));
+          }
+        }
+        ordered.push(chosen);
+      }
+
+      // Conflitos remanescentes (mesmo aluno, intervalo < mínimo)
+      const minInterval = event.minIntervalMinutes ?? 6;
+      const durOf = (p: any) => (Number(p.durationMinutes) > 0 ? Number(p.durationMinutes) : 3);
+      const byStudent = new Map<number, any[]>();
+      ordered.forEach((p) => {
+        alunosOf(p).forEach((sid) => {
+          const list = byStudent.get(sid) ?? [];
+          list.push(p);
+          byStudent.set(sid, list);
+        });
+      });
+      let remainingConflicts = 0;
+      byStudent.forEach((list) => {
+        for (let i = 0; i < list.length - 1; i++) {
+          const ia = ordered.findIndex((x) => x.id === list[i].id);
+          const ib = ordered.findIndex((x) => x.id === list[i + 1].id);
+          if (ia < 0 || ib <= ia) continue;
+          const gap = ordered.slice(ia + 1, ib).reduce((acc: number, x: any) => acc + durOf(x), 0);
+          if (gap < minInterval) remainingConflicts += 1;
+        }
+      });
+
+      return { orderedIds: ordered.map((p) => p.id), notes, remainingConflicts };
     }),
 
     /** Adiciona participante ao evento (também aceita em lote via array). */

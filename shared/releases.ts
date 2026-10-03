@@ -26,6 +26,22 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.10.03.3",
+    date: "2026-10-03",
+    title: "Eventos: ingressos, operação, financeiro e Modo Evento",
+    summary: "FASES 2 e 3 da central de eventos: ingressos com QR e check-in, mapa de assentos, backstage, equipe, checklist, ocorrências, financeiro do evento e Modo Evento.",
+    items: [
+      { type: "novo", title: "Ingressos (independentes da Loja)", description: "Tipos (Adulto, Infantil, VIP, Meia, Cortesia, Personalizado) com preço, lote, janela de vendas e cortesias por aluno; emissão de vendas e cortesias em lote." },
+      { type: "novo", title: "QR Code e Check-in", description: "Cada ingresso tem código único com QR; tela de check-in com leitor de código (USB), câmera opcional e contadores (entraram/emitidos/aguardados)." },
+      { type: "novo", title: "Mapa de assentos", description: "Gere setores/fileiras/assentos, bloqueie lugares e escolha assentos na emissão — cancelamento libera o assento." },
+      { type: "novo", title: "Backstage", description: "Painel operacional com agora no palco, próxima, em preparação e status de cada aluna (chegou, figurino, maquiagem, palco...)." },
+      { type: "novo", title: "Equipe, Checklist e Ocorrências", description: "Equipe do evento por função/horário/local; checklist com prioridades; registro e resolução de ocorrências em tempo real." },
+      { type: "novo", title: "Financeiro do evento", description: "Receita total (Loja paga + Ingressos vendidos + lançamentos), despesas, resultado, ocupação e ticket médio — sem duplicar o financeiro geral." },
+      { type: "novo", title: "Modo Evento", description: "Tela simplificada para o dia do espetáculo: palco, próxima com presença, check-in rápido, ocorrências e equipe — atualização automática." },
+      { type: "novo", title: "Ordem inteligente", description: "Sugere a ordem do programa agrupando apresentações por elenco compartilhado (menos trocas de figurino), com prévia e conflitos restantes." },
+    ],
+  },
+  {
     version: "2026.10.03.2",
     date: "2026-10-03",
     title: "Eventos: dashboard operacional e programação com timeline",

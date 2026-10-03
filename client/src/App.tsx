@@ -15,6 +15,7 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Alunos = lazy(() => import("./pages/Alunos"));
 const Aulas = lazy(() => import("./pages/Aulas"));
 const EventoGestao = lazy(() => import("./pages/EventoGestao"));
+const EventoModo = lazy(() => import("./pages/EventoModo"));
 const Instrumentos = lazy(() => import("./pages/Instrumentos"));
 const Relatorios = lazy(() => import("./pages/Relatorios"));
 const Configuracoes = lazy(() => import("./pages/Configuracoes"));
@@ -267,6 +268,7 @@ function Router() {
           <Route path="/aulas" component={Aulas} />
           <Route path="/coreografias" component={Coreografias} />
           <Route path="/eventos" component={Eventos} />
+          <Route path="/eventos/:id/modo" component={EventoModo} />
           <Route path="/eventos/:id" component={EventoGestao} />
           <Route path="/figurinos" component={Figurinos} />
           <Route path="/loja" component={Figurinos} />
