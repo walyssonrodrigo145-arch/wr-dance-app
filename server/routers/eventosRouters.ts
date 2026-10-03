@@ -6,7 +6,7 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
 import { protectedProcedure, studentProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { coreografiaAlunos, coreografias, costumeSales, eventChoreographies, eventParticipants, events, instruments, settings, students } from "../../drizzle/schema";
+import { coreografiaAlunos, coreografias, costumeSales, eventChoreographies, eventParticipants, events, instruments, paymentDues, settings, students, turmas, turmaAlunos, users } from "../../drizzle/schema";
 import { ENV } from "../_core/env";
 import { notifyUser } from "../_core/notification";
 import { sendWhatsAppMessage } from "../utils/whatsapp";
@@ -295,15 +295,37 @@ export const eventosRouters = {
         id: eventChoreographies.id,
         coreografiaId: eventChoreographies.coreografiaId,
         ordem: eventChoreographies.ordem,
+        durationMinutes: eventChoreographies.durationMinutes,
+        dressingRoom: eventChoreographies.dressingRoom,
+        stageEntry: eventChoreographies.stageEntry,
+        stageExit: eventChoreographies.stageExit,
         title: coreografias.title,
         formacao: coreografias.formacao,
         status: coreografias.status,
         videoId: coreografias.videoId,
+        musica: coreografias.musica,
       })
         .from(eventChoreographies)
         .innerJoin(coreografias, eq(coreografias.id, eventChoreographies.coreografiaId))
         .where(eq(eventChoreographies.eventId, input.id))
         .orderBy(asc(eventChoreographies.ordem), asc(eventChoreographies.id));
+
+      // Elenco de cada coreografia vinculada (para conflitos e timeline)
+      const choreoIds = linkedCoreografias.map((c) => c.coreografiaId);
+      const rosterRows = choreoIds.length > 0 ? await db.select({
+        coreografiaId: coreografiaAlunos.coreografiaId,
+        studentId: coreografiaAlunos.studentId,
+        studentName: students.name,
+        papel: coreografiaAlunos.papel,
+      }).from(coreografiaAlunos)
+        .innerJoin(students, eq(students.id, coreografiaAlunos.studentId))
+        .where(inArray(coreografiaAlunos.coreografiaId, choreoIds)) : [];
+      const rosterByChoreo = new Map<number, Array<{ id: number; name: string; papel: string | null }>>();
+      for (const row of rosterRows) {
+        const list = rosterByChoreo.get(row.coreografiaId) ?? [];
+        list.push({ id: row.studentId, name: row.studentName, papel: row.papel });
+        rosterByChoreo.set(row.coreografiaId, list);
+      }
 
       const participants = await db.select({
         id: eventParticipants.id,
@@ -325,7 +347,75 @@ export const eventosRouters = {
         .where(eq(eventParticipants.eventId, input.id))
         .orderBy(asc(students.name));
 
-      return { ...event, coreografias: linkedCoreografias, participantes: participants };
+      // Enriquecimento do elenco: turmas, professores (via turmas), apresentações no
+      // evento (coreografias vinculadas onde a aluna está no elenco) e pendência financeira.
+      const studentIds = participants.map((p) => p.studentId);
+      const turmaRows = studentIds.length > 0 ? await db.select({
+        studentId: turmaAlunos.studentId,
+        turmaName: turmas.name,
+        professorId: turmas.professorId,
+      }).from(turmaAlunos)
+        .innerJoin(turmas, eq(turmas.id, turmaAlunos.turmaId))
+        .where(and(eq(turmas.organizationId, orgId), inArray(turmaAlunos.studentId, studentIds))) : [];
+
+      const professorIds = Array.from(new Set(turmaRows.map((t) => t.professorId).filter((id): id is number => id != null)));
+      const professorRows = professorIds.length > 0 ? await db.select({ id: users.id, name: users.name })
+        .from(users).where(inArray(users.id, professorIds)) : [];
+      const professorNameById = new Map<number, string>(professorRows.map((p) => [p.id, p.name] as [number, string]));
+
+      const turmasByStudent = new Map<number, string[]>();
+      const professoresByStudent = new Map<number, string[]>();
+      for (const row of turmaRows) {
+        const t = turmasByStudent.get(row.studentId) ?? [];
+        if (!t.includes(row.turmaName)) t.push(row.turmaName);
+        turmasByStudent.set(row.studentId, t);
+        if (row.professorId != null) {
+          const profName = professorNameById.get(row.professorId);
+          if (profName) {
+            const pr = professoresByStudent.get(row.studentId) ?? [];
+            if (!pr.includes(profName)) pr.push(profName);
+            professoresByStudent.set(row.studentId, pr);
+          }
+        }
+      }
+
+      // Apresentações do evento por aluna (elenco das coreografias vinculadas)
+      const eventChoreoIds = new Set(choreoIds);
+      const apresentacoesByStudent = new Map<number, string[]>();
+      const choreoTitleById = new Map<number, string>();
+      for (const c of linkedCoreografias) choreoTitleById.set(c.coreografiaId, c.title);
+      for (const row of rosterRows) {
+        if (!eventChoreoIds.has(row.coreografiaId)) continue;
+        const list = apresentacoesByStudent.get(row.studentId) ?? [];
+        const title = choreoTitleById.get(row.coreografiaId) ?? "";
+        if (title && !list.includes(title)) list.push(title);
+        apresentacoesByStudent.set(row.studentId, list);
+      }
+
+      const overdueRows = studentIds.length > 0 ? await db.select({ studentId: paymentDues.studentId })
+        .from(paymentDues)
+        .where(and(
+          eq(paymentDues.organizationId, orgId),
+          inArray(paymentDues.studentId, studentIds),
+          or(eq(paymentDues.status, "atrasado"), eq(paymentDues.status, "pendente")),
+          sql`${paymentDues.dueDate} < CURRENT_DATE`,
+        )) : [];
+      const overdueSet = new Set(overdueRows.map((r) => r.studentId));
+
+      const enrichedParticipants = participants.map((p) => ({
+        ...p,
+        turmas: turmasByStudent.get(p.studentId) ?? [],
+        professores: professoresByStudent.get(p.studentId) ?? [],
+        apresentacoes: apresentacoesByStudent.get(p.studentId) ?? [],
+        hasOverdue: overdueSet.has(p.studentId),
+      }));
+
+      const coreografiasComElenco = linkedCoreografias.map((c) => ({
+        ...c,
+        alunos: rosterByChoreo.get(c.coreografiaId) ?? [],
+      }));
+
+      return { ...event, coreografias: coreografiasComElenco, participantes: enrichedParticipants };
     }),
 
     create: protectedProcedure.input(eventInput).mutation(async ({ ctx, input }) => {
@@ -642,6 +732,82 @@ export const eventosRouters = {
       if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Coreografia não vinculada." });
 
       await db.delete(eventChoreographies).where(eq(eventChoreographies.id, input.id));
+      return { success: true };
+    }),
+
+    /** FASE 1: metadados operacionais da apresentação (duração, camarim, entrada/saída). */
+    updateChoreography: protectedProcedure.input(z.object({
+      id: z.number(),
+      durationMinutes: z.number().int().min(0).max(240).nullable().optional(),
+      dressingRoom: z.string().max(60).nullable().optional(),
+      stageEntry: z.string().max(10).nullable().optional(),
+      stageExit: z.string().max(10).nullable().optional(),
+    })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+
+      const [existing] = await db.select({ id: eventChoreographies.id }).from(eventChoreographies)
+        .where(and(eq(eventChoreographies.id, input.id), eq(eventChoreographies.organizationId, orgId))).limit(1);
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Apresentação não encontrada no programa." });
+
+      const hhmm = /^([01]\d|2[0-3]):[0-5]\d$/;
+      if (input.stageEntry && !hhmm.test(input.stageEntry)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Entrada no palco deve estar no formato HH:mm." });
+      }
+      if (input.stageExit && !hhmm.test(input.stageExit)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Saída do palco deve estar no formato HH:mm." });
+      }
+
+      await db.update(eventChoreographies).set({
+        durationMinutes: input.durationMinutes ?? null,
+        dressingRoom: input.dressingRoom?.trim() || null,
+        stageEntry: input.stageEntry || null,
+        stageExit: input.stageExit || null,
+      }).where(eq(eventChoreographies.id, input.id));
+
+      return { success: true };
+    }),
+
+    /** FASE 1: reordena o programa de uma vez (drag & drop) a partir da lista ordenada de ids. */
+    reorderPresentations: protectedProcedure.input(z.object({
+      eventId: z.number(),
+      orderedIds: z.array(z.number()).min(1).max(200),
+    })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+
+      const rows = await db.select({ id: eventChoreographies.id }).from(eventChoreographies)
+        .where(and(eq(eventChoreographies.eventId, input.eventId), eq(eventChoreographies.organizationId, orgId)));
+      const validIds = new Set(rows.map((r) => r.id));
+      if (input.orderedIds.some((id) => !validIds.has(id)) || input.orderedIds.length !== validIds.size) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "A lista de ordenação não corresponde ao programa do evento." });
+      }
+
+      for (let i = 0; i < input.orderedIds.length; i++) {
+        await db.update(eventChoreographies).set({ ordem: i + 1 }).where(eq(eventChoreographies.id, input.orderedIds[i]));
+      }
+      return { success: true };
+    }),
+
+    /** FASE 1: intervalo mínimo entre apresentações (min) usado na detecção de conflitos. */
+    setMinInterval: protectedProcedure.input(z.object({
+      id: z.number(),
+      minutes: z.number().int().min(0).max(60),
+    })).mutation(async ({ ctx, input }) => {
+      assertStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
+      const orgId = ctx.user.organizationId!;
+
+      const [event] = await db.select({ id: events.id }).from(events)
+        .where(and(eq(events.id, input.id), eq(events.organizationId, orgId))).limit(1);
+      if (!event) throw new TRPCError({ code: "NOT_FOUND", message: "Evento não encontrado." });
+
+      await db.update(events).set({ minIntervalMinutes: input.minutes, updatedAt: new Date() }).where(eq(events.id, input.id));
       return { success: true };
     }),
 

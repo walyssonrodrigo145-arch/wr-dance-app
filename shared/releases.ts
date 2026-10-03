@@ -26,6 +26,20 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.10.03.2",
+    date: "2026-10-03",
+    title: "Eventos: dashboard operacional e programação com timeline",
+    summary: "FASE 1 da central de eventos: visão geral vira dashboard, participações ganham sub-abas (Elenco, Confirmações, Autorizações, Figurinos) e a programação vira timeline com drag & drop e detecção de conflitos.",
+    items: [
+      { type: "novo", title: "Visão geral operacional", description: "Indicadores compactos (participações, apresentações, receita, pendências), cronograma resumido, pendências com atalhos, situação dos figurinos e resultado financeiro da loja." },
+      { type: "novo", title: "Participações em sub-abas", description: "Elenco (turmas, professores, apresentações, responsável, status, autorização e financeiro), Confirmações, Autorizações e Figurinos (descrição por aluno)." },
+      { type: "novo", title: "Timeline do programa com drag & drop", description: "Arraste para reordenar as apresentações; horários previstos calculados pelo início + durações." },
+      { type: "novo", title: "Detecção de conflitos", description: "Alerta quando um aluno tem apresentações com intervalo menor que o mínimo configurável (padrão 6 min) — ajuste o intervalo na própria tela." },
+      { type: "novo", title: "Metadados da apresentação", description: "Duração, camarim, entrada e saída no palco por apresentação, com horários validados." },
+      { type: "melhoria", title: "Relatório de apresentações", description: "Nova tabela com ordem, duração, horários, camarim e alunos + exportação CSV." },
+    ],
+  },
+  {
     version: "2026.10.03.1",
     date: "2026-10-03",
     title: "Loja e Eventos: correções de usabilidade",

@@ -2652,6 +2652,8 @@ export const events = pgTable("events", {
   requiresAuthorization: boolean("requiresAuthorization").default(true).notNull(),
   // Imagem do evento (banner do cartão na aba Eventos)
   photoUrl: text("photoUrl"),
+  // FASE 1 (aditivo): intervalo mínimo entre apresentações do mesmo aluno (min) — conflitos
+  minIntervalMinutes: integer("minIntervalMinutes").default(6).notNull(),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdateFn(() => new Date()).notNull(),
@@ -2670,6 +2672,11 @@ export const eventChoreographies = pgTable("event_choreographies", {
   eventId: integer("eventId").notNull(),
   coreografiaId: integer("coreografiaId").notNull(),
   ordem: integer("ordem").default(0).notNull(),
+  // FASE 1 (aditivo): metadados de operação da apresentação no programa
+  durationMinutes: integer("durationMinutes"),          // duração prevista (min)
+  dressingRoom: varchar("dressingRoom", { length: 60 }), // camarim
+  stageEntry: varchar("stageEntry", { length: 10 }),     // entrada no palco (HH:mm, opcional manual)
+  stageExit: varchar("stageExit", { length: 10 }),       // saída do palco (HH:mm, opcional manual)
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [
   uniqueIndex("event_choreographies_unique").on(table.eventId, table.coreografiaId),

@@ -11,6 +11,7 @@ import {
   MapPin, CheckCircle2, Clock, TrendingUp, Pencil, Copy, Send, X, UserPlus,
   ShieldCheck, Search, Plus, Loader2, Trash2, ArrowUp, ArrowDown, ShoppingCart,
   QrCode, PackageCheck, ArrowUpRight, Download, Ticket, Ban, Truck,
+  GripVertical, AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,6 +79,11 @@ export default function EventoGestao() {
   const [filterCoreografia, setFilterCoreografia] = useState("none");
   const [selectedCandidateIds, setSelectedCandidateIds] = useState<number[]>([]);
   const [confirmAction, setConfirmAction] = useState<{ status: "realizado" | "cancelado"; label: string } | null>(null);
+  const [participantView, setParticipantView] = useState<"elenco" | "confirmacoes" | "autorizacoes" | "figurinos">("elenco");
+  const [choreoEdit, setChoreoEdit] = useState<any | null>(null);
+  const [costumeDraft, setCostumeDraft] = useState<Record<number, string>>({});
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [minIntervalDraft, setMinIntervalDraft] = useState("");
   const [chargeSale, setChargeSale] = useState<any | null>(null);
 
   const [sellOpen, setSellOpen] = useState(false);
@@ -153,6 +159,29 @@ export default function EventoGestao() {
       toast.success("Pagamento atualizado!");
       utils.figurinos.storeCatalog.invalidate();
       utils.figurinos.sales.invalidate();
+      invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const updateChoreography = trpc.eventos.updateChoreography.useMutation({
+    onSuccess: () => {
+      toast.success("Apresentação atualizada!");
+      setChoreoEdit(null);
+      invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const reorderPresentations = trpc.eventos.reorderPresentations.useMutation({
+    onSuccess: () => invalidate(),
+    onError: (error) => { toast.error(error.message); invalidate(); },
+  });
+
+  const setMinIntervalMut = trpc.eventos.setMinInterval.useMutation({
+    onSuccess: () => {
+      toast.success("Intervalo mínimo atualizado!");
+      setMinIntervalDraft("");
       invalidate();
     },
     onError: (error) => toast.error(error.message),
@@ -277,6 +306,69 @@ export default function EventoGestao() {
     };
   })();
 
+  // ── FASE 1: cronograma, conflitos e pendências (client-side, dados já carregados) ──
+  const minInterval = data?.minIntervalMinutes ?? 6;
+  const presSchedule = useMemo(() => {
+    const list = [...((data?.coreografias ?? []) as any[])].sort((a, b) => a.ordem - b.ordem);
+    let clock: Date | null = data?.startsAt ? new Date(String(data.startsAt)) : null;
+    return list.map((c) => {
+      const duration = Number(c.durationMinutes) > 0 ? Number(c.durationMinutes) : 3;
+      let entryAt: Date | null = clock ? new Date(clock.getTime()) : null;
+      let exitAt: Date | null = null;
+      if (clock) {
+        exitAt = new Date(clock.getTime() + duration * 60000);
+        clock = exitAt;
+      }
+      return { ...c, durationUsed: duration, entryAt, exitAt };
+    });
+  }, [data?.coreografias, data?.startsAt]);
+
+  const conflicts = useMemo(() => {
+    const byStudent = new Map<number, { name: string; pres: any[] }>();
+    for (const c of presSchedule) {
+      for (const a of (c.alunos ?? []) as any[]) {
+        const cur: { name: string; pres: any[] } = byStudent.get(a.id) ?? { name: a.name, pres: [] };
+        cur.pres.push(c);
+        byStudent.set(a.id, cur);
+      }
+    }
+    const out: Array<{ student: string; a: any; b: any; gap: number }> = [];
+    byStudent.forEach((v) => {
+      for (let i = 0; i < v.pres.length - 1; i++) {
+        const a = v.pres[i];
+        const b = v.pres[i + 1];
+        const ia = presSchedule.findIndex((x: any) => x.id === a.id);
+        const ib = presSchedule.findIndex((x: any) => x.id === b.id);
+        if (ia < 0 || ib < 0 || ib <= ia) continue;
+        const gap = presSchedule.slice(ia + 1, ib).reduce((acc: number, x: any) => acc + x.durationUsed, 0);
+        if (gap < minInterval) out.push({ student: v.name, a, b, gap });
+      }
+    });
+    return out.sort((x, y) => x.gap - y.gap).slice(0, 12);
+  }, [presSchedule, minInterval]);
+
+  const aguardandoResposta = participantes.filter((p: any) => p.status === "convidado").length;
+  const semFigurino = participantes.filter((p: any) => !p.costumeNotes || String(p.costumeNotes).trim() === "").length;
+  const pendenciasTotal = (data?.requiresAuthorization ? autorizPendentes : 0) + aguardandoResposta + semFigurino;
+  const ticketMedioLoja = sales.length > 0 ? receitaPrevista / sales.length : 0;
+  const proximaApresentacao = presSchedule.find((c: any) => c.entryAt && c.entryAt > new Date()) ?? presSchedule[0] ?? null;
+
+  const relatorioApresentacoesCsv = () => {
+    const rows: string[][] = [["Ordem", "Apresentação", "Duração (min)", "Entrada", "Saída", "Camarim", "Alunos"]];
+    for (const c of presSchedule as any[]) {
+      rows.push([
+        String(c.ordem),
+        c.title,
+        c.durationMinutes ? String(c.durationMinutes) : "",
+        c.entryAt ? format(c.entryAt, "HH:mm") : "",
+        c.exitAt ? format(c.exitAt, "HH:mm") : "",
+        c.dressingRoom ?? "",
+        String((c.alunos ?? []).length),
+      ]);
+    }
+    downloadCsv(`apresentacoes-evento-${eventId}.csv`, rows);
+  };
+
   const changeTab = (next: string) => {
     setTab(next);
     window.history.replaceState(null, "", `/eventos/${eventId}?aba=${next}`);
@@ -390,29 +482,104 @@ export default function EventoGestao() {
             <TabsTrigger value="relatorios"><FileText size={13} className="mr-1.5" /> Relatórios</TabsTrigger>
           </TabsList>
 
-          {/* ── VISÃO GERAL ── */}
+          {/* ── VISÃO GERAL (dashboard operacional) ── */}
           <TabsContent value="visao" className="mt-4 space-y-4">
-            <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
               {[
-                { label: "Período", value: formatEventPeriod(data?.startsAt, data?.endsAt), icon: CalendarDays, tint: "bg-indigo-500/10 text-indigo-500", note: !data?.endsAt ? "sem horário de término" : isMultiDay(data?.startsAt, data?.endsAt) ? "evento de vários dias" : "evento de um dia" },
-                { label: "Local", value: data?.venueName ?? "—", icon: MapPin, tint: "bg-blue-500/10 text-blue-500", note: data?.venueAddress ?? "sem endereço" },
-                { label: "Participações", value: `${confirmados} de ${participantes.length}`, icon: Users, tint: "bg-purple-500/10 text-purple-500", note: `${recusados} recusado(s) · ${participantes.length - confirmados - recusados} sem resposta` },
-                { label: "Autorizações", value: `${autorizCompletas} completas`, icon: ShieldCheck, tint: "bg-emerald-500/10 text-emerald-500", note: data?.requiresAuthorization ? `${autorizPendentes} pendente(s)` : "evento sem autorização exigida" },
-                { label: "Vendas da loja", value: `${vendasQty} item(ns)`, icon: Shirt, tint: "bg-teal-500/10 text-teal-500", note: `${sales.length} pedido(s) registrado(s)` },
+                { label: "Participações", value: `${confirmados}/${participantes.length}`, icon: Users, tint: "bg-purple-500/10 text-purple-500", note: `${aguardandoResposta} aguardando resposta · ${recusados} recusado(s)` },
+                { label: "Apresentações", value: String(coreografiasVinculadas.length), icon: Music, tint: "bg-indigo-500/10 text-indigo-500", note: proximaApresentacao ? `próxima: ${proximaApresentacao.ordem} - ${proximaApresentacao.title}` : "programa vazio" },
                 { label: "Receita da loja", value: formatBRL(receitaArrecadada), icon: TrendingUp, tint: "bg-amber-500/10 text-amber-500", note: receitaPrevista > 0 ? `prevista: ${formatBRL(receitaPrevista)}` : "sem vendas" },
+                { label: "Pendências", value: String(pendenciasTotal), icon: AlertTriangle, tint: pendenciasTotal > 0 ? "bg-amber-500/10 text-amber-500" : "bg-emerald-500/10 text-emerald-500", note: pendenciasTotal === 0 ? "tudo em ordem" : `${data?.requiresAuthorization ? autorizPendentes : 0} autorização(ões) · ${semFigurino} figurino(s)` },
               ].map((tile, idx) => {
                 const TileIcon = tile.icon;
                 return (
-                  <motion.div key={tile.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }} className="rounded-2xl border border-border bg-card p-4 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+                  <motion.div key={tile.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }} className="rounded-2xl border border-border bg-card p-4 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 min-w-0">
                     <div className="flex items-center gap-2.5">
                       <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", tile.tint)}><TileIcon size={16} /></span>
                       <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{tile.label}</p>
                     </div>
                     <p className="text-lg lg:text-xl font-outfit font-black text-foreground mt-2 truncate">{tile.value}</p>
-                    <p className="text-[10px] font-bold text-muted-foreground mt-0.5 truncate">{tile.note}</p>
+                    <p className="text-[10px] font-bold text-muted-foreground mt-0.5 truncate" title={tile.note}>{tile.note}</p>
                   </motion.div>
                 );
               })}
+            </div>
+
+            <p className="text-[11px] font-bold text-muted-foreground flex items-center gap-1.5">
+              <CalendarDays size={12} /> {formatEventPeriod(data?.startsAt, data?.endsAt)}
+              {data?.venueName && <><span className="opacity-40">·</span><MapPin size={12} /> {data.venueName}</>}
+              <span className="opacity-40">·</span> {!data?.endsAt ? "sem término definido" : isMultiDay(data?.startsAt, data?.endsAt) ? "evento de vários dias" : "evento de um dia"}
+            </p>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 items-start">
+              <div className="rounded-2xl border border-border bg-card p-4 min-w-0">
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5"><Clock size={12} /> Cronograma resumido</p>
+                  <button onClick={() => changeTab("programa")} className="text-[11px] font-black text-primary hover:underline">Ver programa</button>
+                </div>
+                {presSchedule.length === 0 ? (
+                  <p className="text-xs font-bold text-muted-foreground py-3 text-center">Sem apresentações no programa.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {(presSchedule as any[]).slice(0, 6).map((c) => (
+                      <div key={c.id} className="flex items-center gap-2.5 text-xs">
+                        <span className="w-6 h-6 rounded-lg bg-primary/10 text-primary text-[10px] font-black flex items-center justify-center shrink-0">{c.ordem}</span>
+                        <p className="font-bold text-foreground truncate flex-1 min-w-0">{c.title}</p>
+                        <span className="font-black text-muted-foreground shrink-0">{c.entryAt ? format(c.entryAt, "HH:mm") : "—"}</span>
+                      </div>
+                    ))}
+                    {presSchedule.length > 6 && <p className="text-[10px] font-bold text-muted-foreground pt-1">+ {presSchedule.length - 6} apresentação(ões) no programa completo</p>}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3 min-w-0">
+                <div className="rounded-2xl border border-border bg-card p-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3">Pendências importantes</p>
+                  {pendenciasTotal === 0 ? (
+                    <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5"><CheckCircle2 size={14} /> Nada pendente — evento pronto!</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {data?.requiresAuthorization && autorizPendentes > 0 && (
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                          <p className="font-bold text-foreground"><span className="font-black">{autorizPendentes}</span> autorização(ões) pendente(s)</p>
+                          <Button size="sm" variant="ghost" className="h-7 text-[10px] font-black" onClick={() => setParticipantView("autorizacoes")}>Resolver</Button>
+                        </div>
+                      )}
+                      {aguardandoResposta > 0 && (
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                          <p className="font-bold text-foreground"><span className="font-black">{aguardandoResposta}</span> convidado(s) sem resposta</p>
+                          <Button size="sm" variant="ghost" className="h-7 text-[10px] font-black" onClick={() => setParticipantView("confirmacoes")}>Revisar</Button>
+                        </div>
+                      )}
+                      {semFigurino > 0 && (
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                          <p className="font-bold text-foreground"><span className="font-black">{semFigurino}</span> figurino(s) sem observação</p>
+                          <Button size="sm" variant="ghost" className="h-7 text-[10px] font-black" onClick={() => setParticipantView("figurinos")}>Definir</Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-border bg-card p-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">Situação dos figurinos</p>
+                  <p className="text-sm font-black text-foreground">{participantes.length - semFigurino} de {participantes.length} participante(s) com figurino descrito</p>
+                  <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden mt-2">
+                    <span className="block h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500" style={{ width: `${participantes.length > 0 ? Math.round(((participantes.length - semFigurino) / participantes.length) * 100) : 0}%` }} />
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-border bg-card p-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">Resultado financeiro (loja)</p>
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
+                    <span className="font-bold text-muted-foreground">Arrecadado: <span className="font-black text-foreground">{formatBRL(receitaArrecadada)}</span></span>
+                    <span className="font-bold text-muted-foreground">Previsto: <span className="font-black text-foreground">{formatBRL(receitaPrevista)}</span></span>
+                    <span className="font-bold text-muted-foreground">Ticket médio: <span className="font-black text-foreground">{formatBRL(ticketMedioLoja)}</span></span>
+                    <span className="font-bold text-muted-foreground">Itens: <span className="font-black text-foreground">{vendasQty}</span></span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {data?.description && (
@@ -431,6 +598,25 @@ export default function EventoGestao() {
 
           {/* ── PARTICIPAÇÕES ── */}
           <TabsContent value="participantes" className="mt-4 space-y-3">
+            <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border bg-muted/30 p-1">
+              {[
+                { key: "elenco", label: "Elenco", count: participantes.length },
+                { key: "confirmacoes", label: "Confirmações", count: confirmados },
+                { key: "autorizacoes", label: "Autorizações", count: data?.requiresAuthorization ? autorizPendentes : 0 },
+                { key: "figurinos", label: "Figurinos", count: semFigurino },
+              ].map((v) => (
+                <button
+                  key={v.key}
+                  onClick={() => setParticipantView(v.key as any)}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-xs font-black transition-colors",
+                    participantView === v.key ? "bg-background text-foreground shadow" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {v.label} ({v.count})
+                </button>
+              ))}
+            </div>
             <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-4 space-y-3">
               <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                 <UserPlus size={13} /> Adicionar por filtro (turma, modalidade ou coreografia)
@@ -569,7 +755,7 @@ export default function EventoGestao() {
               )}
             </div>
 
-            {participantes.length === 0 ? (
+            {participantView === "confirmacoes" && (participantes.length === 0 ? (
               <div className="text-center py-12 rounded-2xl border-2 border-dashed border-border">
                 <div className="flex justify-center mb-2"><span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary/60"><Users size={22} /></span></div>
                 <p className="font-black text-foreground text-sm">Nenhum participante ainda</p>
@@ -650,6 +836,189 @@ export default function EventoGestao() {
                   );
                 })}
               </div>
+            ))}
+
+            {participantView === "elenco" && (participantes.length === 0 ? (
+              <div className="text-center py-12 rounded-2xl border-2 border-dashed border-border">
+                <div className="flex justify-center mb-2"><span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary/60"><Users size={22} /></span></div>
+                <p className="font-black text-foreground text-sm">Nenhum participante ainda</p>
+                <p className="text-xs text-muted-foreground mt-1">Adicione por filtro, busca ou importando o elenco na aba Programação.</p>
+              </div>
+            ) : (
+              <>
+                <div className="hidden md:block rounded-2xl border border-border bg-card overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <div className="min-w-[980px]">
+                      <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_110px_96px_96px_92px] gap-3 px-4 py-3 border-b border-border bg-muted/30">
+                        {["Aluno", "Turma(s)", "Professor(es)", "Apresentações", "Responsável", "Status", "Autorização", "Financeiro"].map((h) => (
+                          <p key={h} className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{h}</p>
+                        ))}
+                      </div>
+                      {(participantes as any[]).map((p) => {
+                        const fullyAuth = p.imageAuthorization && p.participationAuthorization;
+                        const isMinorRow = p.birthDate ? (Date.now() - new Date(p.birthDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000) < 18 : false;
+                        const statusMetaRow = PARTICIPANT_STATUS_META[p.status] ?? PARTICIPANT_STATUS_META.convidado;
+                        return (
+                          <div key={p.id} className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_110px_96px_96px_92px] gap-3 px-4 py-3 border-b border-border/60 last:border-0 items-center hover:bg-primary/[0.03] transition-colors">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <Avatar className="w-8 h-8 shrink-0">
+                                {p.studentAvatar ? (
+                                  <img src={p.studentAvatar} alt={p.studentName} className="w-full h-full object-cover" />
+                                ) : (
+                                  <AvatarFallback className="bg-indigo-600 text-white text-[10px] font-black">
+                                    {p.studentName?.split(" ").map((part: string) => part[0]).join("").slice(0, 2).toUpperCase()}
+                                  </AvatarFallback>
+                                )}
+                              </Avatar>
+                              <div className="min-w-0">
+                                <p className="text-sm font-black text-foreground truncate flex items-center gap-1.5" title={p.studentName}>
+                                  {p.studentName}
+                                  {isMinorRow && <Badge variant="outline" className="text-[8px] font-black px-1 py-0">MENOR</Badge>}
+                                </p>
+                              </div>
+                            </div>
+                            <p className="text-xs font-bold text-muted-foreground truncate" title={p.turmas?.join(", ")}>{p.turmas?.join(", ") || "—"}</p>
+                            <p className="text-xs font-bold text-muted-foreground truncate" title={p.professores?.join(", ")}>{p.professores?.join(", ") || "—"}</p>
+                            <p className="text-xs font-bold text-muted-foreground truncate" title={p.apresentacoes?.join(", ")}>{p.apresentacoes?.length ? p.apresentacoes.join(", ") : "—"}</p>
+                            <p className="text-xs font-bold text-foreground truncate" title={p.guardianName ?? ""}>{p.guardianName || "—"}</p>
+                            <Badge variant="outline" className={cn("w-fit text-[10px] font-black", statusMetaRow.className)}>{statusMetaRow.label}</Badge>
+                            <Badge variant="outline" className={cn("w-fit text-[10px] font-black", !data?.requiresAuthorization ? "bg-slate-500/10 text-slate-500 border-slate-500/30" : fullyAuth ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30")}>
+                              {!data?.requiresAuthorization ? "N/A" : fullyAuth ? "Em dia" : "Pendente"}
+                            </Badge>
+                            <Badge variant="outline" className={cn("w-fit text-[10px] font-black", p.hasOverdue ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30")}>
+                              {p.hasOverdue ? "Pendência" : "Em dia"}
+                            </Badge>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+                <div className="md:hidden space-y-2">
+                  {(participantes as any[]).map((p) => {
+                    const fullyAuth = p.imageAuthorization && p.participationAuthorization;
+                    const statusMetaRow = PARTICIPANT_STATUS_META[p.status] ?? PARTICIPANT_STATUS_META.convidado;
+                    return (
+                      <div key={p.id} className="rounded-2xl border border-border bg-card p-3.5 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-black text-foreground truncate">{p.studentName}</p>
+                          <Badge variant="outline" className={cn("text-[10px] font-black shrink-0", statusMetaRow.className)}>{statusMetaRow.label}</Badge>
+                        </div>
+                        <p className="text-[11px] font-bold text-muted-foreground truncate">{p.turmas?.join(", ") || "sem turma"} · {p.apresentacoes?.length ? p.apresentacoes.join(", ") : "sem apresentação"}</p>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Badge variant="outline" className={cn("text-[9px] font-black", !data?.requiresAuthorization ? "bg-slate-500/10 text-slate-500 border-slate-500/30" : fullyAuth ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30")}>
+                            {!data?.requiresAuthorization ? "Autorização N/A" : fullyAuth ? "Autorizações em dia" : "Autorização pendente"}
+                          </Badge>
+                          <Badge variant="outline" className={cn("text-[9px] font-black", p.hasOverdue ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30")}>
+                            {p.hasOverdue ? "Pendência financeira" : "Financeiro em dia"}
+                          </Badge>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            ))}
+
+            {participantView === "autorizacoes" && (
+              <div className="space-y-2">
+                {!data?.requiresAuthorization && (
+                  <div className="rounded-2xl border border-border bg-muted/30 px-3 py-2.5">
+                    <p className="text-[11px] font-bold text-muted-foreground">Este evento não exige autorizações. Ative a exigência no cadastro do evento para controlar participação e imagem.</p>
+                  </div>
+                )}
+                {participantes.length === 0 ? (
+                  <div className="text-center py-12 rounded-2xl border-2 border-dashed border-border">
+                    <div className="flex justify-center mb-2"><span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary/60"><ShieldCheck size={22} /></span></div>
+                    <p className="font-black text-foreground text-sm">Nenhum participante ainda</p>
+                  </div>
+                ) : (participantes as any[]).map((p) => {
+                  const fullyAuth = p.imageAuthorization && p.participationAuthorization;
+                  return (
+                    <div key={p.id} className="rounded-2xl border border-border bg-card p-3.5 flex flex-col sm:flex-row sm:items-center gap-3">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <Avatar className="w-9 h-9 shrink-0">
+                          {p.studentAvatar ? (
+                            <img src={p.studentAvatar} alt={p.studentName} className="w-full h-full object-cover" />
+                          ) : (
+                            <AvatarFallback className="bg-indigo-600 text-white text-[10px] font-black">
+                              {p.studentName?.split(" ").map((part: string) => part[0]).join("").slice(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          )}
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="text-sm font-black text-foreground truncate">{p.studentName}</p>
+                          <p className={cn("text-[11px] font-bold flex items-center gap-1 mt-0.5", fullyAuth ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400")}>
+                            {fullyAuth ? <><ShieldCheck size={12} /> Autorizações em dia</> : <><Clock size={12} /> Autorização pendente</>}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <label className="flex items-center gap-2 text-xs font-bold text-muted-foreground cursor-pointer select-none rounded-lg border border-border px-2.5 py-1.5 bg-background">
+                          <Checkbox
+                            checked={p.participationAuthorization}
+                            onCheckedChange={(checked) => updateParticipant.mutate({ id: p.id, participationAuthorization: checked === true })}
+                          />
+                          Participação
+                        </label>
+                        <label className="flex items-center gap-2 text-xs font-bold text-muted-foreground cursor-pointer select-none rounded-lg border border-border px-2.5 py-1.5 bg-background">
+                          <Checkbox
+                            checked={p.imageAuthorization}
+                            onCheckedChange={(checked) => updateParticipant.mutate({ id: p.id, imageAuthorization: checked === true })}
+                          />
+                          Imagem
+                        </label>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {participantView === "figurinos" && (
+              <div className="space-y-2">
+                {participantes.length === 0 ? (
+                  <div className="text-center py-12 rounded-2xl border-2 border-dashed border-border">
+                    <div className="flex justify-center mb-2"><span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary/60"><Shirt size={22} /></span></div>
+                    <p className="font-black text-foreground text-sm">Nenhum participante ainda</p>
+                  </div>
+                ) : (participantes as any[]).map((p) => (
+                  <div key={p.id} className="rounded-2xl border border-border bg-card p-3.5 space-y-2">
+                    <div className="flex items-center gap-2.5">
+                      <Avatar className="w-8 h-8 shrink-0">
+                        {p.studentAvatar ? (
+                          <img src={p.studentAvatar} alt={p.studentName} className="w-full h-full object-cover" />
+                        ) : (
+                          <AvatarFallback className="bg-indigo-600 text-white text-[10px] font-black">
+                            {p.studentName?.split(" ").map((part: string) => part[0]).join("").slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      <p className="text-sm font-black text-foreground truncate flex-1 min-w-0">{p.studentName}</p>
+                      <Badge variant="outline" className={cn("text-[9px] font-black shrink-0", p.costumeNotes ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30")}>
+                        {p.costumeNotes ? "Definido" : "Pendente"}
+                      </Badge>
+                    </div>
+                    <Textarea
+                      value={costumeDraft[p.id] ?? p.costumeNotes ?? ""}
+                      onChange={(event) => setCostumeDraft((prev) => ({ ...prev, [p.id]: event.target.value }))}
+                      rows={2}
+                      maxLength={2000}
+                      placeholder="Ex.: collant branco, sapatilha de pontas, tule azul, acessório de cabeça…"
+                    />
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={updateParticipant.isPending}
+                        onClick={() => updateParticipant.mutate({ id: p.id, costumeNotes: (costumeDraft[p.id] ?? p.costumeNotes ?? "").trim() || null })}
+                      >
+                        <CheckCircle2 size={13} className="mr-1.5" /> Salvar figurino
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </TabsContent>
 
@@ -707,41 +1076,117 @@ export default function EventoGestao() {
                 <p className="text-xs text-muted-foreground mt-1">Vincule pelo seletor acima — o elenco pode ser importado automaticamente.</p>
               </div>
             ) : (
-              <div className="space-y-2">
-                {coreografiasVinculadas.map((coreografia: any) => (
-                  <div key={coreografia.id} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 hover:shadow-md transition-shadow">
-                    <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-xs font-black flex items-center justify-center shrink-0 shadow-md shadow-indigo-500/20">
-                      {coreografia.ordem}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-black text-foreground truncate">{coreografia.title}</p>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{coreografia.formacao}</p>
-                    </div>
-                    <div className="flex items-center rounded-lg border border-border bg-muted/30 p-0.5 shrink-0">
-                      <button
-                        type="button"
-                        className="p-1.5 text-muted-foreground hover:text-indigo-600 disabled:opacity-30 rounded-md hover:bg-background transition-colors"
-                        disabled={reorderCoreografia.isPending || coreografia.ordem <= 1}
-                        onClick={() => reorderCoreografia.mutate({ id: coreografia.id, direction: "up" })}
-                        title="Subir no programa"
-                      >
-                        <ArrowUp size={13} />
-                      </button>
-                      <button
-                        type="button"
-                        className="p-1.5 text-muted-foreground hover:text-indigo-600 disabled:opacity-30 rounded-md hover:bg-background transition-colors"
-                        disabled={reorderCoreografia.isPending || coreografia.ordem >= coreografiasVinculadas.length}
-                        onClick={() => reorderCoreografia.mutate({ id: coreografia.id, direction: "down" })}
-                        title="Descer no programa"
-                      >
-                        <ArrowDown size={13} />
-                      </button>
-                    </div>
-                    <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-rose-500" onClick={() => unlinkCoreografia.mutate({ id: coreografia.id })} title="Remover do evento">
-                      <X size={15} />
+              <div className="space-y-3">
+                {/* Intervalo mínimo (base da detecção de conflitos) */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-2xl border border-border bg-muted/30 px-3 py-2.5">
+                  <p className="text-[11px] font-bold text-muted-foreground flex-1">
+                    Intervalo mínimo entre apresentações do mesmo aluno: <span className="font-black text-foreground">{minInterval} min</span>
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={60}
+                      value={minIntervalDraft !== "" ? minIntervalDraft : String(minInterval)}
+                      onChange={(event) => setMinIntervalDraft(event.target.value)}
+                      className="h-8 w-20 text-xs"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={setMinIntervalMut.isPending}
+                      onClick={() => setMinIntervalMut.mutate({ id: eventId, minutes: Math.max(0, Math.min(60, Number(minIntervalDraft !== "" ? minIntervalDraft : minInterval) || 0)) })}
+                    >
+                      Salvar
                     </Button>
                   </div>
-                ))}
+                </div>
+
+                {/* Conflitos de intervalo */}
+                {conflicts.length > 0 ? (
+                  <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                      <AlertTriangle size={13} /> {conflicts.length} conflito(s) de intervalo
+                    </p>
+                    {conflicts.map((c, i) => (
+                      <p key={i} className="text-[11px] font-bold text-amber-700 dark:text-amber-300 leading-relaxed">
+                        <span className="font-black">{c.student}</span> participa de {c.a.ordem} - {c.a.title} e {c.b.ordem} - {c.b.title}. Intervalo atual: {c.gap} min · mínimo: {minInterval} min.
+                      </p>
+                    ))}
+                    <p className="text-[10px] font-bold text-muted-foreground">Ajuste durações/ordem ou o intervalo mínimo. O cálculo usa as durações cadastradas (padrão 3 min quando vazias).</p>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-3 py-2">
+                    <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5"><CheckCircle2 size={13} /> Sem conflitos de intervalo entre apresentações.</p>
+                  </div>
+                )}
+
+                {/* Timeline do programa (arraste para reordenar) */}
+                <div className="space-y-2">
+                  {(presSchedule as any[]).map((coreografia, idx) => (
+                    <div
+                      key={coreografia.id}
+                      draggable
+                      onDragStart={() => setDragIndex(idx)}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={() => {
+                        if (dragIndex === null || dragIndex === idx) { setDragIndex(null); return; }
+                        const ids = (presSchedule as any[]).map((c) => c.id);
+                        const [moved] = ids.splice(dragIndex, 1);
+                        ids.splice(idx, 0, moved);
+                        reorderPresentations.mutate({ eventId, orderedIds: ids });
+                        setDragIndex(null);
+                      }}
+                      onDragEnd={() => setDragIndex(null)}
+                      className={cn(
+                        "flex items-center gap-3 rounded-2xl border border-border bg-card p-3 hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing",
+                        dragIndex === idx && "opacity-60 border-primary/40",
+                      )}
+                    >
+                      <GripVertical size={15} className="text-muted-foreground/50 shrink-0" />
+                      <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-xs font-black flex items-center justify-center shrink-0 shadow-md shadow-indigo-500/20">
+                        {coreografia.ordem}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-black text-foreground truncate">{coreografia.title}</p>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] font-bold text-muted-foreground mt-0.5">
+                          <span className="flex items-center gap-1"><Clock size={10} /> {coreografia.entryAt ? format(coreografia.entryAt, "HH:mm") : "—"}{coreografia.exitAt ? "–" + format(coreografia.exitAt, "HH:mm") : ""}</span>
+                          <span>{coreografia.durationMinutes ? coreografia.durationMinutes + " min" : "duração não definida"}</span>
+                          {coreografia.dressingRoom && <span>Camarim: {coreografia.dressingRoom}</span>}
+                          {(coreografia.alunos?.length ?? 0) > 0 && <span title={coreografia.alunos.map((a: any) => a.name).join(", ")}>{coreografia.alunos.length} aluno(s)</span>}
+                          <span className="uppercase tracking-widest">{coreografia.formacao}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center rounded-lg border border-border bg-muted/30 p-0.5 shrink-0">
+                        <button
+                          type="button"
+                          className="p-1.5 text-muted-foreground hover:text-indigo-600 disabled:opacity-30 rounded-md hover:bg-background transition-colors"
+                          disabled={reorderCoreografia.isPending || coreografia.ordem <= 1}
+                          onClick={() => reorderCoreografia.mutate({ id: coreografia.id, direction: "up" })}
+                          title="Subir no programa"
+                        >
+                          <ArrowUp size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          className="p-1.5 text-muted-foreground hover:text-indigo-600 disabled:opacity-30 rounded-md hover:bg-background transition-colors"
+                          disabled={reorderCoreografia.isPending || coreografia.ordem >= coreografiasVinculadas.length}
+                          onClick={() => reorderCoreografia.mutate({ id: coreografia.id, direction: "down" })}
+                          title="Descer no programa"
+                        >
+                          <ArrowDown size={13} />
+                        </button>
+                      </div>
+                      <Button size="icon" variant="ghost" onClick={() => setChoreoEdit(coreografia)} title="Editar apresentação (duração, camarim, horários)">
+                        <Pencil size={14} />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-rose-500" onClick={() => unlinkCoreografia.mutate({ id: coreografia.id })} title="Remover do evento">
+                        <X size={15} />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] font-bold text-muted-foreground">Arraste os cartões para reordenar o programa (ou use as setas). Horários previstos calculados a partir do início do evento + durações.</p>
               </div>
             )}
           </TabsContent>
@@ -919,6 +1364,45 @@ export default function EventoGestao() {
 
             <div className="rounded-2xl border border-border bg-card p-4">
               <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Apresentações do programa</p>
+                <Button size="sm" variant="outline" onClick={relatorioApresentacoesCsv} disabled={presSchedule.length === 0}><Download size={13} className="mr-1.5" /> CSV apresentações</Button>
+              </div>
+              {presSchedule.length === 0 ? (
+                <p className="text-xs font-bold text-muted-foreground text-center py-6">Sem apresentações no programa.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-border text-left text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                        <th className="py-2 pr-3">Ordem</th>
+                        <th className="py-2 pr-3">Apresentação</th>
+                        <th className="py-2 pr-3">Duração</th>
+                        <th className="py-2 pr-3">Entrada</th>
+                        <th className="py-2 pr-3">Saída</th>
+                        <th className="py-2 pr-3">Camarim</th>
+                        <th className="py-2">Alunos</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(presSchedule as any[]).map((c) => (
+                        <tr key={c.id} className="border-b border-border/40 last:border-0">
+                          <td className="py-2 pr-3 font-black text-foreground">{c.ordem}</td>
+                          <td className="py-2 pr-3 font-bold text-foreground">{c.title}</td>
+                          <td className="py-2 pr-3 font-bold text-muted-foreground">{c.durationMinutes ? c.durationMinutes + " min" : "—"}</td>
+                          <td className="py-2 pr-3 font-bold text-muted-foreground">{c.entryAt ? format(c.entryAt, "HH:mm") : "—"}</td>
+                          <td className="py-2 pr-3 font-bold text-muted-foreground">{c.exitAt ? format(c.exitAt, "HH:mm") : "—"}</td>
+                          <td className="py-2 pr-3 font-bold text-muted-foreground">{c.dressingRoom ?? "—"}</td>
+                          <td className="py-2 font-bold text-muted-foreground">{(c.alunos ?? []).length}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card p-4">
+              <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
                 <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Vendas por produto</p>
                 <Button size="sm" variant="outline" onClick={relatorioVendasCsv} disabled={sales.length === 0}><Download size={13} className="mr-1.5" /> CSV vendas</Button>
               </div>
@@ -957,6 +1441,15 @@ export default function EventoGestao() {
       )}
 
       <SaleChargeModal sale={chargeSale} onClose={() => setChargeSale(null)} />
+
+      {choreoEdit && (
+        <ChoreoMetaDialog
+          row={choreoEdit}
+          saving={updateChoreography.isPending}
+          onClose={() => setChoreoEdit(null)}
+          onSave={(data) => updateChoreography.mutate({ id: choreoEdit.id, ...data })}
+        />
+      )}
 
       {/* Dialog: vender figurino do evento */}
       <Dialog open={sellOpen} onOpenChange={setSellOpen}>
@@ -1092,3 +1585,74 @@ export default function EventoGestao() {
     </div>
   );
 }
+
+/** FASE 1: edição de metadados da apresentação (duração, camarim, horários). */
+function ChoreoMetaDialog({ row, saving, onClose, onSave }: {
+  row: any;
+  saving: boolean;
+  onClose: () => void;
+  onSave: (data: { durationMinutes: number | null; dressingRoom: string | null; stageEntry: string | null; stageExit: string | null }) => void;
+}) {
+  const [duration, setDuration] = useState(row.durationMinutes != null ? String(row.durationMinutes) : "");
+  const [dressingRoom, setDressingRoom] = useState(row.dressingRoom ?? "");
+  const [stageEntry, setStageEntry] = useState(row.stageEntry ?? "");
+  const [stageExit, setStageExit] = useState(row.stageExit ?? "");
+
+  const parseDuration = () => {
+    const value = duration.trim();
+    if (!value) return null;
+    const n = Math.max(0, Math.min(240, parseInt(value, 10) || 0));
+    return n > 0 ? n : null;
+  };
+
+  return (
+    <Dialog open onOpenChange={(value) => { if (!value) onClose(); }}>
+      <DialogContent className="w-[95vw] max-w-lg max-h-[90dvh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-lg font-black">
+            <Music className="text-indigo-500" size={20} />
+            {row.ordem} · {row.title}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+          <div className="space-y-1.5">
+            <Label>Duração prevista (min)</Label>
+            <Input type="number" min={0} max={240} value={duration} onChange={(event) => setDuration(event.target.value)} placeholder="Ex.: 4" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Camarim</Label>
+            <Input value={dressingRoom} onChange={(event) => setDressingRoom(event.target.value)} maxLength={60} placeholder="Ex.: Camarim 2" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Entrada no palco (opcional)</Label>
+            <Input value={stageEntry} onChange={(event) => setStageEntry(event.target.value)} maxLength={5} placeholder="HH:mm" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Saída do palco (opcional)</Label>
+            <Input value={stageExit} onChange={(event) => setStageExit(event.target.value)} maxLength={5} placeholder="HH:mm" />
+          </div>
+          <p className="sm:col-span-2 text-[10px] font-bold text-muted-foreground">
+            Sem horários manuais, a timeline mostra o horário previsto calculado (início do evento + durações).
+          </p>
+        </div>
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
+          <Button
+            disabled={saving}
+            onClick={() => onSave({
+              durationMinutes: parseDuration(),
+              dressingRoom: dressingRoom.trim() || null,
+              stageEntry: stageEntry.trim() || null,
+              stageExit: stageExit.trim() || null,
+            })}
+            className="shadow-md shadow-indigo-500/20"
+          >
+            {saving && <Loader2 size={14} className="animate-spin mr-2" />}
+            Salvar apresentação
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+

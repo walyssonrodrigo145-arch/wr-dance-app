@@ -144,6 +144,88 @@ await step("Receita do evento reflete a venda (prevista 80)", async () => {
   return "ok";
 });
 
+// ═══════════ FASE 1: programa (elenco, metadados, conflitos, reorder) ═══════════
+await step("FASE 1 — criar 2 coreografias + elenco com a aluna", async () => {
+  const a = await admin.coreografias.create.mutate({ title: `Coreo A ${stamp}`, formacao: "grupo" });
+  const b = await admin.coreografias.create.mutate({ title: `Coreo B ${stamp}`, formacao: "grupo" });
+  ev.coreoA = a.id;
+  ev.coreoB = b.id;
+  await admin.coreografias.addAluno.mutate({ coreografiaId: a.id, studentId: ev.studentId, papel: "Corpo de baile" });
+  await admin.coreografias.addAluno.mutate({ coreografiaId: b.id, studentId: ev.studentId, papel: "Corpo de baile" });
+  return `coreos=${a.id},${b.id}`;
+});
+
+await step("FASE 1 — vincular as 2 ao evento (elenco importado)", async () => {
+  await admin.eventos.linkCoreografia.mutate({ eventId: ev.id, coreografiaId: ev.coreoA, importCast: true });
+  await admin.eventos.linkCoreografia.mutate({ eventId: ev.id, coreografiaId: ev.coreoB, importCast: true });
+  const detail = await admin.eventos.getById.query({ id: ev.id });
+  expect(detail.coreografias.length >= 2, `esperava >=2 apresentações, veio ${detail.coreografias.length}`);
+  const first = detail.coreografias[0];
+  expect((first.alunos ?? []).length >= 1, "elenco da coreografia não veio no getById");
+  const part = detail.participantes.find((p) => p.studentId === ev.studentId);
+  expect(part, "aluna não está nas participações");
+  expect((part.apresentacoes ?? []).length >= 2, `apresentações da aluna deveriam ser >=2, veio ${(part.apresentacoes ?? []).length}`);
+  expect(Array.isArray(part.turmas) && Array.isArray(part.professores), "turmas/professores não enriquecidos");
+  expect(typeof part.hasOverdue === "boolean", "hasOverdue não enriquecido");
+  return `apresentações=${detail.coreografias.length} · elenco ok`;
+});
+
+await step("FASE 1 — metadados da apresentação (duração/camarim/horários)", async () => {
+  const detail = await admin.eventos.getById.query({ id: ev.id });
+  const presA = detail.coreografias.find((c) => c.coreografiaId === ev.coreoA);
+  await admin.eventos.updateChoreography.mutate({
+    id: presA.id,
+    durationMinutes: 4,
+    dressingRoom: "Camarim 1",
+    stageEntry: "19:05",
+    stageExit: "19:09",
+  });
+  const after = await admin.eventos.getById.query({ id: ev.id });
+  const updated = after.coreografias.find((c) => c.id === presA.id);
+  expect(updated.durationMinutes === 4, "duração não persistiu");
+  expect(updated.dressingRoom === "Camarim 1", "camarim não persistiu");
+  expect(updated.stageEntry === "19:05" && updated.stageExit === "19:09", "horários não persistiram");
+  return "4 min · Camarim 1";
+});
+
+await step("FASE 1 — horário inválido é rejeitado", async () => {
+  const detail = await admin.eventos.getById.query({ id: ev.id });
+  let rejected = false;
+  try {
+    await admin.eventos.updateChoreography.mutate({ id: detail.coreografias[0].id, stageEntry: "25:99" });
+  } catch {
+    rejected = true;
+  }
+  expect(rejected, "25:99 deveria ser rejeitado");
+  return "rejeitado";
+});
+
+await step("FASE 1 — reorderPresentations (drag & drop) e intervalo mínimo", async () => {
+  const detail = await admin.eventos.getById.query({ id: ev.id });
+  const ids = detail.coreografias.map((c) => c.id);
+  const reversed = [...ids].reverse();
+  await admin.eventos.reorderPresentations.mutate({ eventId: ev.id, orderedIds: reversed });
+  const after = await admin.eventos.getById.query({ id: ev.id });
+  expect(after.coreografias[0].id === reversed[0], "ordem não foi aplicada");
+  expect(after.coreografias[after.coreografias.length - 1].id === reversed[reversed.length - 1], "última posição errada");
+
+  await admin.eventos.setMinInterval.mutate({ id: ev.id, minutes: 8 });
+  const withInterval = await admin.eventos.getById.query({ id: ev.id });
+  expect(withInterval.minIntervalMinutes === 8, "minIntervalMinutes não persistiu");
+  return `ordem invertida + intervalo=8min`;
+});
+
+await step("FASE 1 — reorder inválido é bloqueado", async () => {
+  let rejected = false;
+  try {
+    await admin.eventos.reorderPresentations.mutate({ eventId: ev.id, orderedIds: [999999] });
+  } catch {
+    rejected = true;
+  }
+  expect(rejected, "ids fora do programa deveriam ser rejeitados");
+  return "rejeitado";
+});
+
 await step("Publicar → Encerrar (realizado) com confirmação de regras", async () => {
   await admin.eventos.setStatus.mutate({ id: ev.id, status: "confirmado" });
   await admin.eventos.setStatus.mutate({ id: ev.id, status: "realizado" });
@@ -154,6 +236,17 @@ await step("Publicar → Encerrar (realizado) com confirmação de regras", asyn
     terminal = true;
   }
   expect(terminal, "realizado deveria ser terminal");
+  return "ok";
+});
+
+await step("FASE 1 — limpeza: remover elenco/programa de teste", async () => {
+  const detail = await admin.eventos.getById.query({ id: ev.id });
+  for (const c of detail.coreografias) {
+    try { await admin.eventos.unlinkCoreografia.mutate({ id: c.id }); } catch { /* ok */ }
+  }
+  for (const coreoId of [ev.coreoA, ev.coreoB].filter(Boolean)) {
+    try { await admin.coreografias.delete.mutate({ id: coreoId }); } catch { /* ok */ }
+  }
   return "ok";
 });
 

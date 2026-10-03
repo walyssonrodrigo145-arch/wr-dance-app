@@ -932,6 +932,13 @@ export async function runAutoMigrations() {
       { table: 'costume_sales', sql: `UPDATE "costume_sales" SET "deliveryStatus" = 'entregue' WHERE "status" = 'entregue'` },
       { table: 'costume_sales', sql: `UPDATE "costume_sales" SET "status" = 'pendente' WHERE "status" = 'em_separacao'` },
       { table: 'costume_sales', sql: `UPDATE "costume_sales" SET "status" = 'pago' WHERE "status" = 'entregue'` },
+
+      // ═══ FASE 1 Eventos: operação do programa (aditivo) ═══
+      { table: 'event_choreographies', sql: `ALTER TABLE "event_choreographies" ADD COLUMN IF NOT EXISTS "durationMinutes" integer` },
+      { table: 'event_choreographies', sql: `ALTER TABLE "event_choreographies" ADD COLUMN IF NOT EXISTS "dressingRoom" varchar(60)` },
+      { table: 'event_choreographies', sql: `ALTER TABLE "event_choreographies" ADD COLUMN IF NOT EXISTS "stageEntry" varchar(10)` },
+      { table: 'event_choreographies', sql: `ALTER TABLE "event_choreographies" ADD COLUMN IF NOT EXISTS "stageExit" varchar(10)` },
+      { table: 'events', sql: `ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "minIntervalMinutes" integer DEFAULT 6 NOT NULL` },
     ];
 
     for (const m of migrations) {
