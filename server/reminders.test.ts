@@ -217,7 +217,14 @@ describe("paymentDues.list", () => {
 
 describe("paymentDues.markPaid", () => {
   it("marks a payment as paid and cancels related reminders", async () => {
-    const db = makeDb();
+    const db = makeDb({
+      // Posse (AUDITORIA P0): sequência de selects do markPaid —
+      // 1º: fatura (do próprio professor via userId), 2º: owner row, 3º: paymentDetails.
+      limit: vi.fn()
+        .mockResolvedValueOnce([{ id: 5, organizationId: 1, studentId: 10, userId: 1, status: "pendente", amount: "100.00" }])
+        .mockResolvedValueOnce([{ professorId: 1 }])
+        .mockResolvedValue([{ id: 5, studentName: "Aluna Teste", amount: "100.00" }]),
+    });
     (getDb as ReturnType<typeof vi.fn>).mockResolvedValue(db);
     const caller = appRouter.createCaller(makeCtx());
     const result = await caller.paymentDues.markPaid({ id: 5 });

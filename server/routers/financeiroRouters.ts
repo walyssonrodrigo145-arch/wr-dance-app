@@ -341,22 +341,6 @@ export const financeiroRouters = {
             .where(and(eq(paymentDues.id, input.id), eq(paymentDues.organizationId, orgId)))
             .limit(1);
 
-          // AUDITORIA P0: posse OBRIGATÓRIA antes dos efeitos (cancelar cobrança
-          // de terceiro / limpar referências / persistir valores).
-          {
-            const isOwnerDue = (await db.select({ id: students.id })
-              .from(students)
-              .where(and(
-                eq(students.id, due.studentId),
-                eq(students.organizationId, orgId),
-                eq(students.professorId, ctx.user.id),
-              )).limit(1)).length > 0;
-            const isOwnerByUser = due.userId === ctx.user.id;
-            if (!isOwnerDue && !isOwnerByUser) {
-              throw new TRPCError({ code: "FORBIDDEN", message: "Mensalidade não pertence aos seus alunos." });
-            }
-          }
-
           // ── CRÍTICO-2 FIX: Cancelar cobrança aberta no Asaas ao dar baixa manual ──
           // Evita que o aluno pague novamente pelo link que ficou ativo
           // (AUDIT: o early-return acima já garante status !== 'pago' aqui)

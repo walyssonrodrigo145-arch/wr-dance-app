@@ -26,6 +26,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2026.10.02.1",
+    date: "2026-10-02",
+    title: "Loja completa: pedidos, promoções e analytics",
+    summary: "A Loja virou um mini-ERP: KPIs de desempenho, fluxo de pedidos com separação/entrega, promoções, categorias e visão em grade ou tabela.",
+    items: [
+      { type: "novo", title: "Painel da Loja com KPIs", description: "Total de produtos, estoque crítico, vendas e faturamento do mês (com comparativo) e pedidos pendentes — tudo na entrada da Loja." },
+      { type: "novo", title: "Fluxo completo de pedidos", description: "Nova aba Pedidos: pendente → em separação → pago → entregue, com busca por código, produto ou aluna e bloqueio de transições inválidas." },
+      { type: "novo", title: "Código do pedido (VDA-XXXX)", description: "Cada venda ganha um número de pedido, visível para a escola e para a aluna no portal." },
+      { type: "novo", title: "Promoções", description: "Defina preço promocional por produto — passa a ser o preço praticado nas vendas, com badge \"Promo\" e preço antigo riscado." },
+      { type: "novo", title: "Visão em Grade ou Tabela", description: "Produtos com foto, SKU, categoria, estado do estoque (crítico/baixo/normal) e status, com busca, filtros, ordenação e paginação." },
+      { type: "novo", title: "Categorias e rankings", description: "Breakdown por categoria com ticket médio, vendas recentes e produtos mais vendidos em tempo real." },
+      { type: "melhoria", title: "Portal do aluno com entrega", description: "As compras da aluna no portal passam a mostrar o código do pedido e o status de entrega." },
+    ],
+  },
+  {
     version: "2026.10.01.24",
     date: "2026-10-01",
     title: "Responsável pela escola nos contratos",

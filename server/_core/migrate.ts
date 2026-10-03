@@ -911,6 +911,13 @@ export async function runAutoMigrations() {
       { table: 'settings', sql: `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "schoolResponsibleRg" varchar(30)` },
       { table: 'settings', sql: `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "schoolResponsibleCpf" varchar(20)` },
       { table: 'students', sql: `ALTER TABLE "students" ADD COLUMN IF NOT EXISTS "guardianRg" varchar(30)` },
+
+      // ═══ Loja completa: código de pedido + promoções ═══
+      { table: 'costume_sales', sql: `ALTER TABLE "costume_sales" ADD COLUMN IF NOT EXISTS "orderCode" varchar(30)` },
+      { table: 'costume_sales', sql: `ALTER TABLE "costume_sales" ADD COLUMN IF NOT EXISTS "deliveredAt" timestamp` },
+      { table: 'costumes', sql: `ALTER TABLE "costumes" ADD COLUMN IF NOT EXISTS "promoPrice" decimal(10,2)` },
+      { table: 'costume_sales', sql: `UPDATE "costume_sales" SET "orderCode" = 'VDA-' || (1000 + "id") WHERE "orderCode" IS NULL` },
+      { table: 'costume_sales', sql: `CREATE UNIQUE INDEX IF NOT EXISTS "costume_sales_order_code_unique" ON "costume_sales" ("orderCode")` },
     ];
 
     for (const m of migrations) {

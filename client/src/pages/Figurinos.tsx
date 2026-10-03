@@ -7,7 +7,10 @@ import { formatDateOnly } from "@/lib/dates";
 import {
   Shirt, Plus, Search, Pencil, Trash2, Loader2, Package, AlertTriangle,
   ArrowUpRight, ArrowDownLeft, X, CheckCircle2, ShoppingBag, QrCode, Copy, ExternalLink,
+  LayoutGrid, List, Eye, Tag, Tags, ChevronLeft, ChevronRight, Wallet, Clock,
+  TrendingUp, Truck, PackageCheck, PackageOpen, Percent, History,
 } from "lucide-react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -44,10 +47,25 @@ const LOAN_STATUS_META: Record<string, { label: string; className: string }> = {
 };
 
 const SALE_STATUS_META: Record<string, { label: string; className: string }> = {
-  pendente: { label: "Venda pendente", className: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
-  pago: { label: "Venda paga", className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
-  cancelado: { label: "Venda cancelada", className: "bg-rose-500/10 text-rose-600 border-rose-500/30" },
+  pendente: { label: "Pendente", className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30" },
+  em_separacao: { label: "Em separação", className: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30" },
+  pago: { label: "Pago", className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" },
+  entregue: { label: "Entregue", className: "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/30" },
+  cancelado: { label: "Cancelado", className: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30" },
 };
+
+/** Preço praticado: promoPrice quando definido (>0), senão salePrice. */
+function effectiveSalePrice(item: Pick<CostumeRow, "salePrice" | "promoPrice">): number {
+  const promo = Number((item as any).promoPrice);
+  return promo > 0 ? promo : Number(item.salePrice) || 0;
+}
+
+/** Estado do estoque de venda (dot + rótulo), padrão da Loja. */
+function stockState(avail: number): { label: string; dot: string; text: string } {
+  if (avail <= 3) return { label: "estoque crítico", dot: "bg-rose-500", text: "text-rose-600 dark:text-rose-400" };
+  if (avail <= 8) return { label: "estoque baixo", dot: "bg-amber-500", text: "text-amber-600 dark:text-amber-400" };
+  return { label: "em estoque", dot: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400" };
+}
 
 type CostumeRow = {
   id: number;
@@ -64,9 +82,11 @@ type CostumeRow = {
   condition: string;
   cost: number;
   salePrice: number;
+  promoPrice: number | null;
   sellable: boolean;
   photoUrl: string | null;
   notes: string | null;
+  active: boolean;
 };
 
 // ─── Modal de peça ────────────────────────────────────────────────────────────
@@ -83,11 +103,12 @@ function CostumeModal({ open, onClose, editing }: { open: boolean; onClose: () =
     condition: editing.condition,
     cost: String(editing.cost),
     salePrice: String(editing.salePrice ?? 0),
+    promoPrice: editing.promoPrice != null && Number(editing.promoPrice) > 0 ? String(editing.promoPrice) : "",
     sellable: editing.sellable === false ? "nao" : "sim",
     notes: editing.notes ?? "",
   } : {
     name: "", code: "", type: "outro", size: "", color: "",
-    quantity: "1", condition: "bom", cost: "0", salePrice: "0", sellable: "sim", notes: "",
+    quantity: "1", condition: "bom", cost: "0", salePrice: "0", promoPrice: "", sellable: "sim", notes: "",
   });
 
   const set = (key: string, value: string) => setForm((prev) => ({ ...prev, [key]: value }));
@@ -102,6 +123,7 @@ function CostumeModal({ open, onClose, editing }: { open: boolean; onClose: () =
     condition: form.condition as any,
     cost: Math.max(0, parseFloat(form.cost.replace(",", ".")) || 0),
     salePrice: Math.max(0, parseFloat(form.salePrice.replace(",", ".")) || 0),
+    promoPrice: form.promoPrice.trim() ? Math.max(0, parseFloat(form.promoPrice.replace(",", ".")) || 0) : null,
     sellable: form.sellable === "sim",
     notes: form.notes.trim() || null,
     // Preserva a foto existente ao editar (o modal não expõe upload ainda)
@@ -185,6 +207,11 @@ function CostumeModal({ open, onClose, editing }: { open: boolean; onClose: () =
           <div className="space-y-1.5">
             <Label>Preço de venda (R$) — Loja</Label>
             <Input value={form.salePrice} onChange={(event) => set("salePrice", event.target.value)} placeholder="0,00" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Preço promocional (opcional)</Label>
+            <Input value={form.promoPrice} onChange={(event) => set("promoPrice", event.target.value)} placeholder="Ex.: 69,90" />
+            <p className="text-[10px] text-muted-foreground font-medium">Quando definido, este é o preço praticado na Loja.</p>
           </div>
           <div className="space-y-1.5">
             <Label>Disponível para venda</Label>
@@ -394,7 +421,7 @@ function SellModal({ open, onClose, preselected }: { open: boolean; onClose: () 
   const maxDiscount = Number((rules as any)?.maxDiscountPercent ?? 0);
   const quantityNumber = Math.max(1, parseInt(quantity, 10) || 1);
   const discountNumber = allowDiscount ? Math.max(0, Math.min(maxDiscount, parseFloat(discount.replace(",", ".")) || 0)) : 0;
-  const unitPrice = selectedCostume ? Number(selectedCostume.salePrice) * (1 - discountNumber / 100) : 0;
+  const unitPrice = selectedCostume ? effectiveSalePrice(selectedCostume) * (1 - discountNumber / 100) : 0;
   const total = Number((unitPrice * quantityNumber).toFixed(2));
 
   return (
@@ -418,7 +445,7 @@ function SellModal({ open, onClose, preselected }: { open: boolean; onClose: () 
                 )}
                 {sellableCostumes.map((item: any) => (
                   <SelectItem key={item.id} value={String(item.id)}>
-                    {item.name} — {formatBRL(item.salePrice)} ({item.disponivelVenda} disp.)
+                    {item.name} — {formatBRL(effectiveSalePrice(item))} ({item.disponivelVenda} disp.)
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -484,7 +511,7 @@ function SellModal({ open, onClose, preselected }: { open: boolean; onClose: () 
             <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 px-3 py-2 text-right">
               {discountNumber > 0 && (
                 <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                  {formatBRL(Number(selectedCostume.salePrice))} − {discountNumber}% = {formatBRL(unitPrice)}/un
+                  {formatBRL(effectiveSalePrice(selectedCostume))} − {discountNumber}% = {formatBRL(unitPrice)}/un
                 </p>
               )}
               <p className="text-sm font-black text-foreground">Total: {formatBRL(total)}</p>
@@ -651,10 +678,68 @@ function SaleChargeModal({ sale, onClose }: { sale: any | null; onClose: () => v
 
 // ─── Página ───────────────────────────────────────────────────────────────────
 
+const PRODUCT_PAGE_SIZE = 12;
+const CATALOG_TYPES = ["saia", "collant", "sapatilha", "top", "calca", "acessorio", "uniforme", "outro"];
+
+const CAT_COLORS: Record<string, string> = {
+  saia: "bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/30",
+  collant: "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/30",
+  sapatilha: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30",
+  top: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30",
+  calca: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
+  acessorio: "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/30",
+  uniforme: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30",
+  outro: "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/30",
+};
+
+/** Payload completo para figurinos.update (bulk/promoções), preservando a peça. */
+function buildUpdatePayload(row: any, overrides: Record<string, unknown> = {}) {
+  return {
+    id: row.id,
+    name: row.name,
+    code: row.code ?? null,
+    type: row.type,
+    size: row.size ?? null,
+    color: row.color ?? null,
+    quantity: Math.max(1, Number(row.quantity) || 1),
+    condition: row.condition,
+    cost: Number(row.cost) || 0,
+    salePrice: Number(row.salePrice) || 0,
+    promoPrice: Number(row.promoPrice) > 0 ? Number(row.promoPrice) : null,
+    sellable: row.sellable !== false,
+    photoUrl: row.photoUrl ?? null,
+    notes: row.notes ?? null,
+    ...overrides,
+  };
+}
+
+function growthPct(current: number, previous: number): { text: string; up: boolean; neutral: boolean } {
+  if (previous <= 0) return current > 0 ? { text: "novo", up: true, neutral: false } : { text: "—", up: true, neutral: true };
+  const pct = Math.round(((current - previous) / previous) * 100);
+  return { text: `${pct >= 0 ? "+" : ""}${pct}%`, up: pct >= 0, neutral: false };
+}
+
+const ORDER_TOAST: Record<string, string> = {
+  pendente: "Pedido voltou para pendente.",
+  em_separacao: "Pedido em separação.",
+  pago: "Pedido marcado como pago!",
+  entregue: "Pedido entregue!",
+  cancelado: "Pedido cancelado.",
+};
+
 export default function Figurinos() {
-  const [tab, setTab] = useState("acervo");
+  const [tab, setTab] = useState("produtos");
   const [search, setSearch] = useState("");
+  const [catFilter, setCatFilter] = useState("todas");
+  const [statusFilter, setStatusFilter] = useState("todos");
+  const [sortKey, setSortKey] = useState("recentes");
+  const [view, setView] = useState<"tabela" | "grade">("tabela");
+  const [page, setPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [loanStatus, setLoanStatus] = useState("em_uso");
+  const [orderStatus, setOrderStatus] = useState("todos");
+  const [orderSearch, setOrderSearch] = useState("");
+
   const [modalOpen, setModalOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [editing, setEditing] = useState<CostumeRow | null>(null);
@@ -663,17 +748,27 @@ export default function Figurinos() {
   const [sellItem, setSellItem] = useState<CostumeRow | null>(null);
   const [chargeSale, setChargeSale] = useState<any | null>(null);
   const [deleting, setDeleting] = useState<CostumeRow | null>(null);
+  const [promoOpen, setPromoOpen] = useState(false);
 
   const utils = trpc.useUtils();
   const { data: stats } = trpc.figurinos.stats.useQuery();
-  const { data: costumes = [], isLoading } = trpc.figurinos.list.useQuery({ search: search.trim() || undefined });
+  const { data: costumes = [], isLoading } = trpc.figurinos.list.useQuery({});
   const { data: loans = [], isLoading: isLoadingLoans } = trpc.figurinos.loans.useQuery({ status: loanStatus as any, search: search.trim() || undefined });
-  const { data: sales = [], isLoading: isLoadingSales } = trpc.figurinos.sales.useQuery({ status: "todos" });
+  const { data: sales = [], isLoading: isLoadingSales } = trpc.figurinos.sales.useQuery({ status: "todos" as any });
 
   const updateSaleStatus = trpc.figurinos.updateSaleStatus.useMutation({
     onSuccess: (_, variables) => {
-      toast.success(variables.status === "pago" ? "Venda marcada como paga!" : "Venda cancelada.");
+      toast.success(ORDER_TOAST[variables.status] ?? "Pedido atualizado.");
       utils.figurinos.sales.invalidate();
+      utils.figurinos.list.invalidate();
+      utils.figurinos.storeCatalog.invalidate();
+      utils.figurinos.myPurchases.invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const updateMutation = trpc.figurinos.update.useMutation({
+    onSuccess: () => {
       utils.figurinos.list.invalidate();
       utils.figurinos.storeCatalog.invalidate();
     },
@@ -692,7 +787,7 @@ export default function Figurinos() {
 
   const deleteMutation = trpc.figurinos.delete.useMutation({
     onSuccess: (result) => {
-      toast.success(result.message || "Figurino excluído.");
+      toast.success(result.message || "Produto excluído.");
       setDeleting(null);
       utils.figurinos.list.invalidate();
       utils.figurinos.stats.invalidate();
@@ -700,305 +795,690 @@ export default function Figurinos() {
     onError: (error) => toast.error(error.message),
   });
 
-  const kpis = useMemo(() => ([
-    { label: "Peças", value: stats?.pecas ?? 0, icon: Shirt, className: "text-indigo-500" },
-    { label: "Unidades", value: stats?.unidades ?? 0, icon: Package, className: "text-blue-500" },
-    { label: "Em uso", value: stats?.emUso ?? 0, icon: ArrowUpRight, className: "text-amber-500" },
-    { label: "Atrasados", value: stats?.atrasados ?? 0, icon: AlertTriangle, className: "text-rose-500" },
-    { label: "Valor do acervo", value: formatBRL(stats?.valorAcervo ?? 0), icon: Package, className: "text-emerald-500" },
-  ]), [stats]);
+  // ─── KPIs da Loja (RF-001) ──────────────────────────────────────────────────
+  const nowDate = new Date();
+  const monthStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), 1);
+  const prevMonthStart = new Date(nowDate.getFullYear(), nowDate.getMonth() - 1, 1);
 
-  return (
-    <div className="flex-1 space-y-6 lg:space-y-8 p-4 sm:p-6 lg:p-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-black tracking-tight text-foreground flex items-center gap-2">
-            <Shirt className="text-indigo-500" size={28} />
-            Loja
-          </h1>
-          <p className="text-muted-foreground font-medium text-sm mt-1">
-            Acervo de figurinos e produtos: empréstimo, devolução e disponibilidade.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => { setCheckoutItem(null); setCheckoutOpen(true); }}>
-            <ArrowUpRight size={16} className="mr-2" /> Emprestar
-          </Button>
-          <Button variant="outline" onClick={() => { setSellItem(null); setSellOpen(true); }}>
-            <ShoppingBag size={16} className="mr-2" /> Vender
-          </Button>
-          <Button onClick={() => { setEditing(null); setModalOpen(true); }} className="bg-indigo-600 hover:bg-indigo-700">
-            <Plus size={16} className="mr-2" /> Nova peça
-          </Button>
+  const activeProducts = useMemo(() => costumes.filter((c: any) => c.active !== false), [costumes]);
+  const validSales = useMemo(() => sales.filter((s: any) => s.status !== "cancelado"), [sales]);
+  const paidSales = useMemo(() => sales.filter((s: any) => s.status === "pago" || s.status === "entregue"), [sales]);
+  const monthSales = useMemo(() => validSales.filter((s: any) => new Date(s.createdAt) >= monthStart), [validSales, monthStart]);
+  const prevMonthSales = useMemo(
+    () => validSales.filter((s: any) => new Date(s.createdAt) >= prevMonthStart && new Date(s.createdAt) < monthStart),
+    [validSales, prevMonthStart, monthStart],
+  );
+  const revenueMonth = useMemo(
+    () => paidSales.filter((s: any) => new Date(s.paidAt ?? s.createdAt) >= monthStart).reduce((acc: number, s: any) => acc + (Number(s.totalPrice) || 0), 0),
+    [paidSales, monthStart],
+  );
+  const revenuePrevMonth = useMemo(
+    () => paidSales.filter((s: any) => { const d = new Date(s.paidAt ?? s.createdAt); return d >= prevMonthStart && d < monthStart; }).reduce((acc: number, s: any) => acc + (Number(s.totalPrice) || 0), 0),
+    [paidSales, prevMonthStart, monthStart],
+  );
+  const pendingOrders = useMemo(() => sales.filter((s: any) => s.status === "pendente" || s.status === "em_separacao").length, [sales]);
+  const lowStockProducts = useMemo(() => activeProducts.filter((c: any) => c.sellable && c.disponivelVenda <= 3), [activeProducts]);
+  const newProductsMonth = useMemo(() => activeProducts.filter((c: any) => new Date(c.createdAt) >= monthStart).length, [activeProducts, monthStart]);
+
+  const kpis = useMemo(() => ([
+    { label: "Total de produtos", icon: Package, iconBg: "bg-indigo-500/10 text-indigo-500", value: String(activeProducts.length), delta: null as any, sub: `${newProductsMonth} novo(s) este mês` },
+    { label: "Estoque baixo", icon: AlertTriangle, iconBg: "bg-amber-500/10 text-amber-500", value: String(lowStockProducts.length), delta: null as any, sub: "produtos com estoque crítico" },
+    { label: "Vendas do mês", icon: ShoppingBag, iconBg: "bg-emerald-500/10 text-emerald-500", value: String(monthSales.length), delta: growthPct(monthSales.length, prevMonthSales.length), sub: "pedidos realizados" },
+    { label: "Faturamento do mês", icon: Wallet, iconBg: "bg-blue-500/10 text-blue-500", value: formatBRL(revenueMonth), delta: growthPct(revenueMonth, revenuePrevMonth), sub: "vs. mês anterior" },
+    { label: "Pedidos pendentes", icon: Clock, iconBg: "bg-rose-500/10 text-rose-500", value: String(pendingOrders), delta: null as any, sub: "aguardando processamento" },
+  ]), [activeProducts, lowStockProducts, monthSales, prevMonthSales, revenueMonth, revenuePrevMonth, pendingOrders, newProductsMonth]);
+
+  // ─── Produtos: busca + filtros + ordenação + paginação (RF-004) ─────────────
+  const filteredProducts = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const typeLabel = (t: string) => TYPE_LABEL[t] ?? t;
+    let rows = (costumes as any[]).filter((c) => {
+      if (q && !(c.name?.toLowerCase().includes(q) || typeLabel(c.type).toLowerCase().includes(q) || c.code?.toLowerCase().includes(q))) return false;
+      if (catFilter !== "todas" && c.type !== catFilter) return false;
+      if (statusFilter === "ativos" && c.active === false) return false;
+      if (statusFilter === "inativos" && c.active !== false) return false;
+      return true;
+    });
+    rows = [...rows];
+    if (sortKey === "recentes") rows.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    else if (sortKey === "preco_asc") rows.sort((a, b) => effectiveSalePrice(a) - effectiveSalePrice(b));
+    else if (sortKey === "preco_desc") rows.sort((a, b) => effectiveSalePrice(b) - effectiveSalePrice(a));
+    else if (sortKey === "nome") rows.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    else if (sortKey === "estoque") rows.sort((a, b) => (a.sellable ? a.disponivelVenda : a.disponivel) - (b.sellable ? b.disponivelVenda : b.disponivel));
+    return rows;
+  }, [costumes, search, catFilter, statusFilter, sortKey]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredProducts.length / PRODUCT_PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const pagedProducts = useMemo(
+    () => filteredProducts.slice((safePage - 1) * PRODUCT_PAGE_SIZE, safePage * PRODUCT_PAGE_SIZE),
+    [filteredProducts, safePage],
+  );
+  const resetPage = () => setPage(1);
+  const pageNumbers = useMemo(() => {
+    const all = Array.from({ length: pageCount }, (_, i) => i + 1);
+    if (pageCount <= 5) return all;
+    const window = [safePage - 1, safePage, safePage + 1].filter((p) => p >= 1 && p <= pageCount);
+    const result = new Set<number>([1, pageCount, ...window]);
+    return all.filter((p) => result.has(p));
+  }, [pageCount, safePage]);
+
+  // ─── Seleção em massa (Ativar/Inativar) ────────────────────────────────────
+  const toggleSelect = (id: number) => setSelectedIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const allPageSelected = pagedProducts.length > 0 && pagedProducts.every((c: any) => selectedIds.has(c.id));
+  const togglePageSelection = () => setSelectedIds((prev) => {
+    const next = new Set(prev);
+    if (allPageSelected) pagedProducts.forEach((c: any) => next.delete(c.id));
+    else pagedProducts.forEach((c: any) => next.add(c.id));
+    return next;
+  });
+  const bulkSetActive = (active: boolean) => {
+    const rows = (costumes as any[]).filter((c) => selectedIds.has(c.id));
+    if (rows.length === 0) return;
+    Promise.all(rows.map((row) => updateMutation.mutateAsync(buildUpdatePayload(row, { active }) as any)))
+      .then(() => {
+        toast.success(`${rows.length} produto(s) ${active ? "ativado(s)" : "inativado(s)"}.`);
+        setSelectedIds(new Set());
+      })
+      .catch((error: any) => toast.error(error?.message ?? "Falha ao atualizar seleção."));
+  };
+
+  // ─── Rail: vendas recentes + mais vendidos (RF-008/RF-009) ─────────────────
+  const recentSales = useMemo(() => validSales.slice(0, 6), [validSales]);
+  const topProducts = useMemo(() => {
+    const map = new Map<number, { name: string; count: number; price: number }>();
+    validSales.forEach((s: any) => {
+      const cur = map.get(s.costumeId) ?? { name: s.costumeName, count: 0, price: Number(s.unitPrice) || 0 };
+      cur.count += Number(s.quantity) || 0;
+      map.set(s.costumeId, cur);
+    });
+    return Array.from(map.values()).sort((a, b) => b.count - a.count).slice(0, 5);
+  }, [validSales]);
+
+  // ─── Categorias (RF-006) ───────────────────────────────────────────────────
+  const categories = useMemo(() => {
+    const typeById = new Map<number, string>((costumes as any[]).map((c) => [c.id, c.type]));
+    return CATALOG_TYPES.map((type) => {
+      const items = activeProducts.filter((c: any) => c.type === type);
+      const soldQty = validSales.filter((s: any) => typeById.get(s.costumeId) === type).reduce((acc: number, s: any) => acc + (Number(s.quantity) || 0), 0);
+      const avgPrice = items.length > 0 ? items.reduce((acc: number, c: any) => acc + effectiveSalePrice(c), 0) / items.length : 0;
+      return { type, count: items.length, units: items.reduce((acc: number, c: any) => acc + (Number(c.quantity) || 0), 0), soldQty, avgPrice };
+    });
+  }, [activeProducts, validSales, costumes]);
+
+  const goProductsFiltered = (type: string) => { setCatFilter(type); setTab("produtos"); resetPage(); };
+
+  // ─── Pedidos (RF-003) ──────────────────────────────────────────────────────
+  const orders = useMemo(() => {
+    const q = orderSearch.trim().toLowerCase();
+    return (sales as any[]).filter((s) => {
+      if (orderStatus !== "todos" && s.status !== orderStatus) return false;
+      if (q && !((s.orderCode ?? "").toLowerCase().includes(q) || s.costumeName?.toLowerCase().includes(q) || s.studentName?.toLowerCase().includes(q))) return false;
+      return true;
+    });
+  }, [sales, orderStatus, orderSearch]);
+
+  const renderEmpty = (icon: any, title: string, subtitle?: string) => (
+    <div className="text-center py-16 rounded-3xl border-2 border-dashed border-border">
+      <div className="flex justify-center mb-3">
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary/60">{(() => { const I = icon; return <I size={26} />; })()}</span>
+      </div>
+      <p className="font-black text-foreground">{title}</p>
+      {subtitle && <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>}
+    </div>
+  );
+
+  const spinner = (
+    <div className="flex justify-center py-16"><Loader2 className="animate-spin text-primary" size={32} /></div>
+  );
+
+  const renderProductThumb = (item: any, size = "h-10 w-10") => (
+    item.photoUrl ? (
+      <img src={item.photoUrl} alt={item.name} className={cn(size, "rounded-xl object-cover border border-border")} loading="lazy" />
+    ) : (
+      <span className={cn(size, "flex items-center justify-center rounded-xl bg-primary/10 text-primary/70")}><Shirt size={16} /></span>
+    )
+  );
+
+  const renderPrice = (item: any, big = false) => {
+    const promo = Number(item.promoPrice) > 0;
+    return (
+      <div className="flex items-center gap-1.5">
+        {promo && <span className={cn("text-muted-foreground line-through", big ? "text-xs" : "text-[10px]")}>{formatBRL(item.salePrice)}</span>}
+        <span className={cn("font-black", big ? "text-base" : "text-sm", promo && "text-emerald-600 dark:text-emerald-400")}>{formatBRL(effectiveSalePrice(item))}</span>
+        {promo && <Badge variant="outline" className="text-[9px] font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 px-1 py-0"><Percent size={8} className="mr-0.5" />Promo</Badge>}
+      </div>
+    );
+  };
+
+  const renderCards = (list: any[], className = "") => (
+    <div className={cn("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4", className)}>
+      {list.map((costume: any, idx: number) => (
+        <motion.div key={costume.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx * 0.04, 0.3) }} className="group rounded-2xl border border-border bg-card overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+          <div className="relative aspect-[4/3] bg-muted/40 overflow-hidden">
+            {costume.photoUrl ? (
+              <img src={costume.photoUrl} alt={costume.name} className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+            ) : (
+              <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-primary/5 to-violet-500/10"><Shirt className="text-primary/30" size={44} /></div>
+            )}
+            {Number(costume.promoPrice) > 0 && (
+              <Badge className="absolute top-2 left-2 bg-emerald-600 hover:bg-emerald-600 text-white text-[9px] font-black border-0"><Percent size={8} className="mr-0.5" />Promo</Badge>
+            )}
+            {costume.active === false && (
+              <Badge className="absolute top-2 right-2 bg-slate-700 hover:bg-slate-700 text-white text-[9px] font-black border-0">Inativo</Badge>
+            )}
+          </div>
+          <div className="p-4 space-y-2.5">
+            <div className="min-w-0">
+              <h3 className="font-black text-foreground truncate">{costume.name}</h3>
+              <p className="text-[11px] font-bold text-muted-foreground mt-0.5">{costume.code ? `SKU: ${costume.code}` : TYPE_LABEL[costume.type] ?? costume.type}</p>
+            </div>
+            <Badge variant="outline" className={cn("text-[10px] font-black", CAT_COLORS[costume.type] ?? CAT_COLORS.outro)}>
+              {TYPE_LABEL[costume.type] ?? costume.type}
+            </Badge>
+            <div className="flex items-center justify-between">
+              {renderPrice(costume, true)}
+              {(() => { const st = stockState(costume.sellable ? costume.disponivelVenda : costume.disponivel); return (
+                <span className={cn("flex items-center gap-1.5 text-[11px] font-bold", st.text)}>
+                  <span className={cn("h-2 w-2 rounded-full", st.dot)} /> {costume.sellable ? costume.disponivelVenda : costume.disponivel}
+                </span>
+              ); })()}
+            </div>
+            <div className="flex items-center gap-1.5 pt-1">
+              <Button size="sm" variant="outline" className="flex-1" disabled={costume.disponivel === 0} onClick={() => { setCheckoutItem(costume); setCheckoutOpen(true); }}>
+                <ArrowUpRight size={13} className="mr-1" /> Emprestar
+              </Button>
+              {costume.sellable && (
+                <Button size="sm" variant="outline" className="flex-1" onClick={() => { setSellItem(costume); setSellOpen(true); }}>
+                  <ShoppingBag size={13} className="mr-1" /> Vender
+                </Button>
+              )}
+              <Button size="icon" variant="ghost" onClick={() => { setEditing(costume); setModalOpen(true); }} title="Editar"><Pencil size={14} /></Button>
+              <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-rose-500" onClick={() => setDeleting(costume)} title="Excluir"><Trash2 size={14} /></Button>
+            </div>
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  );
+
+  const productsTable = (list: any[]) => (
+    <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+      <div className="overflow-x-auto">
+        <div className="min-w-[760px]">
+          <div className="grid grid-cols-[36px_minmax(0,2.2fr)_120px_110px_130px_90px_150px] gap-3 px-4 py-3 border-b border-border bg-muted/30">
+            <button className="flex items-center" onClick={togglePageSelection}>
+              <span className={cn("h-4 w-4 rounded border flex items-center justify-center transition-colors", allPageSelected ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/40")}>
+                {allPageSelected && <CheckCircle2 size={11} />}
+              </span>
+            </button>
+            {["Produto", "Categoria", "Preço", "Estoque", "Status", "Ações"].map((h) => (
+              <p key={h} className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center">{h}</p>
+            ))}
+          </div>
+          {list.map((costume: any) => {
+            const st = stockState(costume.sellable ? costume.disponivelVenda : costume.disponivel);
+            const selected = selectedIds.has(costume.id);
+            return (
+              <div key={costume.id} className={cn("grid grid-cols-[36px_minmax(0,2.2fr)_120px_110px_130px_90px_150px] gap-3 px-4 py-3 border-b border-border/60 items-center hover:bg-primary/[0.03] transition-colors", selected && "bg-primary/[0.05]")}>
+                <button className="flex items-center" onClick={() => toggleSelect(costume.id)}>
+                  <span className={cn("h-4 w-4 rounded border flex items-center justify-center transition-colors", selected ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/40")}>
+                    {selected && <CheckCircle2 size={11} />}
+                  </span>
+                </button>
+                <div className="flex items-center gap-3 min-w-0">
+                  {renderProductThumb(costume)}
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-foreground truncate">{costume.name}</p>
+                    <p className="text-[11px] font-bold text-muted-foreground">SKU: {costume.code ?? "—"}</p>
+                  </div>
+                </div>
+                <Badge variant="outline" className={cn("w-fit text-[10px] font-black", CAT_COLORS[costume.type] ?? CAT_COLORS.outro)}>
+                  {TYPE_LABEL[costume.type] ?? costume.type}
+                </Badge>
+                {renderPrice(costume)}
+                <span className={cn("flex items-center gap-2 text-xs font-bold", st.text)}>
+                  <span className={cn("h-2 w-2 rounded-full", st.dot)} />
+                  <span>{costume.sellable ? costume.disponivelVenda : costume.disponivel}<span className="font-medium opacity-80"> {st.label}</span></span>
+                </span>
+                <Badge variant="outline" className={cn("w-fit text-[10px] font-black", costume.active === false ? "bg-slate-500/10 text-slate-500 border-slate-500/30" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30")}>
+                  {costume.active === false ? "Inativo" : "Ativo"}
+                </Badge>
+                <div className="flex items-center gap-0.5 justify-end">
+                  <Button size="icon" variant="ghost" title="Emprestar" disabled={costume.disponivel === 0} onClick={() => { setCheckoutItem(costume); setCheckoutOpen(true); }}><ArrowUpRight size={15} /></Button>
+                  {costume.sellable && (
+                    <Button size="icon" variant="ghost" title="Vender" onClick={() => { setSellItem(costume); setSellOpen(true); }}><ShoppingBag size={15} /></Button>
+                  )}
+                  <Button size="icon" variant="ghost" title="Editar" onClick={() => { setEditing(costume); setModalOpen(true); }}><Pencil size={15} /></Button>
+                  <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-rose-500" title="Excluir" onClick={() => setDeleting(costume)}><Trash2 size={15} /></Button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
+    </div>
+  );
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        {kpis.map((kpi) => {
+  return (
+    <div className="flex-1 space-y-6 p-4 sm:p-6 lg:p-8">
+      {/* ── Header (padrão da referência) ── */}
+      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl lg:text-3xl font-outfit font-black tracking-tight text-foreground flex items-center gap-2.5">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-500/25"><Shirt size={22} /></span>
+            Loja
+          </h1>
+          <p className="text-muted-foreground font-medium text-sm mt-1.5">Venda produtos, figurinos e acessórios da sua escola de dança.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setTab("categorias")}><Tags size={16} className="mr-2" /> Categorias</Button>
+          <Button variant="outline" onClick={() => setPromoOpen(true)}><Tag size={16} className="mr-2" /> Promoções</Button>
+          <Button variant="outline" onClick={() => { setSellItem(null); setSellOpen(true); }}><ShoppingBag size={16} className="mr-2" /> Nova venda</Button>
+          <Button onClick={() => { setEditing(null); setModalOpen(true); }} className="bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/25"><Plus size={16} className="mr-2" /> Novo produto</Button>
+        </div>
+      </motion.div>
+
+      {/* ── KPIs (RF-001) ── */}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+        {kpis.map((kpi, idx) => {
           const Icon = kpi.icon;
           return (
-            <div key={kpi.label} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-              <div className="flex items-center gap-2">
-                <Icon size={16} className={kpi.className} />
-                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{kpi.label}</p>
+            <motion.div key={kpi.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }} className="rounded-2xl border border-border bg-card p-4 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+              <div className="flex items-center gap-2.5">
+                <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", kpi.iconBg)}><Icon size={18} /></span>
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground leading-tight">{kpi.label}</p>
               </div>
-              <p className="text-xl lg:text-2xl font-black text-foreground mt-2">{kpi.value}</p>
-            </div>
+              <div className="flex items-end gap-2 mt-3 flex-wrap">
+                <p className="text-2xl lg:text-[26px] font-outfit font-black tracking-tight text-foreground leading-none">{kpi.value}</p>
+                {kpi.delta && !kpi.delta.neutral && (
+                  <span className={cn("flex items-center gap-0.5 text-[11px] font-black", kpi.delta.up ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+                    <TrendingUp size={11} /> {kpi.delta.text}
+                  </span>
+                )}
+              </div>
+              <p className="text-[10px] font-bold text-muted-foreground mt-1">{kpi.sub}</p>
+            </motion.div>
           );
         })}
       </div>
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-        <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar peça ou aluno..." className="pl-10" />
+      {/* ── Conteúdo + rail lateral ── */}
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
+        <div className="min-w-0">
+          <Tabs value={tab} onValueChange={(value) => setTab(value)}>
+            <TabsList className="w-full sm:w-auto h-auto flex-wrap">
+              <TabsTrigger value="produtos"><Shirt size={14} className="mr-1.5" /> Produtos</TabsTrigger>
+              <TabsTrigger value="vendas"><ShoppingBag size={14} className="mr-1.5" /> Vendas</TabsTrigger>
+              <TabsTrigger value="pedidos"><PackageCheck size={14} className="mr-1.5" /> Pedidos{pendingOrders > 0 && <span className="ml-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-black text-white">{pendingOrders}</span>}</TabsTrigger>
+              <TabsTrigger value="categorias"><Tags size={14} className="mr-1.5" /> Categorias</TabsTrigger>
+              <TabsTrigger value="emprestimos"><ArrowUpRight size={14} className="mr-1.5" /> Empréstimos{stats && stats.atrasados > 0 && <span className="ml-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black text-white">{stats.atrasados}</span>}</TabsTrigger>
+            </TabsList>
+
+            {/* ── PRODUTOS ── */}
+            <TabsContent value="produtos" className="mt-4 space-y-4">
+              <div className="flex flex-col md:flex-row gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={15} />
+                  <Input value={search} onChange={(e) => { setSearch(e.target.value); resetPage(); }} placeholder="Buscar por nome do produto, categoria ou SKU..." className="pl-9" />
+                </div>
+                <Select value={catFilter} onValueChange={(v) => { setCatFilter(v); resetPage(); }}>
+                  <SelectTrigger className="w-full md:w-[180px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas as categorias</SelectItem>
+                    {CATALOG_TYPES.map((t) => <SelectItem key={t} value={t}>{TYPE_LABEL[t]}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); resetPage(); }}>
+                  <SelectTrigger className="w-full md:w-[150px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os status</SelectItem>
+                    <SelectItem value="ativos">Ativos</SelectItem>
+                    <SelectItem value="inativos">Inativos</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={sortKey} onValueChange={(v) => { setSortKey(v); resetPage(); }}>
+                  <SelectTrigger className="w-full md:w-[160px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="recentes">Mais recentes</SelectItem>
+                    <SelectItem value="preco_asc">Menor preço</SelectItem>
+                    <SelectItem value="preco_desc">Maior preço</SelectItem>
+                    <SelectItem value="nome">Nome (A–Z)</SelectItem>
+                    <SelectItem value="estoque">Menor estoque</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center rounded-lg border border-border bg-muted/30 p-0.5 shrink-0 self-start md:self-auto">
+                  <button onClick={() => setView("tabela")} className={cn("flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-black transition-colors", view === "tabela" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground")}><List size={13} /> Tabela</button>
+                  <button onClick={() => setView("grade")} className={cn("flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-black transition-colors", view === "grade" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground")}><LayoutGrid size={13} /> Grade</button>
+                </div>
+              </div>
+
+              {selectedIds.size > 0 && (
+                <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-2.5">
+                  <p className="text-xs font-black text-foreground">{selectedIds.size} selecionado(s)</p>
+                  <Button size="sm" variant="outline" onClick={() => bulkSetActive(true)}>Ativar</Button>
+                  <Button size="sm" variant="outline" onClick={() => bulkSetActive(false)}>Inativar</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>Limpar</Button>
+                </div>
+              )}
+
+              {isLoading ? spinner : filteredProducts.length === 0 ? renderEmpty(Shirt, "Nenhum produto encontrado", "Ajuste a busca ou cadastre um novo produto.") : (
+                <>
+                  {view === "tabela" ? (
+                    <>
+                      <div className="hidden md:block">{productsTable(pagedProducts)}</div>
+                      <div className="md:hidden">{renderCards(pagedProducts)}</div>
+                    </>
+                  ) : renderCards(pagedProducts)}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-1">
+                    <p className="text-xs font-bold text-muted-foreground">
+                      Mostrando {(safePage - 1) * PRODUCT_PAGE_SIZE + 1}–{Math.min(safePage * PRODUCT_PAGE_SIZE, filteredProducts.length)} de {filteredProducts.length} produtos
+                    </p>
+                    {pageCount > 1 && (
+                      <div className="flex items-center gap-1">
+                        <Button size="icon" variant="outline" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)}><ChevronLeft size={14} /></Button>
+                        {pageNumbers.map((p, i) => (
+                          <span key={p} className="contents">
+                            {i > 0 && p - pageNumbers[i - 1] > 1 && <span className="text-xs text-muted-foreground px-0.5">…</span>}
+                            <button onClick={() => setPage(p)} className={cn("h-8 w-8 rounded-lg text-xs font-black transition-colors", p === safePage ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:bg-muted")}>{p}</button>
+                          </span>
+                        ))}
+                        <Button size="icon" variant="outline" disabled={safePage >= pageCount} onClick={() => setPage(safePage + 1)}><ChevronRight size={14} /></Button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </TabsContent>
+
+            {/* ── VENDAS ── */}
+            <TabsContent value="vendas" className="mt-4 space-y-4">
+              {isLoadingSales ? spinner : sales.length === 0 ? renderEmpty(ShoppingBag, "Nenhuma venda registrada", 'Use o botão "Nova venda" para registrar a primeira.') : (
+                <div className="space-y-2">
+                  {(sales as any[]).map((sale) => {
+                    const statusMeta = SALE_STATUS_META[sale.status] ?? SALE_STATUS_META.pendente;
+                    return (
+                      <div key={sale.id} className="rounded-2xl border border-border bg-card p-4 flex flex-col lg:flex-row lg:items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-black text-foreground truncate">
+                            {sale.orderCode ?? `VDA-${1000 + sale.id}`}
+                            <span className="text-muted-foreground font-bold ml-2">{sale.costumeName} ×{sale.quantity}</span>
+                            <span className="text-indigo-600 dark:text-indigo-400 ml-2">{formatBRL(sale.totalPrice)}</span>
+                          </p>
+                          <p className="text-[11px] font-bold text-muted-foreground mt-0.5 truncate">
+                            {sale.studentName}
+                            {sale.eventName ? ` · ${sale.eventName}` : ""}
+                            {" · "}{new Date(sale.createdAt).toLocaleDateString("pt-BR")}
+                            {sale.paymentMode === "mensalidade" ? " · junto com a mensalidade" : " · cobrança avulsa"}
+                            {sale.discountPercent > 0 ? ` · desconto ${sale.discountPercent}%` : ""}
+                          </p>
+                        </div>
+                        {sale.madeToOrder && (
+                          <Badge variant="outline" className="w-fit text-[10px] font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30">Sob encomenda</Badge>
+                        )}
+                        <Badge variant="outline" className={cn("w-fit text-[10px] font-black", statusMeta.className)}>{statusMeta.label}</Badge>
+                        {(sale.status === "pendente" || sale.status === "em_separacao") && (
+                          <div className="flex items-center gap-2">
+                            <Button size="sm" variant="outline" onClick={() => setChargeSale(sale)}><QrCode size={13} className="mr-1" /> Cobrar</Button>
+                            <Button size="sm" variant="outline" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "pago" })} disabled={updateSaleStatus.isPending}><CheckCircle2 size={13} className="mr-1" /> Pago</Button>
+                            <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-rose-500" title="Cancelar venda" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "cancelado" })} disabled={updateSaleStatus.isPending}><X size={15} /></Button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* ── PEDIDOS (RF-003) ── */}
+            <TabsContent value="pedidos" className="mt-4 space-y-4">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={15} />
+                  <Input value={orderSearch} onChange={(e) => setOrderSearch(e.target.value)} placeholder="Buscar por código do pedido, produto ou aluna..." className="pl-9" />
+                </div>
+                <Select value={orderStatus} onValueChange={setOrderStatus}>
+                  <SelectTrigger className="w-full sm:w-[190px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os status</SelectItem>
+                    <SelectItem value="pendente">Pendente</SelectItem>
+                    <SelectItem value="em_separacao">Em separação</SelectItem>
+                    <SelectItem value="pago">Pago</SelectItem>
+                    <SelectItem value="entregue">Entregue</SelectItem>
+                    <SelectItem value="cancelado">Cancelado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {isLoadingSales ? spinner : orders.length === 0 ? renderEmpty(PackageCheck, "Nenhum pedido neste filtro", "Pedidos aparecem aqui assim que uma venda é registrada.") : (
+                <div className="space-y-2">
+                  {orders.map((sale: any) => {
+                    const statusMeta = SALE_STATUS_META[sale.status] ?? SALE_STATUS_META.pendente;
+                    return (
+                      <div key={sale.id} className="rounded-2xl border border-border bg-card p-4 flex flex-col lg:flex-row lg:items-center gap-3">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><PackageCheck size={18} /></span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-black text-foreground flex flex-wrap items-center gap-2">
+                            {sale.orderCode ?? `VDA-${1000 + sale.id}`}
+                            <Badge variant="outline" className={cn("text-[10px] font-black", statusMeta.className)}>{statusMeta.label}</Badge>
+                          </p>
+                          <p className="text-[11px] font-bold text-muted-foreground mt-0.5 truncate">
+                            {sale.costumeName} ×{sale.quantity} · {sale.studentName} · {new Date(sale.createdAt).toLocaleDateString("pt-BR")}
+                          </p>
+                        </div>
+                        <p className="text-sm font-black text-foreground lg:text-right">{formatBRL(sale.totalPrice)}</p>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {sale.status === "pendente" && (
+                            <>
+                              <Button size="sm" variant="outline" onClick={() => setChargeSale(sale)}><QrCode size={12} className="mr-1" /> Cobrar</Button>
+                              <Button size="sm" variant="outline" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "em_separacao" })} disabled={updateSaleStatus.isPending}><Truck size={12} className="mr-1" /> Em separação</Button>
+                            </>
+                          )}
+                          {(sale.status === "pendente" || sale.status === "em_separacao") && (
+                            <Button size="sm" variant="outline" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "pago" })} disabled={updateSaleStatus.isPending}><CheckCircle2 size={12} className="mr-1" /> Pago</Button>
+                          )}
+                          {sale.status === "pago" && (
+                            <Button size="sm" variant="outline" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "entregue" })} disabled={updateSaleStatus.isPending}><PackageCheck size={12} className="mr-1" /> Entregar</Button>
+                          )}
+                          {sale.status !== "entregue" && sale.status !== "cancelado" && (
+                            <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-rose-500" title="Cancelar pedido" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "cancelado" })} disabled={updateSaleStatus.isPending}><X size={15} /></Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* ── CATEGORIAS (RF-006) ── */}
+            <TabsContent value="categorias" className="mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
+                {categories.map((cat) => (
+                  <button key={cat.type} onClick={() => goProductsFiltered(cat.type)} className={cn("text-left rounded-2xl border border-border bg-card p-4 space-y-2 hover:-translate-y-1 hover:shadow-lg transition-all duration-300", cat.count === 0 && "opacity-50")}>
+                    <div className="flex items-center justify-between">
+                      <Badge variant="outline" className={cn("text-[10px] font-black", CAT_COLORS[cat.type] ?? CAT_COLORS.outro)}>{TYPE_LABEL[cat.type] ?? cat.type}</Badge>
+                      <ChevronRight size={14} className="text-muted-foreground" />
+                    </div>
+                    <p className="text-2xl font-outfit font-black tracking-tight text-foreground">
+                      {cat.count} <span className="text-xs font-bold text-muted-foreground">produto(s)</span>
+                    </p>
+                    <p className="text-[11px] font-bold text-muted-foreground">{cat.units} unid. · {cat.soldQty} vendido(s) · ticket médio {formatBRL(cat.avgPrice)}</p>
+                  </button>
+                ))}
+              </div>
+            </TabsContent>
+
+            {/* ── EMPRÉSTIMOS ── */}
+            <TabsContent value="emprestimos" className="mt-4 space-y-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Select value={loanStatus} onValueChange={setLoanStatus}>
+                  <SelectTrigger className="w-full sm:w-[220px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="em_uso">Em uso</SelectItem>
+                    <SelectItem value="atrasado">Atrasados</SelectItem>
+                    <SelectItem value="devolvido">Devolvidos</SelectItem>
+                    <SelectItem value="todos">Todos</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" onClick={() => { setCheckoutItem(null); setCheckoutOpen(true); }}><Plus size={15} className="mr-1.5" /> Novo empréstimo</Button>
+              </div>
+              {isLoadingLoans ? spinner : loans.length === 0 ? renderEmpty(ArrowUpRight, "Nenhum empréstimo neste filtro") : (
+                <div className="space-y-2">
+                  {loans.map((loan: any) => {
+                    const statusMeta = LOAN_STATUS_META[loan.situacao] ?? LOAN_STATUS_META.em_uso;
+                    return (
+                      <div key={loan.id} className="rounded-2xl border border-border bg-card p-4 flex flex-col lg:flex-row lg:items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-black text-foreground truncate">{loan.costumeName} <span className="text-muted-foreground font-bold">×{loan.quantity}</span></p>
+                          <p className="text-[11px] font-bold text-muted-foreground mt-0.5 truncate">
+                            {loan.studentName}
+                            {loan.coreografiaTitle ? ` · ${loan.coreografiaTitle}` : ""}
+                            {loan.dueDate ? ` · devolver até ${formatDateOnly(loan.dueDate)}` : ""}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className={cn("w-fit text-[10px] font-black", statusMeta.className)}>{statusMeta.label}</Badge>
+                        {!loan.returnedAt && (
+                          <Button size="sm" variant="outline" onClick={() => checkin.mutate({ loanId: loan.id })} disabled={checkin.isPending}><ArrowDownLeft size={14} className="mr-1.5" /> Registrar devolução</Button>
+                        )}
+                        {loan.returnedAt && (
+                          <span className="flex items-center gap-1.5 text-[11px] font-black text-emerald-600 dark:text-emerald-400"><CheckCircle2 size={13} /> Devolvido em {new Date(loan.returnedAt).toLocaleDateString("pt-BR")}</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* ── Rail (RF-008/RF-009) ── */}
+        <aside className="hidden xl:flex flex-col gap-4">
+          <motion.div initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-black text-foreground flex items-center gap-2"><History size={15} className="text-primary" /> Vendas recentes</p>
+              <button onClick={() => setTab("vendas")} className="text-[11px] font-black text-primary hover:underline">Ver todas</button>
+            </div>
+            {recentSales.length === 0 ? (
+              <p className="text-xs text-muted-foreground font-bold py-4 text-center">Sem vendas ainda.</p>
+            ) : (
+              <div className="space-y-2.5">
+                {recentSales.map((sale: any) => {
+                  const statusMeta = SALE_STATUS_META[sale.status] ?? SALE_STATUS_META.pendente;
+                  return (
+                    <div key={sale.id} className="flex items-center gap-2.5">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary/80"><Shirt size={15} /></span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-black text-foreground truncate">{sale.costumeName}</p>
+                        <p className="text-[10px] font-bold text-muted-foreground">{sale.orderCode ?? `VDA-${1000 + sale.id}`} · {new Date(sale.createdAt).toLocaleDateString("pt-BR")}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-xs font-black text-foreground">{formatBRL(sale.totalPrice)}</p>
+                        <Badge variant="outline" className={cn("text-[9px] font-black px-1 py-0", statusMeta.className)}>{statusMeta.label}</Badge>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.08 }} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-black text-foreground flex items-center gap-2"><TrendingUp size={15} className="text-emerald-500" /> Produtos mais vendidos</p>
+              <button onClick={() => setTab("produtos")} className="text-[11px] font-black text-primary hover:underline">Ver produtos</button>
+            </div>
+            {topProducts.length === 0 ? (
+              <p className="text-xs text-muted-foreground font-bold py-4 text-center">Sem vendas para o ranking.</p>
+            ) : (
+              <div className="space-y-2.5">
+                {topProducts.map((prod, idx) => (
+                  <div key={prod.name} className="flex items-center gap-2.5">
+                    <span className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black", idx === 0 ? "bg-amber-400/20 text-amber-600 dark:text-amber-400" : "bg-muted text-muted-foreground")}>{idx + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-black text-foreground truncate">{prod.name}</p>
+                      <p className="text-[10px] font-bold text-muted-foreground">{prod.count} venda(s)</p>
+                    </div>
+                    <p className="text-xs font-black text-foreground shrink-0">{formatBRL(prod.price)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        </aside>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="acervo">Acervo</TabsTrigger>
-          <TabsTrigger value="emprestimos">Empréstimos</TabsTrigger>
-          <TabsTrigger value="vendas">Vendas</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="acervo" className="mt-4">
-          {isLoading ? (
-            <div className="flex justify-center py-16"><Loader2 className="animate-spin text-primary" size={32} /></div>
-          ) : costumes.length === 0 ? (
-            <div className="text-center py-16 rounded-3xl border-2 border-dashed border-border">
-              <Shirt className="mx-auto text-muted-foreground opacity-20 mb-3" size={44} />
-              <p className="font-black text-foreground">Nenhum figurino cadastrado</p>
-              <p className="text-sm text-muted-foreground mt-1">Cadastre as peças do acervo para controlar empréstimos.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {costumes.map((costume: CostumeRow) => {
-                const conditionMeta = CONDITION_META[costume.condition] ?? CONDITION_META.bom;
-                return (
-                  <div key={costume.id} className="rounded-2xl border border-border bg-card shadow-sm p-4 space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <h3 className="font-black text-foreground truncate">{costume.name}</h3>
-                        <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">
-                          {TYPE_LABEL[costume.type] ?? costume.type}
-                          {costume.size ? ` · Tam. ${costume.size}` : ""}
-                          {costume.color ? ` · ${costume.color}` : ""}
-                          {costume.code ? ` · ${costume.code}` : ""}
-                        </p>
-                      </div>
-                      <Badge variant="outline" className={cn("shrink-0 text-[10px] font-black", conditionMeta.className)}>
-                        {conditionMeta.label}
-                      </Badge>
-                    </div>
-
-                    <div className="flex items-center gap-3 text-xs font-bold">
-                      <span className={cn(
-                        "px-2 py-1 rounded-lg",
-                        costume.disponivel === 0 ? "bg-rose-500/10 text-rose-600" : "bg-emerald-500/10 text-emerald-600"
-                      )}>
-                        {costume.disponivel} disponível(is)
-                      </span>
-                      <span className="text-muted-foreground">{costume.emUso} em uso</span>
-                      <span className="text-muted-foreground">Total: {costume.quantity}</span>
-                    </div>
-
-                    <div className="space-y-1 pt-1">
-                      <p className="text-[11px] font-bold text-muted-foreground">
-                        Custo {formatBRL(costume.cost)}/un
-                        {costume.sellable ? (
-                          <span className="text-indigo-600 dark:text-indigo-400"> · Venda {formatBRL(costume.salePrice)}</span>
-                        ) : (
-                          <span className="text-muted-foreground/70"> · não vendável</span>
-                        )}
-                      </p>
-                      {costume.sellable && (
-                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                          {costume.vendidos} vendido(s) · {costume.disponivelVenda} disp. p/ venda
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex items-center justify-end pt-1">
-                      <div className="flex items-center gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={costume.disponivel === 0}
-                          onClick={() => { setCheckoutItem(costume); setCheckoutOpen(true); }}
-                        >
-                          <ArrowUpRight size={13} className="mr-1" /> Emprestar
-                        </Button>
-                        {costume.sellable && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => { setSellItem(costume); setSellOpen(true); }}
-                          >
-                            <ShoppingBag size={13} className="mr-1" /> Vender
-                          </Button>
-                        )}
-                        <Button size="icon" variant="ghost" onClick={() => { setEditing(costume); setModalOpen(true); }} title="Editar">
-                          <Pencil size={15} />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-rose-500" onClick={() => setDeleting(costume)} title="Excluir">
-                          <Trash2 size={15} />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="emprestimos" className="mt-4 space-y-4">
-          <Select value={loanStatus} onValueChange={setLoanStatus}>
-            <SelectTrigger className="w-full sm:w-[220px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="em_uso">Em uso</SelectItem>
-              <SelectItem value="atrasado">Atrasados</SelectItem>
-              <SelectItem value="devolvido">Devolvidos</SelectItem>
-              <SelectItem value="todos">Todos</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {isLoadingLoans ? (
-            <div className="flex justify-center py-16"><Loader2 className="animate-spin text-primary" size={32} /></div>
-          ) : loans.length === 0 ? (
-            <div className="text-center py-16 rounded-3xl border-2 border-dashed border-border">
-              <ArrowUpRight className="mx-auto text-muted-foreground opacity-20 mb-3" size={44} />
-              <p className="font-black text-foreground">Nenhum empréstimo neste filtro</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {loans.map((loan: any) => {
-                const statusMeta = LOAN_STATUS_META[loan.situacao] ?? LOAN_STATUS_META.em_uso;
-                return (
-                  <div key={loan.id} className="rounded-2xl border border-border bg-card p-4 flex flex-col lg:flex-row lg:items-center gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-black text-foreground truncate">
-                        {loan.costumeName} <span className="text-muted-foreground font-bold">×{loan.quantity}</span>
-                      </p>
-                      <p className="text-[11px] font-bold text-muted-foreground mt-0.5 truncate">
-                        {loan.studentName}
-                        {loan.coreografiaTitle ? ` · ${loan.coreografiaTitle}` : ""}
-                        {loan.dueDate ? ` · devolver até ${formatDateOnly(loan.dueDate)}` : ""}
-                      </p>
-                    </div>
-                    <Badge variant="outline" className={cn("w-fit text-[10px] font-black", statusMeta.className)}>
-                      {statusMeta.label}
-                    </Badge>
-                    {!loan.returnedAt && (
-                      <Button size="sm" variant="outline" onClick={() => checkin.mutate({ loanId: loan.id })} disabled={checkin.isPending}>
-                        <ArrowDownLeft size={14} className="mr-1.5" /> Registrar devolução
-                      </Button>
-                    )}
-                    {loan.returnedAt && (
-                      <span className="flex items-center gap-1.5 text-[11px] font-black text-emerald-600">
-                        <CheckCircle2 size={13} /> Devolvido em {new Date(loan.returnedAt).toLocaleDateString("pt-BR")}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="vendas" className="mt-4 space-y-4">
-          {isLoadingSales ? (
-            <div className="flex justify-center py-16"><Loader2 className="animate-spin text-primary" size={32} /></div>
-          ) : sales.length === 0 ? (
-            <div className="text-center py-16 rounded-3xl border-2 border-dashed border-border">
-              <ShoppingBag className="mx-auto text-muted-foreground opacity-20 mb-3" size={44} />
-              <p className="font-black text-foreground">Nenhuma venda registrada</p>
-              <p className="text-sm text-muted-foreground mt-1">Use o botão "Vender" para registrar a primeira venda.</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {(sales as any[]).map((sale) => {
-                const statusMeta = SALE_STATUS_META[sale.status] ?? SALE_STATUS_META.pendente;
-                return (
-                  <div key={sale.id} className="rounded-2xl border border-border bg-card p-4 flex flex-col lg:flex-row lg:items-center gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-black text-foreground truncate">
-                        {sale.costumeName} <span className="text-muted-foreground font-bold">×{sale.quantity}</span>
-                        <span className="text-indigo-600 dark:text-indigo-400 ml-2">{formatBRL(sale.totalPrice)}</span>
-                      </p>
-                      <p className="text-[11px] font-bold text-muted-foreground mt-0.5 truncate">
-                        {sale.studentName}
-                        {sale.eventName ? ` · ${sale.eventName}` : ""}
-                        {" · "}{sale.paymentMode === "mensalidade" ? "junto com a mensalidade" : "cobrança avulsa"}
-                        {sale.discountPercent > 0 ? ` · desconto ${sale.discountPercent}%` : ""}
-                      </p>
-                    </div>
-                    {sale.madeToOrder && (
-                      <Badge variant="outline" className="w-fit text-[10px] font-black bg-amber-500/10 text-amber-600 border-amber-500/30">
-                        Sob encomenda
-                      </Badge>
-                    )}
-                    <Badge variant="outline" className={cn("w-fit text-[10px] font-black", statusMeta.className)}>
-                      {statusMeta.label}
-                    </Badge>
-                    {sale.status === "pendente" && (
-                      <div className="flex items-center gap-2">
-                        <Button size="sm" variant="outline" onClick={() => setChargeSale(sale)}>
-                          <QrCode size={13} className="mr-1" /> Cobrar
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "pago" })} disabled={updateSaleStatus.isPending}>
-                          <CheckCircle2 size={13} className="mr-1" /> Marcar pago
-                        </Button>
-                        <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-rose-500" title="Cancelar venda" onClick={() => updateSaleStatus.mutate({ id: sale.id, status: "cancelado" })} disabled={updateSaleStatus.isPending}>
-                          <X size={15} />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
-
-      {modalOpen && (
-        <CostumeModal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(null); }} editing={editing} />
-      )}
-
-      {checkoutOpen && (
-        <CheckoutModal
-          open={checkoutOpen}
-          onClose={() => { setCheckoutOpen(false); setCheckoutItem(null); }}
-          preselected={checkoutItem}
-        />
-      )}
-
-      {sellOpen && (
-        <SellModal
-          open={sellOpen}
-          onClose={() => { setSellOpen(false); setSellItem(null); }}
-          preselected={sellItem}
-        />
-      )}
-
+      {/* ── Modais ── */}
+      {modalOpen && <CostumeModal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(null); }} editing={editing} />}
+      {checkoutOpen && <CheckoutModal open={checkoutOpen} onClose={() => { setCheckoutOpen(false); setCheckoutItem(null); }} preselected={checkoutItem} />}
+      {sellOpen && <SellModal open={sellOpen} onClose={() => { setSellOpen(false); setSellItem(null); }} preselected={sellItem} />}
       <SaleChargeModal sale={chargeSale} onClose={() => setChargeSale(null)} />
+      {promoOpen && <PromocoesModal open={promoOpen} onClose={() => setPromoOpen(false)} costumes={costumes as any[]} />}
 
       <AlertDialog open={deleting !== null} onOpenChange={(value) => { if (!value) setDeleting(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir figurino?</AlertDialogTitle>
-            <AlertDialogDescription>
-              "{deleting?.name}" será removido do acervo. Peças com histórico de empréstimos são arquivadas em vez de excluídas.
-            </AlertDialogDescription>
+            <AlertDialogTitle>Excluir produto?</AlertDialogTitle>
+            <AlertDialogDescription>"{deleting?.name}" será removido da Loja. Produtos com histórico de vendas/empréstimos são arquivados em vez de excluídos.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction className="bg-rose-600 hover:bg-rose-700" onClick={() => deleting && deleteMutation.mutate({ id: deleting.id })}>
-              Excluir
-            </AlertDialogAction>
+            <AlertDialogAction className="bg-rose-600 hover:bg-rose-700" onClick={() => deleting && deleteMutation.mutate({ id: deleting.id })}>Excluir</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+/** ─── Modal de Promoções (RF-007): define/remove preço promocional ─── */
+function PromocoesModal({ open, onClose, costumes }: { open: boolean; onClose: () => void; costumes: CostumeRow[] }) {
+  const utils = trpc.useUtils();
+  const [drafts, setDrafts] = useState<Record<number, string>>({});
+  const update = trpc.figurinos.update.useMutation({
+    onSuccess: () => {
+      toast.success("Promoção atualizada!");
+      utils.figurinos.list.invalidate();
+      utils.figurinos.storeCatalog.invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const sellable = (costumes as any[]).filter((c) => c.active !== false && c.sellable);
+  const draftFor = (item: any) => drafts[item.id] ?? (item.promoPrice != null && Number(item.promoPrice) > 0 ? String(item.promoPrice) : "");
+  const save = (item: any) => {
+    const raw = draftFor(item).trim();
+    const value = raw ? Math.max(0, parseFloat(raw.replace(",", ".")) || 0) : null;
+    update.mutate(buildUpdatePayload(item, { promoPrice: value }) as any);
+  };
+  return (
+    <Dialog open={open} onOpenChange={(value) => { if (!value) onClose(); }}>
+      <DialogContent className="w-[95vw] max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><Tag size={18} className="text-emerald-500" /> Promoções da Loja</DialogTitle>
+          <p className="text-xs text-muted-foreground font-medium">Defina um preço promocional por produto — ele passa a ser o preço praticado nas vendas. Deixe vazio para remover.</p>
+        </DialogHeader>
+        {sellable.length === 0 ? (
+          <p className="text-sm text-muted-foreground font-bold py-6 text-center">Nenhum produto vendável cadastrado.</p>
+        ) : (
+          <div className="space-y-2">
+            {sellable.map((item: any) => (
+              <div key={item.id} className="flex items-center gap-2.5 rounded-xl border border-border p-2.5">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-black text-foreground truncate">{item.name}</p>
+                  <p className="text-[10px] font-bold text-muted-foreground">Preço cheio: {formatBRL(item.salePrice)}{Number(item.promoPrice) > 0 ? ` · promo ativa: ${formatBRL(item.promoPrice)}` : ""}</p>
+                </div>
+                <Input value={drafts[item.id] ?? draftFor(item)} onChange={(e) => setDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))} placeholder="Promo (R$)" className="w-28" inputMode="decimal" />
+                <Button size="sm" onClick={() => save(item)} disabled={update.isPending} className="bg-emerald-600 hover:bg-emerald-700">Salvar</Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

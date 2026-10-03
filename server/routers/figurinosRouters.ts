@@ -160,6 +160,7 @@ const costumeInput = z.object({
   condition: z.enum(COSTUME_CONDITIONS).default("bom"),
   cost: z.number().min(0).max(1000000).default(0),
   salePrice: z.number().min(0).max(1000000).default(0),
+  promoPrice: z.number().min(0).max(1000000).nullable().optional(),
   sellable: z.boolean().default(true),
   photoUrl: z.string().max(1000).nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
@@ -193,6 +194,7 @@ export const figurinosRouters = {
         condition: costumes.condition,
         cost: costumes.cost,
         salePrice: costumes.salePrice,
+        promoPrice: costumes.promoPrice,
         sellable: costumes.sellable,
         photoUrl: costumes.photoUrl,
         notes: costumes.notes,
@@ -279,6 +281,7 @@ export const figurinosRouters = {
         condition: input.condition,
         cost: input.cost.toFixed(2),
         salePrice: input.salePrice.toFixed(2),
+        promoPrice: input.promoPrice != null && input.promoPrice > 0 ? input.promoPrice.toFixed(2) : null,
         sellable: input.sellable,
         photoUrl: input.photoUrl?.trim() || null,
         notes: input.notes?.trim() || null,
@@ -317,6 +320,7 @@ export const figurinosRouters = {
         condition: input.condition,
         cost: input.cost.toFixed(2),
         salePrice: input.salePrice.toFixed(2),
+        promoPrice: input.promoPrice != null && input.promoPrice > 0 ? input.promoPrice.toFixed(2) : null,
         sellable: input.sellable,
         photoUrl: input.photoUrl?.trim() || null,
         notes: input.notes?.trim() || null,
@@ -658,7 +662,9 @@ export const figurinosRouters = {
         madeToOrder = true;
       }
 
-      const basePrice = Number(costume.salePrice) || 0;
+      let saleRow: any = null;
+      // Loja: preço promocional (promoPrice) é o praticado quando definido
+      const basePrice = Number((costume as any).promoPrice ?? costume.salePrice) || 0;
       const unitPrice = Number((basePrice * (1 - discountPercent / 100)).toFixed(2));
       const totalPrice = Number((unitPrice * input.quantity).toFixed(2));
 
@@ -676,7 +682,14 @@ export const figurinosRouters = {
         status: "pendente",
         notes: input.notes?.trim() || null,
         createdByUserId: ctx.user.id,
-      }).returning({ id: costumeSales.id });
+      }).returning({ id: costumeSales.id }).then(async (r: any) => {
+        // Código do pedido determinístico (ex.: VDA-2023) — id serial garante unicidade
+        saleRow = r?.[0] ?? null;
+        if (saleRow?.id) {
+          await db.update(costumeSales).set({ orderCode: `VDA-${1000 + saleRow.id}` }).where(eq(costumeSales.id, saleRow.id));
+        }
+        return r;
+      });
 
       // AUDITORIA Fase 2: modo "junto com a mensalidade" soma o valor na fatura
       // aberta do aluno (antes a venda não entrava em nenhuma cobrança).
@@ -685,7 +698,7 @@ export const figurinosRouters = {
         addedToDue = await addSaleAmountToStudentDue(db, orgId, input.studentId, totalPrice, `Loja: ${costume.name} (x${input.quantity})`, ctx.user.id);
       }
 
-      return { success: true, unitPrice, totalPrice, quantity: input.quantity, madeToOrder, addedToDue };
+      return { success: true, unitPrice, totalPrice, quantity: input.quantity, madeToOrder, addedToDue, orderCode: saleRow?.id ? `VDA-${1000 + saleRow.id}` : null };
     }),
 
     /** Gateways disponíveis para cobrar uma venda da Loja. */
@@ -869,7 +882,8 @@ export const figurinosRouters = {
     /** Vendas registradas (filtro por evento e status). */
     sales: protectedProcedure.input(z.object({
       eventId: z.number().optional(),
-      status: z.enum(["todos", "pendente", "pago", "cancelado"]).default("todos"),
+      status: z.enum(["todos", "pendente", "em_separacao", "pago", "entregue", "cancelado"]).default("todos"),
+      search: z.string().max(120).optional(),
     }).optional()).query(async ({ ctx, input }) => {
       assertStaff(ctx);
       const db = await getDb();
@@ -893,6 +907,8 @@ export const figurinosRouters = {
         paymentProvider: costumeSales.paymentProvider,
         paymentLink: costumeSales.paymentLink,
         status: costumeSales.status,
+        orderCode: costumeSales.orderCode,
+        deliveredAt: costumeSales.deliveredAt,
         notes: costumeSales.notes,
         paidAt: costumeSales.paidAt,
         createdAt: costumeSales.createdAt,
@@ -909,6 +925,15 @@ export const figurinosRouters = {
         .orderBy(desc(costumeSales.createdAt))
         .limit(500);
 
+      const q = input?.search?.trim().toLowerCase() ?? "";
+      const filtered = q
+        ? rows.filter((r: any) =>
+            r.orderCode?.toLowerCase().includes(q) ||
+            r.studentName?.toLowerCase().includes(q) ||
+            r.costumeName?.toLowerCase().includes(q))
+        : rows;
+      return filtered;
+
       return rows.map((row) => ({
         ...row,
         unitPrice: Number(row.unitPrice) || 0,
@@ -920,24 +945,39 @@ export const figurinosRouters = {
     /** Atualiza o status da venda (somente pendente → pago/cancelado). */
     updateSaleStatus: protectedProcedure.input(z.object({
       id: z.number(),
-      status: z.enum(["pago", "cancelado"]),
+      status: z.enum(["pendente", "em_separacao", "pago", "entregue", "cancelado"]),
     })).mutation(async ({ ctx, input }) => {
       assertStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados não disponível" });
       const orgId = ctx.user.organizationId!;
 
-      const [sale] = await db.select({ id: costumeSales.id, status: costumeSales.status }).from(costumeSales)
+      const [sale] = await db.select({ id: costumeSales.id, status: costumeSales.status, paidAt: costumeSales.paidAt }).from(costumeSales)
         .where(and(eq(costumeSales.id, input.id), eq(costumeSales.organizationId, orgId))).limit(1);
       if (!sale) throw new TRPCError({ code: "NOT_FOUND", message: "Venda não encontrada." });
-      if (sale.status !== "pendente") {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Somente vendas pendentes podem ser atualizadas." });
+
+      // ── RN-002: transições válidas do fluxo de pedidos ──
+      const from = sale.status;
+      const to = input.status;
+      if (from === to) return { success: true };
+      if (from === "entregue") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Pedido já entregue — status final." });
+      }
+      if (from === "cancelado") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Venda cancelada não pode ser reaberta. Crie uma nova venda." });
+      }
+      if (to === "entregue" && from !== "pago") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Marque a venda como paga antes de registrar a entrega." });
+      }
+      if (to === "pendente" && (from === "pago" || from === "entregue")) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Venda paga não volta para pendente." });
       }
 
       await db.update(costumeSales).set({
-        status: input.status,
-        paidAt: input.status === "pago" ? new Date() : null,
-        canceledAt: input.status === "cancelado" ? new Date() : null,
+        status: to,
+        paidAt: to === "pago" ? (sale.paidAt ?? new Date()) : undefined,
+        canceledAt: to === "cancelado" ? new Date() : (to === "pendente" || to === "em_separacao" ? null : undefined),
+        deliveredAt: to === "entregue" ? new Date() : (to === "cancelado" ? null : undefined),
         updatedAt: new Date(),
       }).where(eq(costumeSales.id, input.id));
 
@@ -960,6 +1000,8 @@ export const figurinosRouters = {
         totalPrice: costumeSales.totalPrice,
         paymentMode: costumeSales.paymentMode,
         status: costumeSales.status,
+        orderCode: costumeSales.orderCode,
+        deliveredAt: costumeSales.deliveredAt,
         createdAt: costumeSales.createdAt,
         eventName: events.name,
       })

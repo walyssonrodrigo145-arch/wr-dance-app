@@ -2726,6 +2726,8 @@ export const costumes = pgTable("costumes", {
   cost: decimal("cost", { precision: 10, scale: 2 }).default("0.00").notNull(),
   // Preço de venda na Loja (0 = não à venda)
   salePrice: decimal("salePrice", { precision: 10, scale: 2 }).default("0.00").notNull(),
+  // Preço promocional (Promoções da Loja) — quando definido, é o preço praticado
+  promoPrice: decimal("promoPrice", { precision: 10, scale: 2 }),
   // Disponível para venda (Loja / Loja do evento)
   sellable: boolean("sellable").default(true).notNull(),
   photoUrl: text("photoUrl"),
@@ -2790,8 +2792,12 @@ export const costumeSales = pgTable("costume_sales", {
   discountPercent: decimal("discountPercent", { precision: 5, scale: 2 }).default("0.00").notNull(),
   // Venda sob encomenda (sem estoque disponível, permitida pelas regras)
   madeToOrder: boolean("madeToOrder").default(false).notNull(),
-  // pendente | pago | cancelado
+  // pendente | em_separacao | pago | entregue | cancelado
   status: varchar("status", { length: 20 }).default("pendente").notNull(),
+  // Código do pedido (ex.: VDA-2847)
+  orderCode: varchar("orderCode", { length: 30 }),
+  // Data da entrega (status "entregue")
+  deliveredAt: timestamp("deliveredAt"),
   notes: text("notes"),
   createdByUserId: integer("createdByUserId").notNull(),
   // Cobrança gerada na Loja (asaas | mercadopago | infinitepay | pixkey) — conciliação automática
